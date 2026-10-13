@@ -6,6 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
+import java.net.ServerSocket;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
+import java.util.zip.ZipFile;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -56,6 +64,78 @@ class SchemaIT {
     }
 
     @Test void validatesActualSchemaAndIndexes() { new SchemaValidator(jdbc).validate(); }
+
+    @Test void packagedBackendStartsWithValidatedSchema() throws Exception {
+        int port;
+        try (var socket = new ServerSocket(0)) { port = socket.getLocalPort(); }
+        Path log = Path.of("target", "artifact-test.log");
+        var builder = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+            "-jar", "target/jumpking-server.jar");
+        var environment = builder.environment();
+        environment.put("SPRING_DATASOURCE_URL", dataSource.getUrl());
+        environment.put("SPRING_DATASOURCE_USERNAME", dataSource.getUsername());
+        environment.put("SPRING_DATASOURCE_PASSWORD", dataSource.getPassword());
+        environment.put("SERVER_PORT", Integer.toString(port));
+        environment.put("SPRING_PROFILES_ACTIVE", "local");
+        Process process = builder.redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        try (var http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(1)).build()) {
+            String origin = "http://127.0.0.1:" + port;
+            HttpResponse<String> response = null;
+            for (int attempt = 0; attempt < 80; attempt++) {
+                assertThat(process.isAlive()).as("Packaged process; inspect target/artifact-test.log on failure").isTrue();
+                try {
+                    response = http.send(HttpRequest.newBuilder(URI.create(origin + "/api/health")).timeout(Duration.ofSeconds(1)).build(), HttpResponse.BodyHandlers.ofString());
+                    if (response.statusCode() == 200) break;
+                } catch (java.io.IOException ignored) { }
+                Thread.sleep(250);
+            }
+            assertThat(response).isNotNull();
+            assertThat(response.statusCode()).isEqualTo(200);
+            assertThat(response.body()).contains("\"status\":\"UP\"");
+            try (var archive = new ZipFile("target/jumpking-server.jar")) {
+                if (archive.getEntry("BOOT-INF/classes/static/index.html") != null) {
+                    for (String path : new String[]{"/", "/history", "/community"}) {
+                        var page = http.send(HttpRequest.newBuilder(URI.create(origin + path)).build(), HttpResponse.BodyHandlers.ofString());
+                        assertThat(page.statusCode()).as(path).isEqualTo(200);
+                        assertThat(page.body()).contains("<div id=\"root\"></div>").doesNotContain("SPA routing fixture");
+                    }
+                    verifyViteProxy(http, origin);
+                }
+            }
+            for (String path : new String[]{"/api/missing", "/assets/missing.png", "/ws/game"}) {
+                assertThat(http.send(HttpRequest.newBuilder(URI.create(origin + path)).build(), HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(404);
+            }
+        } finally {
+            process.destroy();
+            if (!process.waitFor(15, TimeUnit.SECONDS)) { process.destroyForcibly(); process.waitFor(5, TimeUnit.SECONDS); }
+        }
+    }
+
+    private void verifyViteProxy(HttpClient http, String backend) throws Exception {
+        int port;
+        try (var socket = new ServerSocket(0)) { port = socket.getLocalPort(); }
+        var builder = new ProcessBuilder("node", "../frontend/node_modules/vite/bin/vite.js", "--host", "127.0.0.1", "--port", Integer.toString(port), "--strictPort");
+        builder.directory(Path.of("../frontend").toFile());
+        builder.environment().put("BACKEND_URL", backend);
+        var vite = builder.redirectErrorStream(true).redirectOutput(Path.of("target/vite-proxy-test.log").toFile()).start();
+        try {
+            HttpResponse<String> response = null;
+            for (int attempt = 0; attempt < 80; attempt++) {
+                assertThat(vite.isAlive()).as("Vite proxy; inspect target/vite-proxy-test.log").isTrue();
+                try {
+                    response = http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/health")).timeout(Duration.ofSeconds(1)).build(), HttpResponse.BodyHandlers.ofString());
+                    if (response.statusCode() == 200) break;
+                } catch (java.io.IOException ignored) { }
+                Thread.sleep(250);
+            }
+            assertThat(response).isNotNull();
+            assertThat(response.statusCode()).isEqualTo(200);
+            assertThat(response.body()).contains("\"status\":\"UP\"");
+        } finally {
+            vite.destroy();
+            if (!vite.waitFor(10, TimeUnit.SECONDS)) { vite.destroyForcibly(); vite.waitFor(5, TimeUnit.SECONDS); }
+        }
+    }
 
     @Test void rejectsMissingConstraints() {
         jdbc.execute("ALTER TABLE matches DROP CHECK ck_matches_ticks");

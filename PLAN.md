@@ -15,7 +15,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 - [x] Khởi tạo React/TypeScript/Phaser, lockfile, npm scripts và .gitignore frontend; kiểm tra build/trang khởi động.
 - [x] Khởi tạo Spring Boot/Java, Maven Wrapper, package, health check và .gitignore backend; kiểm tra test/build/start.
 - [x] Triển khai schema ba bảng và JDBC/MySQL config/validation; kiểm tra ràng buộc, indexes và transactions trên instance cô lập.
-- [ ] Hoàn thiện config mẫu, Vite proxy và Maven web/JAR; kiểm tra development, đóng gói và refresh route UI.
+- [x] Hoàn thiện config mẫu, Vite proxy và Maven web/JAR; kiểm tra development, đóng gói và refresh route UI.
 
 ## Phase 02 — Map và simulation
 
@@ -110,5 +110,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 01 — frontend | PASS — npm run check, npm test (1), npm run build, Chrome E2E (1); npm audit không phát hiện lỗ hổng |
 | Phase 01 — backend | PASS — Maven Wrapper 3.3.4/Maven 3.9.11, JDK 25, Spring Boot 3.5.16; 2 HTTP tests với server thật, package executable JAR |
 | Phase 01 — database | PASS — 5 integration tests trên MySQL 8.4.11 riêng: CHECK/NULL/JSON, FK RESTRICT, unique Community ACTIVE, indexes/validation và transaction rollback; runner dừng/xóa instance test |
+| Phase 01 — cấu hình/artifact | PASS — 2 frontend tests, 6 backend tests + 6 integration tests; JAR web chạy với DB thật, SPA refresh, API/asset/WS thiếu trả 404, Vite proxy tới backend thật; Fly bị tắt trong build/preview/prod |
 | Phase 01–07 còn lại | NOT RUN — chưa triển khai và nghiệm thu hệ thống |
 | Phase 08 | Chưa thực hiện |

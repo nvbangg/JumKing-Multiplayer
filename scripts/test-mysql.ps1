@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$MySqlHome,
-    [string]$JavaHome = $env:JAVA_HOME
+    [string]$JavaHome = $env:JAVA_HOME,
+    [switch]$Web
 )
 $ErrorActionPreference = 'Stop'
 $workspace = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -50,7 +51,8 @@ try {
     $env:JK_TEST_DATABASE_PASSWORD = $password
     Push-Location (Join-Path $workspace 'backend')
     $locationPushed = $true
-    & .\mvnw.cmd -B -ntp verify -Pintegration
+    $profiles = if ($Web) { '-Pintegration,web' } else { '-Pintegration' }
+    & .\mvnw.cmd -B -ntp clean verify $profiles
     if ($LASTEXITCODE -ne 0) { throw 'Integration verification failed.' }
 }
 finally {

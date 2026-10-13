@@ -1,6 +1,11 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { loadEnv } from 'vite';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const sharedFiles = ['maps/main-babe.json', 'physics.json', 'rules.json', 'adventure.json'];
+const sharedRoot = new URL('../shared/', import.meta.url);
 
 export default defineConfig(({ command, mode, isPreview }) => {
   const env = { ...loadEnv(mode, process.cwd(), ''), ...process.env };
@@ -10,7 +15,25 @@ export default defineConfig(({ command, mode, isPreview }) => {
     throw new Error('BACKEND_URL must be an HTTP origin without credentials or a path');
   }
   return {
-    plugins: [react()],
+    plugins: [react(), {
+      name: 'shared-game-data',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (!req.url?.startsWith('/shared/')) return next();
+          const file = req.url.slice('/shared/'.length).split('?')[0]!;
+          if (!sharedFiles.includes(file)) { res.statusCode = 404; res.end(); return; }
+          try {
+            res.setHeader('Content-Type', 'application/json');
+            res.end(readFileSync(new URL(file, sharedRoot)));
+          } catch { res.statusCode = 503; res.end('Game data is unavailable'); }
+        });
+      },
+      generateBundle() {
+        for (const file of sharedFiles) {
+          this.emitFile({ type: 'asset', fileName: 'shared/' + file, source: readFileSync(fileURLToPath(new URL(file, sharedRoot))) });
+        }
+      },
+    }],
     define: { __SOLO_FLY_ENABLED__: JSON.stringify(command === 'serve' && !isPreview && env.FLY_ENABLED === 'true') },
     server: {
       port: 5173, strictPort: true,

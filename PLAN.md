@@ -20,7 +20,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 ## Phase 02 — Map và simulation
 
 - [x] Chuẩn hóa Main Babe map/spawn/Finish/tile/biên, tuning/rules/adventure; kiểm tra geometry và ranh giới với presentation.
-- [ ] Đóng gói shared vào hai build; kiểm tra nạp dữ liệu từ artifact.
+- [x] Đóng gói shared vào hai build; kiểm tra nạp dữ liệu từ artifact.
 - [ ] Triển khai TypeScript simulation và state codec; kiểm tra terrain/charge/collision bằng fixtures.
 - [ ] Triển khai Java simulation; kiểm tra số học từng tick và restore/replay khớp fixtures TypeScript.
 - [ ] Triển khai bay/thoát solid trong hai simulation; kiểm tra input, biên và restore.
@@ -112,5 +112,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 01 — database | PASS — 5 integration tests trên MySQL 8.4.11 riêng: CHECK/NULL/JSON, FK RESTRICT, unique Community ACTIVE, indexes/validation và transaction rollback; runner dừng/xóa instance test |
 | Phase 01 — cấu hình/artifact | PASS — 2 frontend tests, 6 backend tests + 6 integration tests; JAR web chạy với DB thật, SPA refresh, API/asset/WS thiếu trả 404, Vite proxy tới backend thật; Fly bị tắt trong build/preview/prod |
 | Phase 02 — dữ liệu | PASS — map 43 screen/60×45 tile, đúng spawn/Finish/tuning; shared không chứa presentation, loại liên kết sang campaign ngoài Main Babe; map/tuning tests |
+| Phase 02 — artifact | PASS — Vite dist/shared và JAR classpath/shared nạp cùng JSON; kiểm tra byte trong JAR, không đóng gói fixtures; SharedData defensive copy, Maven test/build và integration MySQL thật |
 | Phase 01–07 còn lại | NOT RUN — chưa triển khai và nghiệm thu hệ thống |
 | Phase 08 | Chưa thực hiện |

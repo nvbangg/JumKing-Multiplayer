@@ -93,6 +93,14 @@ class SchemaIT {
             assertThat(response.statusCode()).isEqualTo(200);
             assertThat(response.body()).contains("\"status\":\"UP\"");
             try (var archive = new ZipFile("target/jumpking-server.jar")) {
+                for (String shared : new String[]{"maps/main-babe.json", "physics.json", "rules.json", "adventure.json"}) {
+                    var entry = archive.getEntry("BOOT-INF/classes/shared/" + shared);
+                    assertThat(entry).as(shared).isNotNull();
+                    try (var stream = archive.getInputStream(entry)) {
+                        assertThat(stream.readAllBytes()).isEqualTo(Files.readAllBytes(Path.of("../shared", shared)));
+                    }
+                }
+                assertThat(archive.getEntry("BOOT-INF/classes/shared/fixtures/physics-traces.json")).isNull();
                 if (archive.getEntry("BOOT-INF/classes/static/index.html") != null) {
                     for (String path : new String[]{"/", "/history", "/community"}) {
                         var page = http.send(HttpRequest.newBuilder(URI.create(origin + path)).build(), HttpResponse.BodyHandlers.ofString());

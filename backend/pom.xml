@@ -16,6 +16,14 @@
   </dependencies>
   <build>
     <finalName>jumpking-server</finalName>
+    <resources>
+      <resource><directory>src/main/resources</directory></resource>
+      <resource><directory>../shared</directory><targetPath>shared</targetPath><excludes><exclude>fixtures/**</exclude></excludes></resource>
+    </resources>
+    <testResources>
+      <testResource><directory>src/test/resources</directory></testResource>
+      <testResource><directory>../shared/fixtures</directory><targetPath>fixtures</targetPath></testResource>
+    </testResources>
     <plugins>
       <plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin>
     </plugins>
@@ -25,7 +33,6 @@
       <id>web</id>
       <build>
         <resources>
-          <resource><directory>src/main/resources</directory></resource>
           <resource><directory>../frontend/dist</directory><targetPath>static</targetPath></resource>
         </resources>
         <plugins><plugin>

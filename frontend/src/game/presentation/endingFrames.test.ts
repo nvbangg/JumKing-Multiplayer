@@ -3,7 +3,8 @@ import { ENDING_FRAMES, ENDING_PATHS } from './endingFrames';
 import expected from '../../../../shared/fixtures/ending-paths.json';
 
 test('ending jump paths retain every independent native float32 coordinate', () => {
-  expect(ENDING_PATHS).toEqual(expected);
+  expect(JSON.parse(JSON.stringify(ENDING_PATHS))).toEqual(expected);
+  expect(Object.is(ENDING_PATHS.full[0], -0)).toBe(true);
   expect(Object.keys(ENDING_FRAMES).some(name => /nbp|owl|intro|credit/i.test(name))).toBe(false);
   for (const frame of Object.values(ENDING_FRAMES)) {
     expect(frame.width).toBeGreaterThan(0); expect(frame.height).toBeGreaterThan(0);

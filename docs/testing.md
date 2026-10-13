@@ -38,6 +38,15 @@ Các lệnh là contract của Maven/npm configuration và được nghiệm thu
 
 E2E (end-to-end) dùng Playwright thao tác trình duyệt qua UI → HTTP/WS → backend/MySQL để kiểm tra cả luồng. Chạy riêng vì cần ứng dụng đang chạy và trình duyệt, khác unit tests kiểm tra từng hàm/module.
 
+Fly dev: chạy trong terminal riêng tại `frontend/`; cổng test riêng tránh dùng nhầm server đang chạy. Các E2E mặc định kiểm tra tính năng bị khóa.
+
+```powershell
+$env:FLY_ENABLED = 'true'
+$env:E2E_FLY_ENABLED = 'true'
+$env:E2E_PORT = '5174'
+npm run test:e2e -- e2e/fly.spec.ts
+```
+
 Integration dùng [Testcontainers MySQL](https://java.testcontainers.org/modules/databases/mysql/), Docker và MySQL theo [deployment](deployment.md#runtime-và-workflow). E2E dùng instance cô lập; không reset database cá nhân. Runner chỉ cleanup resources/fixtures do nó tạo, kể cả khi test lỗi.
 
 Windows không có Docker: chạy `./scripts/test-mysql.ps1 -MySqlHome '<thư mục MySQL 8.4>' -JavaHome '<thư mục JDK 25>'` từ root. Runner tạo instance loopback/cổng ngẫu nhiên, credentials riêng, chạy integration rồi dừng và xóa dữ liệu test; không sửa service/database đang dùng. Thêm `-Web` sau khi build frontend để kiểm tra JAR chứa web và Vite proxy. Integration cũng nhận `JK_TEST_DATABASE_URL/USERNAME/PASSWORD` cho database test rỗng có tên bắt đầu `jumpking_it`; runner bên ngoài chịu trách nhiệm cleanup.

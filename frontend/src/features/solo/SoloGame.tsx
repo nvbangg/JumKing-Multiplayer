@@ -14,6 +14,7 @@ import { OptionsButtons, ControlsHelp } from './OptionsPanel';
 import { MenuPanel } from '../../components/MenuPanel';
 import { duration, ticksToMs } from '../records/format';
 import { ADVENTURE } from '../../game/simulation/Adventure';
+import { FlightToggle } from '../../game/input/FlightToggle';
 
 export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = null, onExit }: {
   profile?: string; action?: 'new' | 'continue' | 'auto'; expectedRunId?: string | null; onExit?: () => void;
@@ -32,6 +33,7 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
   const [ending, setEnding] = useState<'playing' | 'picture' | null>(null);
   const [pictureReady, setPictureReady] = useState(false);
   const skipEnding = useRef<(() => void) | null>(null);
+  const flight = useRef<FlightToggle | null>(null);
   useEffect(() => { if (ending !== 'picture') return; const timer = setTimeout(() => setPictureReady(true), PRESENTATION.endingPictureGuardMs); return () => clearTimeout(timer); }, [ending]);
   const [state, setState] = useState<PlayerState | null>(null);
   const [error, setError] = useState('');
@@ -48,9 +50,10 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
     try { await storage.save(); setSaveStatus('SAVED'); setSaveError(''); }
     catch (cause) { session.pause(); input.current?.cancel(); setPaused(true); setSaveStatus('FAILED'); setSaveError(cause instanceof Error ? cause.message : 'Could not save Solo'); throw cause; }
   };
-  const pause = () => { if (runtime.current?.simulation.finished) { skipEnding.current?.(); return; } pauseRequested.current = true; runtime.current?.pause(); audio.current?.pause(true); input.current?.cancel(); setMenu('pause'); setPaused(true); void flush().catch(() => {}); };
+  const pause = () => { if (runtime.current?.simulation.finished) { skipEnding.current?.(); return; } pauseRequested.current = true; runtime.current?.pause(); audio.current?.pause(true); flight.current?.cancel(); input.current?.cancel(); setMenu('pause'); setPaused(true); void flush().catch(() => {}); };
   const updateOptions = (key: keyof Options) => {
     const next = { ...options, [key]: !options[key] }; setOptions(next); audio.current?.setEnabled(next.sound);
+    if (key === 'fly') { flight.current?.setEnabled(next.fly); void flush().catch(() => {}); }
     try { saveOptions(next); setOptionError(''); } catch { setOptionError('Options could not be saved on this device'); }
   };
   useEffect(() => {
@@ -60,7 +63,7 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
     let lastHud = 0;
     let lastActivity = performance.now();
     const activity = () => { lastActivity = performance.now(); };
-    const controls = new InputController(activity, pause, () => runtime.current?.simulation.cancelInput());
+    const controls = new InputController(activity, pause, () => { runtime.current?.simulation.cancelInput(); flight.current?.cancel(); }, now => flight.current?.press(now));
     input.current = controls;
     const hidden = () => { if (document.hidden) pause(); };
     window.addEventListener('blur', pause); document.addEventListener('visibilitychange', hidden);
@@ -101,6 +104,8 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
       catch (cause) { await storage?.close(); throw cause; }
       writer.current = storage;
       runtime.current = session;
+      flight.current = new FlightToggle(__SOLO_FLY_ENABLED__, () => session.simulation.snapshot().freeFlight, enabled => session.simulation.setFlight(enabled));
+      flight.current.setEnabled(readOptions().fly);
       audio.current.setScreen(session.simulation.snapshot().screen);
       if (pauseRequested.current) { session.pause(); controls.cancel(); audio.current.pause(true); }
       if (storage) setSaveStatus('SAVED');
@@ -114,7 +119,7 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
       disposed = true; controller.abort(); clearInterval(afk); clearInterval(autosave);
       const storage = writer.current, session = runtime.current;
       if (storage && session) { session.pause(); storage.observe(session.game.snapshot(), session.simulation.map.progressOriginY, session.simulation.finished); void storage.save().finally(() => storage.close()).catch(() => {}); }
-      writer.current = null; controls.dispose(); game?.destroy(true); audio.current?.dispose(); audio.current = null; runtime.current = null; input.current = null;
+      writer.current = null; controls.dispose(); game?.destroy(true); audio.current?.dispose(); audio.current = null; runtime.current = null; input.current = null; flight.current = null;
       window.removeEventListener('blur', pause); document.removeEventListener('visibilitychange', hidden);
       window.removeEventListener('pagehide', pageHide); window.removeEventListener('pageshow', pageShow);
     };

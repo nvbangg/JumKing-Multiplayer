@@ -24,7 +24,7 @@ button { cursor: pointer; }
 .touch-controls > div { display: flex; flex-wrap: wrap; gap: 10px; }
 .touch-controls button { pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; border: 1px solid #b2a484; background: #0009; color: #ede7d3; min-width: 54px; height: 54px; border-radius: 8px; font-size: 22px; }
 .touch-controls button:active { background: #463a24cc; }
-@media (pointer: coarse), (max-width: 680px) { .touch-controls { display: flex; } }
+@media (pointer: coarse), (max-width: 680px) { .touch-controls { display: flex; } .game-viewport { bottom: 84px; } }
 .brand { margin: 0 0 36px; }
 .brand h1 { margin: 0; line-height: 0; }
 .brand img { width: min(560px, 85vw); height: auto; image-rendering: pixelated; }

@@ -10,7 +10,7 @@ export class InputController {
   private padBlocked = false;
   private padUnavailable = false;
   private previousPad = { ...NEUTRAL_INPUT, menu: false };
-  constructor(private onActivity: () => void, private onMenu: () => void, private onCancelInput: () => void = () => {}) {
+  constructor(private onActivity: () => void, private onMenu: () => void, private onCancelInput: () => void = () => {}, private onJumpPress: (now: number) => void = () => {}) {
     window.addEventListener('keydown', this.keyDown);
     window.addEventListener('keyup', this.keyUp);
   }
@@ -20,7 +20,7 @@ export class InputController {
     if (event.code === 'Escape' && !event.repeat) { this.onMenu(); return; }
     if (!relevant.has(event.code)) return;
     event.preventDefault();
-    if (!event.repeat && !this.keys.has(event.code)) { this.keys.add(event.code); this.onActivity(); }
+    if (!event.repeat && !this.keys.has(event.code)) { this.keys.add(event.code); this.onActivity(); if (event.code === 'Space' && !this.canceled) this.onJumpPress(performance.now()); }
   };
   private keyUp = (event: KeyboardEvent) => {
     if (!relevant.has(event.code)) return;
@@ -28,7 +28,9 @@ export class InputController {
   };
   pressPointer(id: number, action: TouchAction): void {
     if (this.canceled || this.pointers.has(id)) return;
+    const freshJump = action === 'jump' && ![...this.pointers.values()].includes('jump');
     this.pointers.set(id, action); this.onActivity();
+    if (freshJump) this.onJumpPress(performance.now());
   }
   releasePointer(id: number): void { if (this.pointers.delete(id)) this.onActivity(); }
   cancelPointer(id: number): void {

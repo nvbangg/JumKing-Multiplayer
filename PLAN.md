@@ -38,7 +38,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 - [x] Triển khai collectibles/inventory/equipment/merchant/quests trong hai simulation; kiểm tra fixtures/restore.
 - [x] Hoàn thiện NPC/readables/hội thoại; kiểm tra ID/state/trigger và focus/input.
 - [x] Hoàn thiện Solo ending/Skip; kiểm tra đúng Finish, không credit/phát trùng.
-- [ ] Thêm Options/điều khiển Fly Mode; kiểm tra quyền Solo dev, nhấn đúp, di chuyển và restore.
+- [x] Thêm Options/điều khiển Fly Mode; kiểm tra quyền Solo dev, nhấn đúp, di chuyển và restore.
 
 ## Phase 04 — Account và contracts
 
@@ -128,5 +128,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 03 — hội thoại | PASS — build/type-check, 40 unit tests; 4 Chrome E2E kiểm tra bitmap font/NPC typewriter/readable, 43 screen và input. Old Man nói trong khi người chơi vẫn nhảy; đổi screen ẩn bubble cũ. Nội dung tra bằng ID, merchant thay giá, animation theo state; không thêm pause hội thoại |
 | Phase 03 — ending | PASS — build/type-check, 42 unit tests, 4 đường animation khớp tọa độ native; Chrome chạy trọn timeline Shoes/Raven và Skip/ảnh kết thúc, không credit/callback trùng. Continue đúng Finish cấp Crown trước autosave, clock giữ 16.957 ticks, một History; xem trực tiếp 2 screenshots. Renderer 43 screen phân biệt avatar với Babe |
 | Phase 03 — ending fixture JSON | PASS — sửa phép so sánh qua JSON codec (JSON không giữ dấu của zero); kiểm tra riêng native −0, chạy lại type-check và toàn bộ 42 unit tests |
-| Phase 03–07 còn lại | NOT RUN — chưa triển khai và nghiệm thu hệ thống |
+| Phase 03 — Fly controls | PASS — type-check/build, 44 unit tests, 25 Chrome E2E mặc định và 3 E2E riêng với cờ dev; kiểm tra gate, Options, double Space/touch, nhiều ngón, Continue và thoát solid. Build/preview luôn khóa Fly; mobile dành chỗ riêng cho touch controls |
+| Phase 04–07 | NOT RUN — chưa triển khai và nghiệm thu hệ thống |
 | Phase 08 | Chưa thực hiện |

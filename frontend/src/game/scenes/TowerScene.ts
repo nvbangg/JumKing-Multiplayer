@@ -5,6 +5,7 @@ import { PHYSICS } from '../simulation/tuning';
 import { playerFrame } from '../presentation/playerFrame';
 import type { GameRuntime, RenderPlayer } from '../presentation/types';
 import { AdventureVisuals } from '../presentation/AdventureVisuals';
+import { ConversationVisuals } from '../presentation/ConversationVisuals';
 
 interface Avatar { sprite: Phaser.GameObjects.Sprite; name: Phaser.GameObjects.Text; layers: Map<string, Phaser.GameObjects.Sprite> }
 export class TowerScene extends Phaser.Scene {
@@ -19,9 +20,11 @@ export class TowerScene extends Phaser.Scene {
   private screen = -1;
   private ready = false;
   private adventureVisuals?: AdventureVisuals;
+  private conversations?: ConversationVisuals;
   constructor(private manifest: AssetManifest, private runtime: GameRuntime, private onReady: () => void, private onError: (message: string) => void) { super('Tower'); }
   preload(): void {
     for (const [key, texture] of Object.entries(this.manifest.textures)) this.load.image(key, assetUrl(texture.file));
+    for (const [key, font] of Object.entries(this.manifest.fonts)) this.load.bitmapFont(key, assetUrl(font.texture), assetUrl(font.data));
     this.load.on('loaderror', (file: Phaser.Loader.File) => this.onError('Could not load ' + file.key));
   }
   create(): void {
@@ -30,6 +33,7 @@ export class TowerScene extends Phaser.Scene {
       PLAYER_FRAMES.forEach((name, i) => { if (!texture.has(name)) texture.add(name, 0, V.spriteStartX + i % V.spriteColumns * V.spriteSize, Math.floor(i / V.spriteColumns) * V.spriteSize, V.spriteSize, V.spriteSize); });
     }
     this.adventureVisuals = new AdventureVisuals(this, this.manifest);
+    this.conversations = new ConversationVisuals(this, this.manifest);
     this.ready = true; this.render(); this.onReady();
   }
   update(_time: number, delta: number): void {
@@ -50,13 +54,6 @@ export class TowerScene extends Phaser.Scene {
     for (const weather of this.weather) {
       weather.sprite.setTexture(weather.textures[Math.floor(seconds * weather.fps) % weather.textures.length]!);
       weather.sprite.tilePositionX = this.weatherWind * this.manifest.textures[weather.textures[0]!]!.width;
-    }
-    for (const npc of this.npcSprites) {
-      const steps = npc.data.busy;
-      const duration = steps.reduce((total, step) => total + step.duration, 0);
-      if (!duration) continue;
-      let time = seconds % duration;
-      for (const step of steps) { if (time < step.duration) { npc.sprite.setFrame(String(step.sprite_index)); break; } time -= step.duration; }
     }
     for (const { sprite, data } of this.props) {
       const count = data.cells.X * data.cells.Y;
@@ -101,6 +98,7 @@ export class TowerScene extends Phaser.Scene {
     for (const peer of frame.peers) this.avatar(peer, false);
     this.avatar(frame.self, true);
     this.adventureVisuals?.render(frame);
+    this.conversations?.render(frame, this.npcSprites);
   }
   private addFrames(key: string, columns: number, rows: number): void {
     const info = this.manifest.textures[key]!, texture = this.textures.get(key);

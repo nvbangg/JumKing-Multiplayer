@@ -3,6 +3,8 @@ export const PRESENTATION = Object.freeze({
   peerOpacity: 0.7, maxFrameMs: 250, hudIntervalMs: 100, afkPollMs: 1000, nameFontSize: 9, nameGap: 3,
   gamepadDeadZone: 0.35,
   effectVolume: 0.65, ambienceVolume: 0.6,
+  bubblePadding: 7, bubbleMargin: 5, bubbleOffsetY: 32, npcTalkingFrameSeconds: 0.2,
+  readableLineHeight: 12, readableOffsetX: 10, readableOffsetY: 40,
   foregroundDepth: 20, selfDepth: 10, peerDepth: 8, nameDepth: 30,
 });
 export const PLAYER_FRAMES = ['idle', 'walk_one', 'walk_smear', 'walk_two', 'charge', 'up', 'fall', 'splat', 'bounce', 'stretch_one', 'stretch_smear', 'stretch_two', 'look_up'] as const;

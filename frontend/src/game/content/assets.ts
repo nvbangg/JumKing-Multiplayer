@@ -11,7 +11,7 @@ export interface VisualScreen {
 }
 export interface ScrollLayer { texture: string; position: number; scroll_multiplier: number; foreground?: boolean }
 export interface Npc {
-  name: string; screen: number; texture: string; position: { X: number; Y: number }; cells: { X: number; Y: number };
+  name: string; screen: number; texture: string; font: string; position: { X: number; Y: number }; cells: { X: number; Y: number };
   busy: { sprite_index: number; duration: number }[]; talking: { sprite_index: number; duration: number }[];
   intro: string[]; looping: string[][]; screenQuotes: { screen: number; lines: string[] }[];
   flagQuotes: { flag: string; quotes: string[][] }[];
@@ -29,7 +29,7 @@ export interface AssetManifest {
   itemTextures: Record<string, string>;
   birds: { name: string; texture: string; sound: string; item: string; positions: { screen: number; x: number; y: number; direction: number; flyDirection: number; treasure: boolean }[] }[];
   merchants: { name: string; screen: number; intro: string[]; sale: string[]; sell: string[]; noGold: string[]; sold: string[] }[];
-  messages: { id: string; screen: number; lines: string[]; anchor: { x: number; y: number }; bubble: { direction: string; width: number } }[];
+  messages: { id: string; screen: number; font: string; lines: string[]; anchor: { x: number; y: number }; bubble: { direction: string; width: number; anchor: { X: string; Y: string } } }[];
   walls: { id: string; screen: number; texture: string; position: { X: number; Y: number }; appearSound: string | null; disappearSound: string | null }[];
 }
 export function assetUrl(file: string): string {

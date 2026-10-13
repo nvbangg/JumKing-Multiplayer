@@ -1,0 +1,13 @@
+export interface Account { id: string; username: string; email: string }
+export interface Identity { authenticated: boolean; guest: boolean; account: Account | null }
+export interface Statistics {
+  totalPlayTimeMs: number; totalJumps: number; totalFalls: number; finishes: number;
+  matchesPlayed: number; wins: number; bestFinishTimeMs: number | null;
+}
+export interface HistoryItem {
+  id: string; kind: 'SOLO' | 'COMMUNITY' | 'ROOM'; status: string;
+  startedAt: string; endedAt: string; playTimeMs: number; jumps: number; falls: number;
+  currentProgress: number; maxProgress: number; finishTimeMs: number | null;
+  room: null | { mode: string; roomCode: string; durationMs: number; rank: number; isWinner: boolean };
+}
+export const EMPTY_STATS: Readonly<Statistics> = Object.freeze({ totalPlayTimeMs: 0, totalJumps: 0, totalFalls: 0, finishes: 0, matchesPlayed: 0, wins: 0, bestFinishTimeMs: null });

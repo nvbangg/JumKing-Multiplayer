@@ -13,5 +13,6 @@
   "soloSyncMs": 5000,
   "timeLimitMinutesMin": 1,
   "timeLimitMinutesMax": 30,
+  "timeLimitDefaultMinutes": 5,
   "appearanceColors": ["#ffffff", "#e76f51", "#2a9d8f", "#61a5ff", "#bd8bea", "#f28ab2", "#b7d56c", "#f5a65b", "#67d5df", "#c7cbd5"]
 }

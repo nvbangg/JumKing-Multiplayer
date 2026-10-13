@@ -152,7 +152,7 @@ self gồm lastProcessedInputSeq, status, metrics và full simulation để rest
 
 adventure gồm inventory/trang bị/tiền và ID/counters/flags tiến độ. Client dựng nội dung theo [architecture](architecture.md#công-nghệ-và-trách-nhiệm); thay đổi state phải do server xác nhận.
 
-Results={playerId,status,rank,currentProgress,maxProgress,isWinner,finishTimeMs}. Status/reason/saveStatus theo data; SAVE_STATUS Room có revision=null. Server chốt metrics và showEnding theo gameplay.
+Results={playerId,nickname,status,rank,currentProgress,maxProgress,isWinner,finishTimeMs}; nickname giữ lúc Join để Results vẫn hiển thị đúng người đã Leave. Status/reason/saveStatus theo data; SAVE_STATUS Room có revision=null. Server chốt metrics và showEnding theo gameplay.
 
 Chat giữ trong RAM của từng sảnh, mất khi sảnh đóng/restart. Effects gồm JUMP/LAND/SPLAT/BUMP và NORMAL/ICE/SNOW; lọc screen, âm lượng và dedupe ở client.
 

@@ -4,6 +4,7 @@ import { PRESENTATION as V, PLAYER_FRAMES } from '../presentation/config';
 import { PHYSICS } from '../simulation/tuning';
 import { playerFrame } from '../presentation/playerFrame';
 import type { GameRuntime, RenderPlayer } from '../presentation/types';
+import { AdventureVisuals } from '../presentation/AdventureVisuals';
 
 interface Avatar { sprite: Phaser.GameObjects.Sprite; name: Phaser.GameObjects.Text; layers: Map<string, Phaser.GameObjects.Sprite> }
 export class TowerScene extends Phaser.Scene {
@@ -17,6 +18,7 @@ export class TowerScene extends Phaser.Scene {
   private weatherWind = 0;
   private screen = -1;
   private ready = false;
+  private adventureVisuals?: AdventureVisuals;
   constructor(private manifest: AssetManifest, private runtime: GameRuntime, private onReady: () => void, private onError: (message: string) => void) { super('Tower'); }
   preload(): void {
     for (const [key, texture] of Object.entries(this.manifest.textures)) this.load.image(key, assetUrl(texture.file));
@@ -27,6 +29,7 @@ export class TowerScene extends Phaser.Scene {
       const texture = this.textures.get(key);
       PLAYER_FRAMES.forEach((name, i) => { if (!texture.has(name)) texture.add(name, 0, V.spriteStartX + i % V.spriteColumns * V.spriteSize, Math.floor(i / V.spriteColumns) * V.spriteSize, V.spriteSize, V.spriteSize); });
     }
+    this.adventureVisuals = new AdventureVisuals(this, this.manifest);
     this.ready = true; this.render(); this.onReady();
   }
   update(_time: number, delta: number): void {
@@ -34,7 +37,9 @@ export class TowerScene extends Phaser.Scene {
     this.runtime.advance(delta);
     this.render();
     const state = this.runtime.frame().self.state;
-    for (let tick = this.lastTick + 1; tick <= state.ticks; tick++) {
+    const world = this.runtime.frame().world;
+    if (world) this.weatherWind = world.weatherWind;
+    else for (let tick = this.lastTick + 1; tick <= state.ticks; tick++) {
       const phase = tick / PHYSICS.tickRate * PHYSICS.windFrequency;
       const force = Math.max(-1, Math.min(1, 2 * Math.sin(phase) + (Math.cos(phase) > 0 ? 1 : -1))) * PHYSICS.windAcceleration;
       this.weatherWind = state.wind ? this.weatherWind - force * 2 / 3 : 0;
@@ -95,6 +100,7 @@ export class TowerScene extends Phaser.Scene {
     for (const [id, avatar] of this.avatars) if (!present.has(id)) { avatar.sprite.destroy(); avatar.name.destroy(); for (const sprite of avatar.layers.values()) sprite.destroy(); this.avatars.delete(id); }
     for (const peer of frame.peers) this.avatar(peer, false);
     this.avatar(frame.self, true);
+    this.adventureVisuals?.render(frame);
   }
   private addFrames(key: string, columns: number, rows: number): void {
     const info = this.manifest.textures[key]!, texture = this.textures.get(key);

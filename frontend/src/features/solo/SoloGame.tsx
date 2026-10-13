@@ -13,6 +13,7 @@ import { readOptions, saveOptions, type Options } from './options';
 import { OptionsButtons, ControlsHelp } from './OptionsPanel';
 import { MenuPanel } from '../../components/MenuPanel';
 import { duration, ticksToMs } from '../records/format';
+import { ADVENTURE } from '../../game/simulation/Adventure';
 
 export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = null, onExit }: {
   profile?: string; action?: 'new' | 'continue' | 'auto'; expectedRunId?: string | null; onExit?: () => void;
@@ -25,7 +26,8 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
   const closing = useRef(false);
   const audio = useRef<AudioBus | null>(null);
   const [options, setOptions] = useState(readOptions);
-  const [menu, setMenu] = useState<'pause' | 'options' | 'controls'>('pause');
+  const [menu, setMenu] = useState<'pause' | 'options' | 'controls' | 'inventory'>('pause');
+  const [, setInventoryRevision] = useState(0);
   const [optionError, setOptionError] = useState('');
   const [state, setState] = useState<PlayerState | null>(null);
   const [error, setError] = useState('');
@@ -37,7 +39,7 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
   const flush = async () => {
     const session = runtime.current, storage = writer.current;
     if (!session || !storage) return;
-    storage.observe(session.simulation.snapshot(), session.simulation.map.progressOriginY, session.simulation.finished);
+    storage.observe(session.game.snapshot(), session.simulation.map.progressOriginY, session.simulation.finished);
     setSaveStatus('PENDING');
     try { await storage.save(); setSaveStatus('SAVED'); setSaveError(''); }
     catch (cause) { session.pause(); input.current?.cancel(); setPaused(true); setSaveStatus('FAILED'); setSaveError(cause instanceof Error ? cause.message : 'Could not save Solo'); throw cause; }
@@ -77,18 +79,21 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
       let savedScreen = 0;
       const session = new SoloRuntime(map, () => controls.read(), frame => {
         audio.current?.setScreen(frame.screen);
-        writer.current?.observe(frame, map.progressOriginY, session.simulation.finished);
+        writer.current?.observe(session.game.snapshot(), map.progressOriginY, session.simulation.finished);
         if (frame.screen !== savedScreen) { savedScreen = frame.screen; void flush().catch(() => {}); }
         if (session.simulation.finished && !finished) { finished = true; controls.cancel(); void flush().catch(() => {}); }
         const now = performance.now();
         if (now - lastHud >= PRESENTATION.hudIntervalMs) { setState(frame); lastHud = now; }
-      }, 'Player', (effects, frame) => { for (const effect of effects) audio.current?.effect(effect, frame); });
-      const storage = await SoloWriter.open(profile, action, session.simulation.snapshot(), expectedRunId).catch(cause => {
+      }, 'Player', (effects, frame) => { for (const effect of effects) audio.current?.effect(effect, frame); }, (events, world) => {
+        for (const event of events) audio.current?.play(event.type === 'FLEE' ? 'audio/event_sfx/bird_fly' : event.type === 'SPEECH' ? 'audio/talking' : 'audio/plink');
+        for (const event of world) audio.current?.play(event.type === 'JINGLE' ? 'audio/music/event_music/ending_jingle' : manifest.walls.find(wall => wall.id === event.id)?.appearSound || 'audio/illusion');
+      });
+      const storage = await SoloWriter.open(profile, action, session.game.snapshot(), expectedRunId).catch(cause => {
         if (cause instanceof StorageUnavailable && action !== 'continue' && expectedRunId === null) { setSaveStatus('FAILED'); setSaveError(cause.message); return null; }
         throw cause;
       });
       if (disposed) { await storage?.close(); return; }
-      try { if (storage?.run.snapshot) { session.simulation.restore(storage.run.snapshot); session.simulation.cancelInput(); savedScreen = storage.run.snapshot.screen; } }
+      try { if (storage?.run.snapshot) { session.game.restore(storage.run.snapshot); session.simulation.cancelInput(); savedScreen = storage.run.snapshot.physics.screen; } }
       catch (cause) { await storage?.close(); throw cause; }
       writer.current = storage;
       runtime.current = session;
@@ -101,7 +106,7 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
     return () => {
       disposed = true; controller.abort(); clearInterval(afk); clearInterval(autosave);
       const storage = writer.current, session = runtime.current;
-      if (storage && session) { session.pause(); storage.observe(session.simulation.snapshot(), session.simulation.map.progressOriginY, session.simulation.finished); void storage.save().finally(() => storage.close()).catch(() => {}); }
+      if (storage && session) { session.pause(); storage.observe(session.game.snapshot(), session.simulation.map.progressOriginY, session.simulation.finished); void storage.save().finally(() => storage.close()).catch(() => {}); }
       writer.current = null; controls.dispose(); game?.destroy(true); audio.current?.dispose(); audio.current = null; runtime.current = null; input.current = null;
       window.removeEventListener('blur', pause); document.removeEventListener('visibilitychange', hidden);
       window.removeEventListener('pagehide', pageHide); window.removeEventListener('pageshow', pageShow);
@@ -133,14 +138,23 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
     {saveError && <p className="save-error" role="alert">{saveError}</p>}
     {ready && <div className="game-hud"><span>Jumps: {state?.jumps ?? 0}{options.displayTimer && <span className="timer" aria-label="Play time">{duration(ticksToMs(state?.ticks || 0))}</span>}</span><button onClick={pause}>Menu</button></div>}
     {ready && !paused && <TouchControls input={input} flying={state?.freeFlight} />}
-    {paused && <section className="game-overlay" aria-label="Game menu"><MenuPanel title={menu === 'pause' ? 'Paused' : menu === 'options' ? 'Options' : 'Controls'} onBack={menu === 'pause' ? undefined : () => setMenu(menu === 'controls' ? 'options' : 'pause')}>
+    {paused && <section className="game-overlay" aria-label="Game menu"><MenuPanel title={menu === 'pause' ? 'Paused' : menu === 'options' ? 'Options' : menu === 'inventory' ? 'Inventory' : 'Controls'} onBack={menu === 'pause' ? undefined : () => setMenu(menu === 'controls' ? 'options' : 'pause')}>
       {menu === 'pause' && <><button disabled={leaving} onClick={() => { pauseRequested.current = false; input.current?.resume(); runtime.current?.resume(); audio.current?.pause(false); setPaused(false); }}>Resume</button>
         <button onClick={() => setMenu('options')}>Options</button>
+        <button onClick={() => setMenu('inventory')}>Inventory</button>
         <button disabled={leaving} onClick={() => { void leave(); }}>{leaving ? 'Saving…' : 'Save & Exit'}</button>
         {saveStatus === 'FAILED' && <button disabled={leaving} onClick={() => { void discardUnsaved(); }}>Leave Without Saving</button>}
         <small role="status">{saveStatus === 'SAVED' ? 'Saved' : saveStatus === 'PENDING' ? 'Saving…' : 'Save failed'}</small></>}
       {menu === 'options' && <OptionsButtons options={options} flyAllowed={__SOLO_FLY_ENABLED__} onChange={updateOptions} onControls={() => setMenu('controls')} onError={setOptionError} />}
       {menu === 'controls' && <ControlsHelp flyAllowed={__SOLO_FLY_ENABLED__} />}
+      {menu === 'inventory' && <>
+        {Object.entries(runtime.current?.game.adventure.snapshot().inventory || {}).filter(([, amount]) => amount > 0).map(([item, amount]) => ADVENTURE.skins.some(skin => skin.item === item)
+          ? <button key={item} role="switch" aria-checked={runtime.current!.game.adventure.snapshot().equipped.includes(item)} onClick={() => {
+            const adventure = runtime.current!.game.adventure; adventure.equip(item, !adventure.snapshot().equipped.includes(item)); setInventoryRevision(value => value + 1); void flush().catch(() => {});
+          }}>{item}: {runtime.current!.game.adventure.snapshot().equipped.includes(item) ? 'On' : 'Off'}</button>
+          : <p key={item}>{item}: {amount}</p>)}
+        {!Object.values(runtime.current?.game.adventure.snapshot().inventory || {}).some(amount => amount > 0) && <p>No items yet.</p>}
+      </>}
       {optionError && <p role="alert">{optionError}</p>}
       </MenuPanel>
     </section>}

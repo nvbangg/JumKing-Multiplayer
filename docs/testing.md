@@ -63,7 +63,7 @@ Windows không có Docker: chạy `./scripts/test-mysql.ps1 -MySqlHome '<thư m�
 | Stats/History | Tổng cả ba kiểu chơi; Guest local/Room và Account đã sync không cộng trùng; History theo kind/run/match, chỉ terminal/finalized; pending Solo thay cùng ID, Merge không nhân mục; ownership/pagination/best/wins đúng data |
 | Identity/chat | Ngoại hình không trùng; Community username và Room nickname đúng identity; adventure/effects không lặp qua replay; chat plain text, cooldown/history/focus |
 | Mobile/browser | Multi-touch/cancel/capture, xoay màn hình, keyboard/gamepad fallback, viewport/menu, storage/audio bị chặn; refresh UI đúng route, API/asset thiếu giữ đúng lỗi |
-| Assets | Manifest đủ file sử dụng, nguồn/license hợp lệ; artifact/Git không chứa tài nguyên chưa được phép hoặc dữ liệu/công cụ riêng tư |
+| Assets | Manifest đủ file sử dụng, nguồn/tình trạng giấy phép rõ; artifact/Git đúng phạm vi và không chứa dữ liệu/công cụ riêng tư |
 
 Fixtures cần input trace/map/tuning và expected states độc lập; hai simulation giống nhau chưa đủ chứng minh đúng. Kiểm tra float32/flags/buffers/restore/pha gió, không nới tolerance che lỗi.
 

@@ -14,6 +14,7 @@ export interface Npc {
   name: string; screen: number; texture: string; position: { X: number; Y: number }; cells: { X: number; Y: number };
   busy: { sprite_index: number; duration: number }[]; talking: { sprite_index: number; duration: number }[];
   intro: string[]; looping: string[][]; screenQuotes: { screen: number; lines: string[] }[];
+  flagQuotes: { flag: string; quotes: string[][] }[];
   bubble: { direction: string; width: number };
 }
 export interface AssetManifest {
@@ -24,6 +25,12 @@ export interface AssetManifest {
   hashes: Record<string, string>;
   npcs: Npc[];
   skins: { item: string; texture: string; layer: string }[];
+  items: { id: string; item: string; screen: number; x: number; y: number; width: number; height: number; texture: string; displayOnly: boolean }[];
+  itemTextures: Record<string, string>;
+  birds: { name: string; texture: string; sound: string; item: string; positions: { screen: number; x: number; y: number; direction: number; flyDirection: number; treasure: boolean }[] }[];
+  merchants: { name: string; screen: number; intro: string[]; sale: string[]; sell: string[]; noGold: string[]; sold: string[] }[];
+  messages: { id: string; screen: number; lines: string[]; anchor: { x: number; y: number }; bubble: { direction: string; width: number } }[];
+  walls: { id: string; screen: number; texture: string; position: { X: number; Y: number }; appearSound: string | null; disappearSound: string | null }[];
 }
 export function assetUrl(file: string): string {
   if (!file || file.split('/').some(segment => !segment || segment === '.' || segment === '..') || file.includes('\\') || file.includes(':')) throw new Error('Invalid asset path');

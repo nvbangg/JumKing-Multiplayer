@@ -4,13 +4,13 @@ import checkpoints from '../../shared/fixtures/main-babe-checkpoints.json' with 
 test('finished Solo stays in History and profile totals after a fresh game', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(async finish => {
-    const path = '/src/features/solo/storage.ts', simulationPath = '/src/game/simulation/Simulation.ts', formatPath = '/src/features/records/format.ts';
+    const path = '/src/features/solo/storage.ts', simulationPath = '/src/game/simulation/GameSimulation.ts', formatPath = '/src/features/records/format.ts';
     const { SoloWriter, currentSolo, soloRuns } = await import(path);
-    const { Simulation } = await import(simulationPath);
+    const { GameSimulation: Simulation } = await import(simulationPath);
     const { soloHistory, soloStatistics } = await import(formatPath);
     const map = await (await fetch('/shared/maps/main-babe.json')).json(), simulation = new Simulation(map);
     const writer = await SoloWriter.open('history-account', 'new', simulation.snapshot());
-    simulation.restore(finish);
+    simulation.physics.restore(finish); simulation.adventure.complete();
     writer.observe(simulation.snapshot(), map.progressOriginY, simulation.finished);
     const saved = await writer.save(); await writer.close();
     const hasContinue = await currentSolo('history-account');

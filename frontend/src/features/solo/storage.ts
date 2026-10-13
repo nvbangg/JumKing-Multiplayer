@@ -1,16 +1,18 @@
-import type { PlayerState } from '../../game/simulation/types';
 import { PHYSICS } from '../../game/simulation/tuning';
 import { uuid } from '../../network/ids';
+import { GameSimulation, type GameSnapshot } from '../../game/simulation/GameSimulation';
+import { Adventure, ADVENTURE } from '../../game/simulation/Adventure';
+import map from '../../../../shared/maps/main-babe.json';
 
-const STORE = Object.freeze({ name: 'jumpking', version: 1, writerLeaseMs: 10000 });
+const STORE = Object.freeze({ name: 'jumpking', version: 2, writerLeaseMs: 10000 });
 export type RunStatus = 'ACTIVE' | 'FINISHED' | 'ABANDONED';
 export interface SoloRun {
   id: string; profile: string; revision: number; syncedRevision: number; status: RunStatus;
   playTicks: number; jumps: number; falls: number; currentProgress: number; maxProgress: number;
   peakReachedTicks: number; finishTicks: number | null; startedAt: string; endedAt: string | null;
-  snapshot: PlayerState | null;
+  snapshot: GameSnapshot | null;
 }
-interface Profile { key: string; activeRunId: string | null; writerId: string | null; leaseExpiresAt: number }
+interface Profile { key: string; activeRunId: string | null; writerId: string | null; leaseExpiresAt: number; wardrobe: string[]; equipped: string[] }
 
 export class StorageUnavailable extends Error {
   constructor(message = 'Browser storage is unavailable. This game cannot be saved.') { super(message); }
@@ -26,10 +28,26 @@ export async function openStore(): Promise<IDBDatabase> {
   return new Promise<IDBDatabase>((resolve, reject) => {
     const open = indexedDB.open(STORE.name, STORE.version);
     let blocked = false;
-    open.onupgradeneeded = () => {
+    open.onupgradeneeded = event => {
       const db = open.result;
-      db.createObjectStore('profiles', { keyPath: 'key' });
-      db.createObjectStore('runs', { keyPath: 'id' }).createIndex('profile', 'profile');
+      if (event.oldVersion === 0) {
+        db.createObjectStore('profiles', { keyPath: 'key' });
+        db.createObjectStore('runs', { keyPath: 'id' }).createIndex('profile', 'profile');
+      } else if (event.oldVersion === 1) {
+        const cursor = open.transaction!.objectStore('runs').openCursor();
+        cursor.onsuccess = () => {
+          const row = cursor.result; if (!row) return;
+          const value = row.value;
+          if (value.snapshot) {
+            const game = new GameSimulation(map).snapshot();
+            game.physics = value.snapshot; game.world.lastTick = value.snapshot.ticks;
+            row.update({ ...value, snapshot: game });
+          }
+          row.continue();
+        };
+        const profiles = open.transaction!.objectStore('profiles').openCursor();
+        profiles.onsuccess = () => { const row = profiles.result; if (row) { row.update({ ...row.value, wardrobe: [], equipped: [] }); row.continue(); } };
+      }
     };
     open.onerror = () => reject(open.error || new Error('Browser storage is unavailable'));
     open.onblocked = () => { blocked = true; reject(new Error('Close other JumpKing tabs to update browser storage')); };
@@ -88,7 +106,7 @@ export class SoloWriter {
   }
   get run(): SoloRun { return structuredClone(this.observed); }
 
-  static async open(profile: string, action: 'new' | 'continue' | 'auto', initial: PlayerState, expectedRunId: string | null = null): Promise<SoloWriter> {
+  static async open(profile: string, action: 'new' | 'continue' | 'auto', initial: GameSnapshot, expectedRunId: string | null = null): Promise<SoloWriter> {
     const db = await openStore(), writerId = uuid();
     let releaseLock: (() => Promise<void>) | null;
     try { releaseLock = await exclusiveWriter(profile); }
@@ -106,24 +124,28 @@ export class SoloWriter {
       if (action === 'new' && (run?.id || null) !== expectedRunId) throw new Error('The Solo save changed. Return to the menu and try again.');
       if (action === 'new' || !run) {
         if (run?.status === 'ACTIVE') runs.put({ ...run, status: 'ABANDONED', endedAt: terminalTime(run.startedAt), snapshot: null, revision: run.revision + 1 });
+        const adventure = new Adventure(map, existing?.wardrobe || []);
+        for (const item of adventure.snapshot().equipped) adventure.equip(item, false);
+        for (const item of existing?.equipped || []) adventure.equip(item, true);
         run = {
           id: uuid(), profile, revision: 1, syncedRevision: 0, status: 'ACTIVE',
           playTicks: 0, jumps: 0, falls: 0, currentProgress: 0, maxProgress: 0, peakReachedTicks: 0,
-          finishTicks: null, startedAt: new Date().toISOString(), endedAt: null, snapshot: structuredClone(initial),
+          finishTicks: null, startedAt: new Date().toISOString(), endedAt: null, snapshot: { ...structuredClone(initial), adventure: adventure.snapshot() },
         };
         runs.put(run);
       }
-      profiles.put({ key: profile, activeRunId: run.id, writerId, leaseExpiresAt: Date.now() + STORE.writerLeaseMs } satisfies Profile);
+      profiles.put({ key: profile, activeRunId: run.id, writerId, leaseExpiresAt: Date.now() + STORE.writerLeaseMs, wardrobe: existing?.wardrobe || [], equipped: existing?.equipped || [] } satisfies Profile);
       await done;
       return new SoloWriter(db, writerId, run, releaseLock);
     } catch (error) { try { tx.abort(); } catch { } await done.catch(() => {}); db.close(); await releaseLock?.(); throw error; }
   }
 
-  observe(state: PlayerState, progressOriginY: number, finished: boolean): void {
+  observe(snapshot: GameSnapshot, progressOriginY: number, finished: boolean): void {
     if (this.observed.status !== 'ACTIVE') return;
+    const state = snapshot.physics;
     const progress = Math.max(0, progressOriginY - state.y - PHYSICS.bodyHeight);
     if (progress > this.observed.maxProgress) { this.observed.maxProgress = progress; this.observed.peakReachedTicks = state.ticks; }
-    Object.assign(this.observed, { playTicks: state.ticks, jumps: state.jumps, falls: state.falls, currentProgress: progress, snapshot: structuredClone(state) });
+    Object.assign(this.observed, { playTicks: state.ticks, jumps: state.jumps, falls: state.falls, currentProgress: progress, snapshot: structuredClone(snapshot) });
     if (finished) Object.assign(this.observed, { status: 'FINISHED', finishTicks: state.ticks, endedAt: terminalTime(this.observed.startedAt) });
   }
 
@@ -149,7 +171,8 @@ export class SoloWriter {
           return stored;
         }
         runs.put(next);
-        profiles.put({ ...profile, activeRunId: next.status === 'ACTIVE' ? next.id : null, leaseExpiresAt: Date.now() + STORE.writerLeaseMs });
+        const wardrobe = [...new Set([...(profile.wardrobe || []), ...ADVENTURE.skins.filter(skin => (view.snapshot?.adventure.inventory[skin.item] || 0) > 0).map(skin => skin.item)])];
+        profiles.put({ ...profile, activeRunId: next.status === 'ACTIVE' ? next.id : null, leaseExpiresAt: Date.now() + STORE.writerLeaseMs, wardrobe, equipped: view.snapshot?.adventure.equipped || profile.equipped || [] });
         await done;
         this.committedRevision = next.revision;
         this.observed.revision = next.revision; this.observed.syncedRevision = next.syncedRevision;

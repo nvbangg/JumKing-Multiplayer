@@ -5915,7 +5915,23 @@
         "I will wait here."
       ],
       "looping": [],
-      "flagQuotes": [],
+      "flagQuotes": [
+        {
+          "flag": "CompletedNormalGame",
+          "quotes": [
+            [
+              "Hey! Wait a minute!",
+              "That crown..!?",
+              "...No, it cannot be...",
+              "A replica, I am sure...",
+              "You have quite the audacity, posing as the Jump King like that.",
+              "Nevermind.",
+              "I should warn you, up ahead is an impenetrable pass.",
+              "Go ahead if you are curious, but I am sure we will meet again."
+            ]
+          ]
+        }
+      ],
       "screenQuotes": [
         {
           "screen": 25,
@@ -6095,7 +6111,20 @@
         "Heh, heh, heh..."
       ],
       "looping": [],
-      "flagQuotes": [],
+      "flagQuotes": [
+        {
+          "flag": "CompletedNormalGame",
+          "quotes": [
+            [
+              "You have heard the legen-",
+              "Hmm?",
+              "What a funny yellow hat!",
+              "Can I have it?",
+              "Heh, heh, heh..."
+            ]
+          ]
+        }
+      ],
       "screenQuotes": [
         {
           "screen": 2,
@@ -6695,7 +6724,20 @@
         "What do you say, eh?"
       ],
       "looping": [],
-      "flagQuotes": [],
+      "flagQuotes": [
+        {
+          "flag": "CompletedNormalGame",
+          "quotes": [
+            [
+              "Oh my! Royalty visiting my humble boutique?",
+              "I am pleased to offer my premium selection to a connoisseur such as yourself!",
+              "This is an exquisite pair of boots, crafted with attention to the finest detail...",
+              "Since you are clearly a man of fine taste, I will offer you an exclusive deal of [gold_count] gold for these fantastic boots!",
+              "Is my lord interested?"
+            ]
+          ]
+        }
+      ],
       "screenQuotes": [
         {
           "screen": 2,
@@ -6741,6 +6783,10 @@
       "invisible": false
     }
   ],
+  "itemTextures": {
+    "GoldRing": "props/textures/raven/gold_ring",
+    "Cap": "props/worlditems/cap"
+  },
   "skins": [
     {
       "item": "Crown",
@@ -6875,150 +6921,6 @@
           "y": 88,
           "treasure": false,
           "direction": -1,
-          "flyDirection": -1
-        }
-      ]
-    },
-    {
-      "name": "white_raven",
-      "texture": "props/textures/raven/white_raven",
-      "sound": "audio/event_sfx/white_bird_fly",
-      "item": "Ruby",
-      "positions": [
-        {
-          "screen": 0,
-          "x": 210,
-          "y": 31,
-          "treasure": false,
-          "direction": -1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 1,
-          "x": 50,
-          "y": 71,
-          "treasure": false,
-          "direction": 1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 2,
-          "x": 182,
-          "y": 112,
-          "treasure": false,
-          "direction": -1,
-          "flyDirection": -1
-        },
-        {
-          "screen": 3,
-          "x": 197,
-          "y": 208,
-          "treasure": false,
-          "direction": -1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 4,
-          "x": 456,
-          "y": 152,
-          "treasure": false,
-          "direction": -1,
-          "flyDirection": -1
-        },
-        {
-          "screen": 5,
-          "x": 298,
-          "y": 72,
-          "treasure": false,
-          "direction": -1,
-          "flyDirection": -1
-        },
-        {
-          "screen": 6,
-          "x": 200,
-          "y": 232,
-          "treasure": false,
-          "direction": 1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 7,
-          "x": 244,
-          "y": 136,
-          "treasure": false,
-          "direction": 1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 8,
-          "x": 98,
-          "y": 80,
-          "treasure": false,
-          "direction": -1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 9,
-          "x": 167,
-          "y": 96,
-          "treasure": false,
-          "direction": -1,
-          "flyDirection": -1
-        },
-        {
-          "screen": 11,
-          "x": 312,
-          "y": 120,
-          "treasure": false,
-          "direction": 1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 12,
-          "x": 249,
-          "y": 88,
-          "treasure": false,
-          "direction": -1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 13,
-          "x": 262,
-          "y": 88,
-          "treasure": false,
-          "direction": 1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 14,
-          "x": 341,
-          "y": 216,
-          "treasure": false,
-          "direction": -1,
-          "flyDirection": -1
-        },
-        {
-          "screen": 15,
-          "x": 401,
-          "y": 168,
-          "treasure": false,
-          "direction": -1,
-          "flyDirection": -1
-        },
-        {
-          "screen": 16,
-          "x": 107,
-          "y": 248,
-          "treasure": false,
-          "direction": 1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 17,
-          "x": 8,
-          "y": 191,
-          "treasure": false,
-          "direction": 1,
           "flyDirection": -1
         }
       ]
@@ -7234,6 +7136,194 @@
         "Pleasure doing business with you!",
         "Heh heh heh!"
       ]
+    }
+  ],
+  "walls": [
+    {
+      "texture": "props/hidden_walls/textures/6_hidden_wall",
+      "position": {
+        "X": 303,
+        "Y": 95
+      },
+      "screenCoordinates": false,
+      "appearSound": "audio/illusion",
+      "disappearSound": null,
+      "playMode": "once",
+      "hitboxes": [
+        {
+          "X": 0,
+          "Y": 0,
+          "Width": 177,
+          "Height": 170
+        }
+      ],
+      "id": "wall:5:0",
+      "screen": 5
+    },
+    {
+      "texture": "props/hidden_walls/textures/7_hidden_wall1",
+      "position": {
+        "X": 303,
+        "Y": 223
+      },
+      "screenCoordinates": false,
+      "appearSound": "audio/illusion",
+      "disappearSound": null,
+      "playMode": "once",
+      "hitboxes": [
+        {
+          "X": 0,
+          "Y": 0,
+          "Width": 65,
+          "Height": 82
+        }
+      ],
+      "id": "wall:6:0",
+      "screen": 6
+    },
+    {
+      "texture": "props/hidden_walls/textures/7_hidden_wall2_2",
+      "position": {
+        "X": 288,
+        "Y": 47
+      },
+      "screenCoordinates": false,
+      "appearSound": "audio/illusion",
+      "disappearSound": null,
+      "playMode": "once",
+      "hitboxes": [
+        {
+          "X": 0,
+          "Y": 72,
+          "Width": 64,
+          "Height": 34
+        },
+        {
+          "X": 48,
+          "Y": 16,
+          "Width": 16,
+          "Height": 57
+        },
+        {
+          "X": 63,
+          "Y": 1,
+          "Width": 32,
+          "Height": 106
+        }
+      ],
+      "id": "wall:6:1",
+      "screen": 6
+    },
+    {
+      "texture": "props/hidden_walls/textures/7_hidden_wall2_1",
+      "position": {
+        "X": 382,
+        "Y": 47
+      },
+      "screenCoordinates": false,
+      "appearSound": "audio/illusion",
+      "disappearSound": null,
+      "playMode": "once",
+      "hitboxes": [
+        {
+          "X": 0,
+          "Y": 0,
+          "Width": 91,
+          "Height": 89
+        }
+      ],
+      "id": "wall:6:2",
+      "screen": 6
+    },
+    {
+      "texture": "props/hidden_walls/textures/7_hidden_wall3",
+      "position": {
+        "X": 167,
+        "Y": 0
+      },
+      "screenCoordinates": false,
+      "appearSound": "audio/illusion",
+      "disappearSound": null,
+      "playMode": "once",
+      "hitboxes": [
+        {
+          "X": 0,
+          "Y": 0,
+          "Width": 98,
+          "Height": 73
+        }
+      ],
+      "id": "wall:6:3",
+      "screen": 6
+    },
+    {
+      "texture": "props/hidden_walls/textures/8_hidden_wall1_2",
+      "position": {
+        "X": 240,
+        "Y": 303
+      },
+      "screenCoordinates": false,
+      "appearSound": "audio/illusion",
+      "disappearSound": null,
+      "playMode": "once",
+      "hitboxes": [
+        {
+          "X": 0,
+          "Y": 0,
+          "Width": 40,
+          "Height": 17
+        },
+        {
+          "X": 0,
+          "Y": 17,
+          "Width": 56,
+          "Height": 33
+        }
+      ],
+      "id": "wall:7:0",
+      "screen": 7
+    },
+    {
+      "texture": "props/hidden_walls/textures/8_hidden_wall1_1",
+      "position": {
+        "X": 152,
+        "Y": 279
+      },
+      "screenCoordinates": false,
+      "appearSound": "audio/illusion",
+      "disappearSound": null,
+      "playMode": "once",
+      "hitboxes": [
+        {
+          "X": 0,
+          "Y": 0,
+          "Width": 89,
+          "Height": 81
+        }
+      ],
+      "id": "wall:7:1",
+      "screen": 7
+    },
+    {
+      "texture": "props/hidden_walls/textures/22_hidden_wall1",
+      "position": {
+        "X": 7,
+        "Y": 287
+      },
+      "screenCoordinates": false,
+      "appearSound": "audio/illusion",
+      "disappearSound": null,
+      "playMode": "once",
+      "hitboxes": [
+        {
+          "X": 0,
+          "Y": 0,
+          "Width": 127,
+          "Height": 50
+        }
+      ],
+      "id": "wall:21:0",
+      "screen": 21
     }
   ],
   "fonts": {
@@ -7836,10 +7926,55 @@
       "width": 144,
       "height": 128
     },
-    "props/textures/raven/white_raven": {
-      "file": "props/textures/raven/white_raven.png",
-      "width": 144,
-      "height": 160
+    "props/textures/raven/gold_ring": {
+      "file": "props/textures/raven/gold_ring.png",
+      "width": 8,
+      "height": 4
+    },
+    "props/hidden_walls/textures/6_hidden_wall": {
+      "file": "props/hidden_walls/textures/6_hidden_wall.png",
+      "width": 177,
+      "height": 170
+    },
+    "props/hidden_walls/textures/7_hidden_wall1": {
+      "file": "props/hidden_walls/textures/7_hidden_wall1.png",
+      "width": 65,
+      "height": 82
+    },
+    "props/hidden_walls/textures/7_hidden_wall2_2": {
+      "file": "props/hidden_walls/textures/7_hidden_wall2_2.png",
+      "width": 96,
+      "height": 106
+    },
+    "props/hidden_walls/textures/7_hidden_wall2_1": {
+      "file": "props/hidden_walls/textures/7_hidden_wall2_1.png",
+      "width": 91,
+      "height": 90
+    },
+    "props/hidden_walls/textures/7_hidden_wall3": {
+      "file": "props/hidden_walls/textures/7_hidden_wall3.png",
+      "width": 98,
+      "height": 73
+    },
+    "props/hidden_walls/textures/8_hidden_wall1_2": {
+      "file": "props/hidden_walls/textures/8_hidden_wall1_2.png",
+      "width": 56,
+      "height": 50
+    },
+    "props/hidden_walls/textures/8_hidden_wall1_1": {
+      "file": "props/hidden_walls/textures/8_hidden_wall1_1.png",
+      "width": 89,
+      "height": 81
+    },
+    "props/hidden_walls/textures/22_hidden_wall1": {
+      "file": "props/hidden_walls/textures/22_hidden_wall1.png",
+      "width": 127,
+      "height": 50
+    },
+    "props/textures/raven/raven_crown": {
+      "file": "props/textures/raven/raven_crown.png",
+      "width": 168,
+      "height": 48
     },
     "particles/jump_particle": {
       "file": "particles/jump_particle.png",
@@ -7869,18 +8004,6 @@
       "file": "audio/music/event_music/ending_jingle.ogg",
       "duration": 20495
     },
-    "audio/music/event_music/Elude1": {
-      "file": "audio/music/event_music/Elude1.ogg",
-      "duration": 6101
-    },
-    "audio/music/event_music/Elude2": {
-      "file": "audio/music/event_music/Elude2.ogg",
-      "duration": 9152
-    },
-    "audio/music/event_music/Moon": {
-      "file": "audio/music/event_music/Moon.ogg",
-      "duration": 11707
-    },
     "audio/talking": {
       "file": "audio/talking.ogg",
       "duration": 89
@@ -7896,6 +8019,10 @@
     "audio/event_sfx/bird_fly": {
       "file": "audio/event_sfx/bird_fly.ogg",
       "duration": 683
+    },
+    "audio/illusion": {
+      "file": "audio/illusion.ogg",
+      "duration": 3566
     },
     "audio/babe/babe jump": {
       "file": "audio/babe/babe jump.ogg",
@@ -8184,20 +8311,27 @@
     "king/shoes.png": "3122aacb20a6b7fa555e1d12fb2f6a0a873c974367d27504c85e926762a6354b",
     "king/cap.png": "fd0f937fc5701c4606080c5765ef4861802dc445da7701d55a8baff241277028",
     "props/textures/raven/raven.png": "be95d49c860a434180c01eec9cf0da69192d68627a857585c754eab8f087afa2",
-    "props/textures/raven/white_raven.png": "6112378396d655b7200e211e10fb47fb65de065b630059a63226be088d4281df",
+    "props/textures/raven/gold_ring.png": "6c7ca03563f9d0de4f6a67062c37f446a8813150315473936eb112d8fe1821c4",
+    "props/hidden_walls/textures/6_hidden_wall.png": "acbe4d4c949184f4859fe86b5549ba8d1ad63bddb10a91c2401d979f423afac5",
+    "props/hidden_walls/textures/7_hidden_wall1.png": "78097bd54a9356b3cb2465e6f3b326cd44c3d30ddd05afbd6094f2a198642816",
+    "props/hidden_walls/textures/7_hidden_wall2_2.png": "50be818ce898fe0a9d59ae12ddf65fff920960636ccf6a15f8db9205d320f3f4",
+    "props/hidden_walls/textures/7_hidden_wall2_1.png": "2f9ba4c4ce5a9fcd7be8cb61803d6e5338da7285e68b57cd50bb4bc180c3a755",
+    "props/hidden_walls/textures/7_hidden_wall3.png": "20513dfca5ca159df2a2987239139fa26b8a777ccf6759b7c0f994331a68231c",
+    "props/hidden_walls/textures/8_hidden_wall1_2.png": "712c18b059df8d852cead2a2f566e8ab823c80cdcac76fc2b5fa15340bed2da6",
+    "props/hidden_walls/textures/8_hidden_wall1_1.png": "c5acb09bd40976d781f50d124b832909c1eedb431a801d814edd0e47798d9b77",
+    "props/hidden_walls/textures/22_hidden_wall1.png": "80b6d2c839331b0062a796940d5ac3b24fe2d9a2fd154a173d001ff7b720ada1",
+    "props/textures/raven/raven_crown.png": "3531cf0588e3fcd99fae9f6c3c344b65963a9e19116c5d18bf3920aefec28c9c",
     "particles/jump_particle.png": "033030af811ea57f5f68ef6509de03be0193d3f6ead2a7ef1cfae9a9f683c5e0",
     "particles/snow_jump_particle.png": "45674b51742719b1c18dc0b1092f797a01ee832d339f76da222018170d84e37e",
     "audio/music/menu loop/menu_intro.ogg": "e72d99f53da376a13d5aeff5b38e135d0f2f96a6cdb7352ef843d2b568f8051f",
     "audio/music/menu loop/menu_loop.ogg": "1eb05e458db7acf20b8ec64b1ad376ffdaf5a0eb11844b6833c4d2f0f4221193",
     "audio/music/ending.ogg": "91054eb38a4acca3f0b6679d0219993219c7c1bfe03dbb0ca1dfc27e1cb74a55",
     "audio/music/event_music/ending_jingle.ogg": "e0d977fdb010759bc68b914316a727e48aa3660c4ba081ccc4301567052a4a9f",
-    "audio/music/event_music/Elude1.ogg": "f1d6963c243055a2fd6dc924e7ab94cadfa08d076eab48c3bd592f873bd28098",
-    "audio/music/event_music/Elude2.ogg": "7a6a96fac09b9ca5c027f5db08396fc5cd3ecd932f9f32086d0170197b3e2a05",
-    "audio/music/event_music/Moon.ogg": "3b7edc928506f39e16be29a9605780a17d47637f7cface1b62eddde2e8c2c724",
     "audio/talking.ogg": "758db4489e8fb8f064b3b4712868210458e3efc202c28860a722a5359f0dee72",
     "audio/plink.ogg": "4a5b1ad43f4a2fea1b9d55fd3305e7a00290427ed01adb3a0ea77b21b6e22c40",
     "audio/new_location.ogg": "1be858bb3c96a167e5744fb9bbbcd64ac349330ba5f2823e40fe70c7e24e3d33",
     "audio/event_sfx/bird_fly.ogg": "725b86a7c8375ae4b8e85b6bbc3d62b3355d954238bbed6d0a7e02929a05c197",
+    "audio/illusion.ogg": "9e8918c85799f0301164fd5a35f45bdf6dd933160db758d93c27513a78377e45",
     "audio/babe/babe jump.ogg": "39fcf7fe1d3a34ec86f721c50081d307b30add14fa6a623d4bd69f1013903261",
     "audio/babe/babe kiss.ogg": "a1a88a21e55879d6d752cc66e6e55ce8ac19a16236d0908ea2fdf76a4094d4d7",
     "audio/babe/babe mou.ogg": "b27717a2675c38910d90f0274d86a0f3f390243ca634bc52c79dcb5f460dd514",

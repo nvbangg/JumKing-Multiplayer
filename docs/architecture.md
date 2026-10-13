@@ -5,7 +5,7 @@
 | Thành phần | Công nghệ và trách nhiệm |
 | --- | --- |
 | UI | React + TypeScript: menu, Account, phòng và Records |
-| Hiển thị | Phaser: map, sprite, animation, camera và âm thanh |
+| Hiển thị | Phaser: map, sprite, animation và camera; Web Audio/HTMLAudio: âm thanh |
 | Solo | TypeScript simulation chạy tại trình duyệt |
 | Online | Spring Boot/Java quyết định physics, thời gian, tiến độ và kết quả |
 | Persistence | MySQL + Spring JDBC: identity, lượt chơi, checkpoint và kết quả |

@@ -123,7 +123,7 @@ Reload/lỗi mạng giữ hàng chờ; chỉ xác nhận sync sau commit. New Ga
 
 Continue tìm COMMUNITY/ACTIVE theo Account; chưa có thì tạo spawn snapshot, revision=1. Save thuộc lượt, không gắn room code. Chuyển sảnh/Save & Exit/AFK giữ lượt.
 
-Snapshot do server tạo: simulation (freeFlight/phasingFall), inventory/tiền/trang bị, tiến độ adventure, môi trường/RNG và codec version. Không chứa định nghĩa shared hoặc nội dung hiển thị. Backend validate codec/metrics khi restore; xử lý quyền bay theo [gameplay](gameplay.md#fly-mode).
+Snapshot do server tạo: physics (freeFlight/phasingFall), inventory/trang bị/quest/hội thoại theo ID, screen events/hidden walls/pha gió và codec version. Không chứa định nghĩa shared hoặc nội dung hiển thị. Backend validate codec/metrics khi restore; xử lý quyền bay theo [gameplay](gameplay.md#fly-mode).
 
 Autosave ghi metrics/snapshot/revision/updated_at cùng transaction trên đúng id/owner/COMMUNITY/ACTIVE, không upsert lượt đã mất. Worker tuần tự từng lượt, gộp bản chưa ghi. Chu kỳ theo [deployment](deployment.md#cấu-hình); Pause/Leave/Finish yêu cầu flush.
 

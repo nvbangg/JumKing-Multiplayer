@@ -50,9 +50,9 @@ test('real IndexedDB enforces writer ownership, revision and profile separation'
   await page.goto('/');
   const result = await page.evaluate(async () => {
     const storagePath = '/src/features/solo/storage.ts';
-    const simulationPath = '/src/game/simulation/Simulation.ts';
+    const simulationPath = '/src/game/simulation/GameSimulation.ts';
     const { SoloWriter, soloRuns } = await import(storagePath);
-    const { Simulation } = await import(simulationPath);
+    const { GameSimulation: Simulation } = await import(simulationPath);
     const map = await (await fetch('/shared/maps/main-babe.json')).json();
     const sim = new Simulation(map), initial = sim.snapshot();
     const first = await SoloWriter.open('writer-test', 'new', initial);
@@ -75,9 +75,9 @@ test('real IndexedDB enforces writer ownership, revision and profile separation'
 test('pending sync survives reopen and late acknowledgements preserve newer revisions', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(async () => {
-    const path = '/src/features/solo/storage.ts', simulationPath = '/src/game/simulation/Simulation.ts';
+    const path = '/src/features/solo/storage.ts', simulationPath = '/src/game/simulation/GameSimulation.ts';
     const { SoloWriter, pendingSoloRuns, acknowledgeSolo, soloRuns } = await import(path);
-    const { Simulation } = await import(simulationPath);
+    const { GameSimulation: Simulation } = await import(simulationPath);
     const map = await (await fetch('/shared/maps/main-babe.json')).json(), simulation = new Simulation(map);
     const writer = await SoloWriter.open('sync-account', 'new', simulation.snapshot());
     const first = writer.run;

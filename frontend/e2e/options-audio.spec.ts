@@ -23,6 +23,7 @@ test('Options persist between home and game and timer reflects active play', asy
   await page.getByRole('switch', { name: 'Display Timer: On', exact: true }).click();
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   await page.getByRole('button', { name: 'Save & Exit', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Continue Solo', exact: true })).toBeVisible();
   await page.reload();
   await page.getByRole('button', { name: 'Options', exact: true }).click();
   await expect(page.getByRole('switch', { name: 'Display Timer: Off', exact: true })).toHaveAttribute('aria-checked', 'false');

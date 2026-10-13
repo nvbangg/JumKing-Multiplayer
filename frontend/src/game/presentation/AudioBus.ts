@@ -24,7 +24,7 @@ export class AudioBus {
       this.context ||= new AudioContext();
       if (this.context.state === 'suspended') await this.context.resume();
       for (const audio of this.ambience) this.playStream(audio);
-      if (this.preloadEffects) await Promise.all(Object.keys(this.manifest.sounds).filter(key => key.startsWith('audio/jump_king/') || key.startsWith('audio/gui_sfx/') || ['audio/talking', 'audio/plink', 'audio/new_location'].includes(key)).map(key => this.load(key)));
+      if (this.preloadEffects) await Promise.all(Object.keys(this.manifest.sounds).filter(key => key.startsWith('audio/jump_king/') || key.startsWith('audio/gui_sfx/') || ['audio/talking', 'audio/plink', 'audio/new_location', 'audio/illusion', 'audio/event_sfx/bird_fly', 'audio/music/event_music/ending_jingle'].includes(key)).map(key => this.load(key)));
     } catch (cause) { this.report(cause); }
   }
   private async load(key: string): Promise<void> {

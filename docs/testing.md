@@ -40,6 +40,8 @@ E2E (end-to-end) dùng Playwright thao tác trình duyệt qua UI → HTTP/WS �
 
 Integration dùng [Testcontainers MySQL](https://java.testcontainers.org/modules/databases/mysql/), Docker và MySQL theo [deployment](deployment.md#runtime-và-workflow). E2E dùng instance cô lập; không reset database cá nhân. Runner chỉ cleanup resources/fixtures do nó tạo, kể cả khi test lỗi.
 
+Windows không có Docker: chạy `./scripts/test-mysql.ps1 -MySqlHome '<thư mục MySQL 8.4>' -JavaHome '<thư mục JDK 25>'` từ root. Runner tạo instance loopback/cổng ngẫu nhiên, credentials riêng, chạy integration rồi dừng và xóa dữ liệu test; không sửa service/database đang dùng. Integration cũng nhận `JK_TEST_DATABASE_URL/USERNAME/PASSWORD` cho database test rỗng có tên bắt đầu `jumpking_it`; runner bên ngoài chịu trách nhiệm cleanup.
+
 ## Scenarios và oracles
 
 | Nhóm | Kiểm tra và kết quả mong đợi |

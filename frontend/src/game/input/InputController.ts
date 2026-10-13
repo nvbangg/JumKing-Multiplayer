@@ -15,6 +15,7 @@ export class InputController {
     window.addEventListener('keyup', this.keyUp);
   }
   private keyDown = (event: KeyboardEvent) => {
+    if (event.defaultPrevented) return;
     if (event.target instanceof Element && event.target.closest('input,textarea,select,[contenteditable="true"]')) return;
     if (event.code === 'Escape' && !event.repeat) { this.onMenu(); return; }
     if (!relevant.has(event.code)) return;

@@ -11,6 +11,9 @@ import { GameSocket, type MatchResult, type RoomState } from '../network/GameSoc
 import { EMPTY_STATS, type HistoryItem, type Identity, type Statistics } from '../network/contracts';
 import { Lobby } from '../features/rooms/Lobby';
 import { Results } from '../features/rooms/Results';
+import { OptionsButtons, ControlsHelp } from '../features/solo/OptionsPanel';
+import { AudioBus } from '../game/presentation/AudioBus';
+import { loadManifest } from '../game/content/assets';
 
 type Screen = 'home' | 'play' | 'sign-in' | 'register' | 'account' | 'community' | 'leaderboard' | 'history' | 'detail' | 'options' | 'controls' | 'nickname' | 'join' | 'lobby' | 'results';
 interface SoloLaunch { profile: string; action: 'new' | 'continue' | 'auto'; expectedRunId: string | null }
@@ -46,6 +49,17 @@ export function App() {
   const [pending, setPending] = useState(false);
   const socket = useRef<GameSocket | null>(null);
   const profile = identity.account ? backendOrigin() + ':account:' + identity.account.id : 'guest';
+  const playing = screen === 'play';
+  useEffect(() => {
+    if (playing || !options.sound) return;
+    let disposed = false, music: AudioBus | undefined;
+    const controller = new AbortController();
+    void loadManifest(controller.signal).then(manifest => {
+      if (disposed) return;
+      music = new AudioBus(manifest, true, setError, false); music.setMusic('audio/music/menu loop/menu_loop');
+    }).catch(() => { if (!disposed) setError('Menu sound could not be loaded'); });
+    return () => { disposed = true; controller.abort(); music?.dispose(); };
+  }, [playing, options.sound]);
   useEffect(() => {
     setActiveSolo(null); setCommunityRun(null); setStatistics({ ...EMPTY_STATS }); setHistory([]); setDetail(null);
   }, [profile]);
@@ -139,7 +153,7 @@ export function App() {
     try { saveOptions(next); setError(''); } catch { setError('Options could not be saved on this device'); }
   };
 
-  if (screen === 'play') return <SoloGame {...launch} onExit={back} />;
+  if (screen === 'play') return <SoloGame {...launch} onExit={() => { setOptions(readOptions()); back(); }} />;
   return <main className="home">
     <header className="brand"><h1><img src="/assets/title_logo.png" alt="JumpKing" /></h1></header>
     <div className={screen === 'home' ? 'home-layout' : 'single-panel'}>
@@ -166,14 +180,8 @@ export function App() {
         {screen === 'leaderboard' && <ol className="leaderboard">{leaderboard.map(entry => <li key={entry.id}><span>{entry.rank}. {entry.username}</span><strong>{entry.finishTimeMs === null ? Math.floor(entry.maxProgress) + ' px' : duration(entry.finishTimeMs)}</strong></li>)}{!leaderboard.length && !error && <p>No results yet.</p>}</ol>}
         {screen === 'history' && <div className="history-list">{history.map(item => <button key={item.kind + ':' + item.id} onClick={() => { setDetail(item); setScreen('detail'); }}><span className="kind-label">{item.kind}</span><span>{new Date(item.endedAt).toLocaleDateString()} · {item.status}</span><span>{duration(item.finishTimeMs ?? item.playTimeMs)}</span></button>)}{!history.length && <p>No completed games.</p>}</div>}
         {screen === 'detail' && detail && <dl className="record-detail"><dt>Type</dt><dd>{detail.kind}</dd><dt>Result</dt><dd>{detail.status}</dd><dt>Play Time</dt><dd>{duration(detail.playTimeMs)}</dd><dt>Finish Time</dt><dd>{duration(detail.finishTimeMs)}</dd><dt>Jumps</dt><dd>{detail.jumps}</dd><dt>Falls</dt><dd>{detail.falls}</dd><dt>Peak</dt><dd>{Math.floor(detail.maxProgress)} px</dd>{detail.room && <><dt>Room</dt><dd>{detail.room.roomCode}</dd><dt>Mode</dt><dd>{detail.room.mode}</dd><dt>Rank</dt><dd>{detail.room.rank}</dd></>}</dl>}
-        {screen === 'options' && <>
-          <button role="switch" aria-checked={options.sound} onClick={() => updateOptions('sound')}>Sound: {options.sound ? 'On' : 'Off'}</button>
-          <button onClick={() => { void execute(async () => { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); }); }} disabled={typeof document !== 'undefined' && !document.fullscreenEnabled}>Fullscreen</button>
-          <button role="switch" aria-checked={options.displayTimer} onClick={() => updateOptions('displayTimer')}>Display Timer: {options.displayTimer ? 'On' : 'Off'}</button>
-          {flyAllowed && <button role="switch" aria-checked={options.fly} onClick={() => updateOptions('fly')}>Fly Mode: {options.fly ? 'On' : 'Off'}</button>}
-          <button onClick={() => setScreen('controls')}>Controls</button>
-        </>}
-        {screen === 'controls' && <dl className="record-detail"><dt>Move</dt><dd>A / D or ← / →</dd><dt>Jump</dt><dd>Hold Space / W / ↑, then release</dd><dt>Menu</dt><dd>Escape</dd><dt>Gamepad</dt><dd>D-pad / left stick, A, Start</dd><dt>Touch</dt><dd>Direction and Jump buttons</dd>{flyAllowed && <><dt>Fly</dt><dd>Double-tap Space, WASD / arrows</dd></>}</dl>}
+        {screen === 'options' && <OptionsButtons options={options} flyAllowed={flyAllowed} onChange={updateOptions} onControls={() => setScreen('controls')} onError={setError} />}
+        {screen === 'controls' && <ControlsHelp flyAllowed={flyAllowed} />}
         {screen === 'nickname' && <form className="menu-form" onSubmit={event => {
           event.preventDefault(); const nickname = String(new FormData(event.currentTarget).get('nickname')).trim();
           command(roomIntent.roomId ? 'JOIN_ROOM' : 'CREATE_ROOM', { ...(roomIntent.roomId ? { roomId: roomIntent.roomId } : {}), nickname });

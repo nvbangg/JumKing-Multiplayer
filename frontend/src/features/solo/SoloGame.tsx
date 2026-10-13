@@ -8,6 +8,11 @@ import type { PlayerState } from '../../game/simulation/types';
 import rules from '../../../../shared/rules.json';
 import { SoloWriter, StorageUnavailable } from './storage';
 import { TouchControls } from '../../game/input/TouchControls';
+import { AudioBus } from '../../game/presentation/AudioBus';
+import { readOptions, saveOptions, type Options } from './options';
+import { OptionsButtons, ControlsHelp } from './OptionsPanel';
+import { MenuPanel } from '../../components/MenuPanel';
+import { duration, ticksToMs } from '../records/format';
 
 export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = null, onExit }: {
   profile?: string; action?: 'new' | 'continue' | 'auto'; expectedRunId?: string | null; onExit?: () => void;
@@ -18,6 +23,10 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
   const writer = useRef<SoloWriter | null>(null);
   const pauseRequested = useRef(false);
   const closing = useRef(false);
+  const audio = useRef<AudioBus | null>(null);
+  const [options, setOptions] = useState(readOptions);
+  const [menu, setMenu] = useState<'pause' | 'options' | 'controls'>('pause');
+  const [optionError, setOptionError] = useState('');
   const [state, setState] = useState<PlayerState | null>(null);
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
@@ -33,7 +42,11 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
     try { await storage.save(); setSaveStatus('SAVED'); setSaveError(''); }
     catch (cause) { session.pause(); input.current?.cancel(); setPaused(true); setSaveStatus('FAILED'); setSaveError(cause instanceof Error ? cause.message : 'Could not save Solo'); throw cause; }
   };
-  const pause = () => { pauseRequested.current = true; runtime.current?.pause(); input.current?.cancel(); setPaused(true); void flush().catch(() => {}); };
+  const pause = () => { pauseRequested.current = true; runtime.current?.pause(); audio.current?.pause(true); input.current?.cancel(); setMenu('pause'); setPaused(true); void flush().catch(() => {}); };
+  const updateOptions = (key: keyof Options) => {
+    const next = { ...options, [key]: !options[key] }; setOptions(next); audio.current?.setEnabled(next.sound);
+    try { saveOptions(next); setOptionError(''); } catch { setOptionError('Options could not be saved on this device'); }
+  };
   useEffect(() => {
     const controller = new AbortController();
     let disposed = false;
@@ -59,15 +72,17 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
       if (!response.ok) throw new Error('Game map is unavailable');
       const map = parseMap(await response.json());
       if (disposed) return;
+      audio.current = new AudioBus(manifest, readOptions().sound, setOptionError);
       let finished = false;
       let savedScreen = 0;
       const session = new SoloRuntime(map, () => controls.read(), frame => {
+        audio.current?.setScreen(frame.screen);
         writer.current?.observe(frame, map.progressOriginY, session.simulation.finished);
         if (frame.screen !== savedScreen) { savedScreen = frame.screen; void flush().catch(() => {}); }
         if (session.simulation.finished && !finished) { finished = true; controls.cancel(); void flush().catch(() => {}); }
         const now = performance.now();
         if (now - lastHud >= PRESENTATION.hudIntervalMs) { setState(frame); lastHud = now; }
-      });
+      }, 'Player', (effects, frame) => { for (const effect of effects) audio.current?.effect(effect, frame); });
       const storage = await SoloWriter.open(profile, action, session.simulation.snapshot(), expectedRunId).catch(cause => {
         if (cause instanceof StorageUnavailable && action !== 'continue' && expectedRunId === null) { setSaveStatus('FAILED'); setSaveError(cause.message); return null; }
         throw cause;
@@ -77,7 +92,8 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
       catch (cause) { await storage?.close(); throw cause; }
       writer.current = storage;
       runtime.current = session;
-      if (pauseRequested.current) { session.pause(); controls.cancel(); }
+      audio.current.setScreen(session.simulation.snapshot().screen);
+      if (pauseRequested.current) { session.pause(); controls.cancel(); audio.current.pause(true); }
       if (storage) setSaveStatus('SAVED');
       activity();
       game = renderer.createGame(container.current!, manifest, session, () => { setReady(true); setState(session.simulation.snapshot()); }, message => { session.pause(); controls.cancel(); setError(message); });
@@ -86,7 +102,7 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
       disposed = true; controller.abort(); clearInterval(afk); clearInterval(autosave);
       const storage = writer.current, session = runtime.current;
       if (storage && session) { session.pause(); storage.observe(session.simulation.snapshot(), session.simulation.map.progressOriginY, session.simulation.finished); void storage.save().finally(() => storage.close()).catch(() => {}); }
-      writer.current = null; controls.dispose(); game?.destroy(true); runtime.current = null; input.current = null;
+      writer.current = null; controls.dispose(); game?.destroy(true); audio.current?.dispose(); audio.current = null; runtime.current = null; input.current = null;
       window.removeEventListener('blur', pause); document.removeEventListener('visibilitychange', hidden);
       window.removeEventListener('pagehide', pageHide); window.removeEventListener('pageshow', pageShow);
     };
@@ -115,13 +131,18 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
       if (onExit) onExit(); else location.href = '/';
     })(); }}>Back</button></div>}
     {saveError && <p className="save-error" role="alert">{saveError}</p>}
-    {ready && <div className="game-hud"><span>Jumps: {state?.jumps ?? 0}</span><button onClick={pause}>Menu</button></div>}
+    {ready && <div className="game-hud"><span>Jumps: {state?.jumps ?? 0}{options.displayTimer && <span className="timer" aria-label="Play time">{duration(ticksToMs(state?.ticks || 0))}</span>}</span><button onClick={pause}>Menu</button></div>}
     {ready && !paused && <TouchControls input={input} flying={state?.freeFlight} />}
-    {paused && <section className="game-overlay" aria-label="Game menu"><h2>Paused</h2>
-      <button disabled={leaving} onClick={() => { pauseRequested.current = false; input.current?.resume(); runtime.current?.resume(); setPaused(false); }}>Resume</button>
-      <button disabled={leaving} onClick={() => { void leave(); }}>{leaving ? 'Saving…' : 'Save & Exit'}</button>
-      {saveStatus === 'FAILED' && <button disabled={leaving} onClick={() => { void discardUnsaved(); }}>Leave Without Saving</button>}
-      <small role="status">{saveStatus === 'SAVED' ? 'Saved' : saveStatus === 'PENDING' ? 'Saving…' : 'Save failed'}</small>
+    {paused && <section className="game-overlay" aria-label="Game menu"><MenuPanel title={menu === 'pause' ? 'Paused' : menu === 'options' ? 'Options' : 'Controls'} onBack={menu === 'pause' ? undefined : () => setMenu(menu === 'controls' ? 'options' : 'pause')}>
+      {menu === 'pause' && <><button disabled={leaving} onClick={() => { pauseRequested.current = false; input.current?.resume(); runtime.current?.resume(); audio.current?.pause(false); setPaused(false); }}>Resume</button>
+        <button onClick={() => setMenu('options')}>Options</button>
+        <button disabled={leaving} onClick={() => { void leave(); }}>{leaving ? 'Saving…' : 'Save & Exit'}</button>
+        {saveStatus === 'FAILED' && <button disabled={leaving} onClick={() => { void discardUnsaved(); }}>Leave Without Saving</button>}
+        <small role="status">{saveStatus === 'SAVED' ? 'Saved' : saveStatus === 'PENDING' ? 'Saving…' : 'Save failed'}</small></>}
+      {menu === 'options' && <OptionsButtons options={options} flyAllowed={__SOLO_FLY_ENABLED__} onChange={updateOptions} onControls={() => setMenu('controls')} onError={setOptionError} />}
+      {menu === 'controls' && <ControlsHelp flyAllowed={__SOLO_FLY_ENABLED__} />}
+      {optionError && <p role="alert">{optionError}</p>}
+      </MenuPanel>
     </section>}
   </main>;
 }

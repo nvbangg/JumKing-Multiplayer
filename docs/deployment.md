@@ -50,6 +50,7 @@ BACKEND_URL chỉ dùng cho proxy Vite. VITE_BACKEND_ORIGIN trống nếu cùng 
 | SERVER_SERVLET_SESSION_COOKIE_SECURE | true khi HTTPS; áp dụng cả Guest cookie |
 | SERVER_SERVLET_SESSION_TIMEOUT | server.servlet.session.timeout; idle theo [protocol](protocol.md#identity-và-security) |
 | APP_SESSION_ABSOLUTE_TIMEOUT | app.session-absolute-timeout; hạn tối đa theo protocol |
+| APP_AUTH_RATE_PER_MINUTE / APP_HTTP_BODY_LIMIT | app.auth-rate-per-minute=20; app.http-body-limit=16384 bytes |
 | APP_CHECKPOINT_INTERVAL_MS | app.checkpoint-interval-ms=1000; chu kỳ checkpoint Community và metrics Room |
 | APP_PERSISTENCE_RETRY_COUNT | app.persistence-retry-count=3 |
 | FLY_ENABLED | app.fly-enabled=${FLY_ENABLED:false}; mặc định false |

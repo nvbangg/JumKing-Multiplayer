@@ -14,43 +14,20 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipFile;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.testcontainers.containers.MySQLContainer;
+import jumpking.support.TestDatabase;
 
 class SchemaIT {
-    private static MySQLContainer<?> container;
     private static JdbcTemplate jdbc;
     private static DriverManagerDataSource dataSource;
 
     @BeforeAll static void startDatabase() throws Exception {
-        String url = System.getenv("JK_TEST_DATABASE_URL");
-        if (url == null) {
-            container = new MySQLContainer<>("mysql:8.4").withDatabaseName("jumpking_it");
-            container.start();
-            url = container.getJdbcUrl();
-            dataSource = new DriverManagerDataSource(url, container.getUsername(), container.getPassword());
-        } else {
-            dataSource = new DriverManagerDataSource(url, System.getenv("JK_TEST_DATABASE_USERNAME"), System.getenv("JK_TEST_DATABASE_PASSWORD"));
-        }
-        jdbc = new JdbcTemplate(dataSource);
-        assertThat(jdbc.queryForObject("SELECT DATABASE()", String.class)).startsWith("jumpking_it");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()", Integer.class)).isZero();
-        String script = Files.readString(Path.of("../scripts/schema.sql"));
-        for (String statement : script.split(";")) {
-            if (statement.isBlank() || statement.strip().startsWith("CREATE DATABASE") || statement.strip().startsWith("USE ")) continue;
-            jdbc.execute(statement);
-        }
-    }
-
-    @AfterAll static void stopDatabase() {
-        if (container != null) container.stop();
-        // Instance do runner sở hữu; không xóa database bên ngoài.
+        var database = TestDatabase.get(); dataSource = database.dataSource; jdbc = database.jdbc;
     }
 
     private long account() {
@@ -111,7 +88,7 @@ class SchemaIT {
                 }
             }
             for (String path : new String[]{"/api/missing", "/assets/missing.png", "/ws/game"}) {
-                assertThat(http.send(HttpRequest.newBuilder(URI.create(origin + path)).build(), HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(404);
+                assertThat(http.send(HttpRequest.newBuilder(URI.create(origin + path)).header("Origin", "http://127.0.0.1:5173").build(), HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(404);
             }
         } finally {
             process.destroy();

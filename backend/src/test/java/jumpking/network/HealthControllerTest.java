@@ -16,7 +16,9 @@ import org.springframework.http.HttpStatus;
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class HealthControllerTest {
     @Configuration(proxyBeanMethods = false)
-    @EnableAutoConfiguration(exclude = DataSourceAutoConfiguration.class)
+    @EnableAutoConfiguration(exclude = {DataSourceAutoConfiguration.class,
+        org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
+        org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration.class})
     @Import({HealthController.class, jumpking.config.WebConfiguration.class})
     static class HttpApplication {}
     @Autowired private TestRestTemplate http;

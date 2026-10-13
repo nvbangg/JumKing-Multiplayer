@@ -42,7 +42,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 
 ## Phase 04 — Account và contracts
 
-- [ ] Triển khai Guest/session/CSRF/Origin và HTTP errors; kiểm tra cookies, idle/absolute, quyền và rate limits.
+- [x] Triển khai Guest/session/CSRF/Origin và HTTP errors; kiểm tra cookies, idle/absolute, quyền và rate limits.
 - [ ] Hoàn thiện Register/Login/Logout và UI Account; kiểm tra validation, session rotation và ownership.
 - [ ] Hoàn thiện Merge/Skip Guest Room History; kiểm tra pointer/writer đồng thời, nhiều lượt cùng match và Stats không cộng trùng.
 - [ ] Triển khai map/game-config API và HTTP/WS adapter; kiểm tra contract, credentials, endpoints và lỗi kết nối.
@@ -129,5 +129,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 03 — ending | PASS — build/type-check, 42 unit tests, 4 đường animation khớp tọa độ native; Chrome chạy trọn timeline Shoes/Raven và Skip/ảnh kết thúc, không credit/callback trùng. Continue đúng Finish cấp Crown trước autosave, clock giữ 16.957 ticks, một History; xem trực tiếp 2 screenshots. Renderer 43 screen phân biệt avatar với Babe |
 | Phase 03 — ending fixture JSON | PASS — sửa phép so sánh qua JSON codec (JSON không giữ dấu của zero); kiểm tra riêng native −0, chạy lại type-check và toàn bộ 42 unit tests |
 | Phase 03 — Fly controls | PASS — type-check/build, 44 unit tests, 25 Chrome E2E mặc định và 3 E2E riêng với cờ dev; kiểm tra gate, Options, double Space/touch, nhiều ngón, Continue và thoát solid. Build/preview luôn khóa Fly; mobile dành chỗ riêng cho touch controls |
-| Phase 04–07 | NOT RUN — chưa triển khai và nghiệm thu hệ thống |
+| Phase 04 — identity/security | PASS — 22 unit tests + 13 MySQL/HTTP/JAR integration tests; Guest opaque/hash và hết hạn, CSRF/CORS/Origin, cookies Secure/HttpOnly/Lax, body thường/chunked, quyền Account, idle/absolute và rate theo IP/identity. Session authority dùng chung HTTP/WS; tích hợp thu hồi socket theo mốc WS transport |
+| Phase 04–07 còn lại | NOT RUN — chưa triển khai và nghiệm thu hệ thống |
 | Phase 08 | Chưa thực hiện |

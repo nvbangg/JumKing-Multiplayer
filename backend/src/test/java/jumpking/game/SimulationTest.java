@@ -66,6 +66,8 @@ class SimulationTest {
     @Test void completesTheFullMainBabeRouteWithoutCheats() throws Exception {
         var sim = new Simulation(map, physics, false, false);
         var visited = new HashSet<Integer>();
+        var checkpoints = fixture("main-babe-checkpoints.json");
+        int index = 0;
         for (int i = 0; i < 30; i++) step(sim, PlayerInput.NEUTRAL, visited);
         for (JsonNode action : fixture("main-babe-route.json")) {
             if (action.has("walk")) {
@@ -77,11 +79,18 @@ class SimulationTest {
                 if (charge != 36) step(sim, new PlayerInput(direction < 0, direction > 0, false), visited);
                 for (int i = 0; i < 180; i++) { step(sim, PlayerInput.NEUTRAL, visited); if (sim.snapshot().grounded && i > 0) break; }
             }
+            assertState(sim.snapshot(), checkpoints.get(index), "route/" + index);
+            if (index++ % 17 == 0) {
+                var resumed = new Simulation(map, physics, false, false);
+                resumed.restore(mapper.readValue(mapper.writeValueAsBytes(sim.snapshot()), PlayerState.class));
+                sim = resumed;
+            }
         }
         assertThat(visited).hasSize(43);
         assertThat(sim.snapshot().jumps).isEqualTo(228);
         assertThat(sim.snapshot().falls).isZero();
         assertThat(sim.finished()).isTrue();
+        assertThat(sim.snapshot().ticks).isEqualTo(16957);
     }
 
     private void step(Simulation sim, PlayerInput input, HashSet<Integer> visited) {

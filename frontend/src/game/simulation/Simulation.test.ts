@@ -5,6 +5,7 @@ import { PHYSICS as P } from './tuning';
 import { NEUTRAL_INPUT as idle, type GameMap } from './types';
 import rawMap from '../../../../shared/maps/main-babe.json';
 import route from '../../../../shared/fixtures/main-babe-route.json';
+import checkpoints from '../../../../shared/fixtures/main-babe-checkpoints.json';
 
 const map = parseMap(rawMap);
 function settled(world = map, noWalk = false) {
@@ -74,9 +75,10 @@ test('codec restores exact replay and rejects malformed state', () => {
 });
 
 test('legitimate replay reaches Finish through all 43 screens without fly or teleport', () => {
-  const sim = settled(), visited = new Set([0]);
+  let sim = settled();
+  const visited = new Set([0]);
   const step = (input = idle) => { sim.tick(input); visited.add(sim.snapshot().screen); };
-  for (const action of route) {
+  for (const [index, action] of route.entries()) {
     if ('walk' in action) {
       for (let i = 0; i < action.ticks!; i++) step({ left: action.walk! < 0, right: action.walk! > 0, jump: false });
     } else {
@@ -85,7 +87,14 @@ test('legitimate replay reaches Finish through all 43 screens without fly or tel
       if (action.charge !== 36) step({ left: action.direction! < 0, right: action.direction! > 0, jump: false });
       for (let i = 0; i < 180; i++) { step(); if (sim.snapshot().grounded && i > 0) break; }
     }
+    expect(sim.snapshot(), `route checkpoint ${index}`).toEqual(checkpoints[index]);
+    if (index % 17 === 0) {
+      const resumed = new Simulation(map);
+      resumed.restore(JSON.parse(JSON.stringify(sim.snapshot())));
+      sim = resumed;
+    }
   }
   expect(visited.size).toBe(43); expect(sim.snapshot().jumps).toBe(228);
   expect(sim.snapshot().falls).toBe(0); expect(sim.finished).toBe(true);
+  expect(sim.snapshot().ticks).toBe(16957);
 });

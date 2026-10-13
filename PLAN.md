@@ -8,7 +8,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 
 ## Phase 00 — Thiết kế
 
-- [ ] Hoàn thiện tài liệu khởi tạo và .gitignore chung; kiểm tra nguồn quyết định, links, contracts và yêu cầu học phần.
+- [x] Hoàn thiện tài liệu khởi tạo và .gitignore chung; kiểm tra nguồn quyết định, links, contracts và yêu cầu học phần.
 
 ## Phase 01 — Nền tảng
 
@@ -106,6 +106,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 
 | Phần | Kết quả |
 | --- | --- |
-| Phase 00 | Đã rà soát nội dung/links/contracts; chưa commit; quyền phân phối asset gốc chưa xác minh |
+| Phase 00 | PASS — 9 tài liệu, 67 links/anchors nội bộ; đối chiếu contracts, Source of Truth, yêu cầu học phần; git diff --check |
 | Phase 01–07 | NOT RUN — chưa triển khai và nghiệm thu hệ thống |
 | Phase 08 | Chưa thực hiện |

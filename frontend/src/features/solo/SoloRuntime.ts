@@ -16,8 +16,10 @@ export class SoloRuntime implements GameRuntime {
     if (this.paused || this.simulation.finished) { this.accumulatedMs = 0; return; }
     this.accumulatedMs += Math.max(0, Math.min(PRESENTATION.maxFrameMs, deltaMs));
     const step = 1000 / PHYSICS.tickRate;
-    while (this.accumulatedMs >= step && !this.simulation.finished) {
-      this.simulation.tick(this.readInput()); this.accumulatedMs -= step;
+    while (this.accumulatedMs >= step && !this.simulation.finished && !this.paused) {
+      const input = this.readInput();
+      if (this.paused) break;
+      this.simulation.tick(input); this.accumulatedMs -= step;
       this.onTick(this.simulation.snapshot());
     }
   }

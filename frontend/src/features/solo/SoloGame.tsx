@@ -7,6 +7,7 @@ import { PRESENTATION } from '../../game/presentation/config';
 import type { PlayerState } from '../../game/simulation/types';
 import rules from '../../../../shared/rules.json';
 import { SoloWriter, StorageUnavailable } from './storage';
+import { TouchControls } from '../../game/input/TouchControls';
 
 export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = null, onExit }: {
   profile?: string; action?: 'new' | 'continue' | 'auto'; expectedRunId?: string | null; onExit?: () => void;
@@ -40,7 +41,7 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
     let lastHud = 0;
     let lastActivity = performance.now();
     const activity = () => { lastActivity = performance.now(); };
-    const controls = new InputController(activity, pause);
+    const controls = new InputController(activity, pause, () => runtime.current?.simulation.cancelInput());
     input.current = controls;
     const hidden = () => { if (document.hidden) pause(); };
     window.addEventListener('blur', pause); document.addEventListener('visibilitychange', hidden);
@@ -115,6 +116,7 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
     })(); }}>Back</button></div>}
     {saveError && <p className="save-error" role="alert">{saveError}</p>}
     {ready && <div className="game-hud"><span>Jumps: {state?.jumps ?? 0}</span><button onClick={pause}>Menu</button></div>}
+    {ready && !paused && <TouchControls input={input} flying={state?.freeFlight} />}
     {paused && <section className="game-overlay" aria-label="Game menu"><h2>Paused</h2>
       <button disabled={leaving} onClick={() => { pauseRequested.current = false; input.current?.resume(); runtime.current?.resume(); setPaused(false); }}>Resume</button>
       <button disabled={leaving} onClick={() => { void leave(); }}>{leaving ? 'Saving…' : 'Save & Exit'}</button>

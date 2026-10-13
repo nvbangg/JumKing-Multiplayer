@@ -33,7 +33,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 - [x] Hoàn thiện khung frontend/menu và các màn hình chức năng; kiểm tra navigation/focus, responsive và trạng thái lỗi. Tích hợp chức năng online theo Phase 04–06.
 - [x] Triển khai Solo save/Continue/Pause/New Game/Stats local; kiểm tra profile/UUID/revision, sync queue, offline/storage và tự Pause khi hidden/blur/AFK.
 - [x] Hoàn thiện Solo History local; kiểm tra terminal summaries, Guest/Account tách biệt và không mất lịch sử khi thay save.
-- [ ] Hoàn thiện keyboard/touch/gamepad; kiểm tra charge, multi-touch và cancel input.
+- [x] Hoàn thiện keyboard/touch/gamepad; kiểm tra charge, multi-touch và cancel input.
 - [ ] Hoàn thiện audio/Options; kiểm tra lựa chọn, audio unlock/cache và lưu settings.
 - [ ] Triển khai collectibles/inventory/equipment/merchant/quests trong hai simulation; kiểm tra fixtures/restore.
 - [ ] Hoàn thiện NPC/readables/hội thoại; kiểm tra ID/state/trigger và focus/input.
@@ -122,5 +122,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 03 — frontend/menu | PASS — 30 unit tests và 5 Chrome E2E cho menu/forms, keyboard/focus, desktop/mobile, lỗi offline và Save/Continue/refresh; kiểm tra screenshots. Adapter gọi HTTP/WS thật; backend Account/Community/Room và tích hợp online chưa triển khai, kiểm chứng ở Phase 04–06 |
 | Phase 03 — Solo save | PASS — IndexedDB thật: Save/Continue/refresh, New Game giữ totals, writer lock/revision/profile, ACK cũ và sai owner, storage bị chặn, blur cancel charge và AFK 60 giây; hàng chờ local tồn tại qua mở lại DB. Đồng bộ HTTP theo Phase 04; state adventure được bổ sung cùng nội dung game |
 | Phase 03 — Solo History | PASS — 33 unit tests và Chrome với IndexedDB thật: Finish dùng checkpoint oracle, terminal summary giữ UUID/counters, không còn Continue; New Game giữ best/totals/History, profile Guest không nhận dữ liệu Account; ABANDONED/ACTIVE không thành Finish |
+| Phase 03 — input | PASS — build/type-check, 33 unit tests, 14 Chrome E2E; multi-touch thật qua Chrome giữ hướng/Jump, pointercancel không launch; gamepad API mô phỏng kiểm tra dead zone/held/Start/disconnect/SecurityError và keyboard fallback. Tay cầm/điện thoại vật lý chưa nghiệm thu |
 | Phase 03–07 còn lại | NOT RUN — chưa triển khai và nghiệm thu hệ thống |
 | Phase 08 | Chưa thực hiện |

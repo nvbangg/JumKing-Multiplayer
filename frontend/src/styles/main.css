@@ -15,6 +15,11 @@ button { cursor: pointer; }
 .game-message { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); text-align: center; background: #08090c; padding: 1rem; }
 .game-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 1rem; background: #000b; }
 .game-overlay button { min-width: 180px; background: #08090c; color: #ede7d3; border: 2px solid #6b6250; padding: .7rem; }
+.touch-controls { display: none; position: absolute; bottom: max(16px, env(safe-area-inset-bottom)); left: max(16px, env(safe-area-inset-left)); right: max(16px, env(safe-area-inset-right)); justify-content: space-between; gap: 16px; pointer-events: none; }
+.touch-controls > div { display: flex; flex-wrap: wrap; gap: 10px; }
+.touch-controls button { pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; border: 1px solid #b2a484; background: #0009; color: #ede7d3; min-width: 54px; height: 54px; border-radius: 8px; font-size: 22px; }
+.touch-controls button:active { background: #463a24cc; }
+@media (pointer: coarse), (max-width: 680px) { .touch-controls { display: flex; } }
 .brand { margin: 0 0 36px; }
 .brand h1 { margin: 0; line-height: 0; }
 .brand img { width: min(560px, 85vw); height: auto; image-rendering: pixelated; }

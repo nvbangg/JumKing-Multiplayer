@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, copyFile, realpath } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, copyFile, realpath, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -22,9 +22,13 @@ const world = {
 };
 const inCampaign = entry => Number.isInteger(entry.screen) && entry.screen >= 0 && entry.screen < 43;
 const main = details.adventure;
-const npcs = details.npcs.filter(inCampaign);
+const npcs = details.npcs.filter(inCampaign).map(({ achievements, quotes, ...npc }) => ({
+  ...npc,
+  screenQuotes: (npc.screenQuotes || []).filter(inCampaign),
+  flagQuotes: (npc.flagQuotes || []).filter(quote => quote.flag === 'CompletedOriginal'),
+}));
 const items = main.items.filter(inCampaign);
-const merchants = main.merchants.filter(inCampaign);
+const merchants = main.merchants.filter(inCampaign).map(({ achievements, ...merchant }) => merchant);
 const birds = main.birds.map(bird => ({ ...bird, positions: bird.positions.filter(inCampaign) })).filter(bird => bird.positions.length);
 const messages = main.messages.filter(inCampaign);
 const validItems = new Set(['Crown', 'Cap', 'Shoes', ...items.map(item => item.item), ...birds.map(bird => bird.item)]);
@@ -50,18 +54,34 @@ for (const screen of screens) {
   for (const prop of screen.props || []) textureKeys.add(prop.texture);
   for (const ambient of screen.ambience || []) soundKeys.add('audio/background/' + ambient.name);
   for (const weather of screen.weather || []) {
-    for (const key of Object.keys(manifest.textures)) if (key.startsWith('particles/' + weather.name) || key.startsWith('screens/masks/' + weather.name + 'mask')) textureKeys.add(key);
+    if (weather.mask) textureKeys.add(weather.mask);
+    for (const key of Object.keys(manifest.textures)) if (key.startsWith('particles/' + weather.name + '/')) textureKeys.add(key);
   }
+  const scrolling = screen.scrolling?.ScrollingBGdata?.layers?.Layer;
+  for (const layer of scrolling ? (Array.isArray(scrolling) ? scrolling : [scrolling]) : []) textureKeys.add('screens/scrolling/textures/' + layer.texture);
 }
 for (const entry of [...npcs, ...items, ...skins, ...birds]) if (entry.texture) textureKeys.add(entry.texture);
-for (const key of Object.keys(manifest.textures)) if (key.startsWith('particles/') && !/qs|sand/.test(key)) textureKeys.add(key);
+textureKeys.add('particles/jump_particle');
+textureKeys.add('particles/snow_jump_particle');
 const fonts = Object.fromEntries(Object.entries(manifest.fonts).filter(([key]) => ['font/sf_pixolde', 'font/sf_litter_lover2_bold'].includes(key)));
 const textures = Object.fromEntries([...textureKeys].filter(key => manifest.textures[key]).map(key => [key, manifest.textures[key]]));
 const sounds = Object.fromEntries([...soundKeys].filter(key => manifest.sounds[key]).map(key => [key, manifest.sounds[key]]));
 const output = path.join(root, 'frontend/public/assets');
 await mkdir(output, { recursive: true });
+let previousHashes = {};
+try { previousHashes = JSON.parse(await readFile(path.join(output, 'manifest.json'), 'utf8')).hashes || {}; }
+catch (error) { if (error.code !== 'ENOENT') throw error; }
 const files = new Set([...Object.values(textures).map(t => t.file), ...Object.values(sounds).map(s => s.file), ...Object.values(fonts).flatMap(f => [f.texture, f.data]), 'font/ttf_litter_lover2_bold.ttf']);
 const hashes = {};
+for (const [file, hash] of Object.entries(previousHashes)) {
+  if (files.has(file)) continue;
+  const owned = path.resolve(output, file);
+  if (!owned.startsWith(output + path.sep)) throw new Error('Previous manifest escapes asset directory');
+  try {
+    if (createHash('sha256').update(await readFile(owned)).digest('hex') !== hash) throw new Error('Refusing to remove modified asset: ' + file);
+    await unlink(owned);
+  } catch (error) { if (error.code !== 'ENOENT') throw error; }
+}
 for (const file of files) {
   const resolved = await realpath(path.join(sourceRoot, file));
   if (!resolved.startsWith(sourceRoot + path.sep)) throw new Error('Asset path escapes source directory');

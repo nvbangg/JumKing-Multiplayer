@@ -149,4 +149,4 @@ History gồm các lượt Solo/Community đã kết thúc và các trận Room 
 
 Community và Room có chat riêng theo sảnh; chat hủy input nhưng không trực tiếp Pause. AFK áp dụng theo [điều khiển](#điều-khiển-và-physics); định dạng, giới hạn và lưu chat theo [protocol](protocol.md).
 
-Assets có manifest; `frontend/public/assets/ATTRIBUTION.md` ghi nguồn và giấy phép của từng nhóm. Chỉ commit/phân phối asset khi đã xác minh quyền sử dụng; sở hữu bản game không mặc nhiên cấp quyền phân phối lại.
+Assets có manifest; `frontend/public/assets/ATTRIBUTION.md` ghi nguồn và tình trạng giấy phép của từng nhóm. Không gán giấy phép mã nguồn mở cho tài nguyên khi chưa có căn cứ; sở hữu bản game không mặc nhiên cấp quyền phân phối lại.

@@ -3,9 +3,11 @@ import { assetUrl, type AssetManifest, type Npc, type Prop } from '../content/as
 import { PRESENTATION as V, PLAYER_FRAMES } from '../presentation/config';
 import { PHYSICS } from '../simulation/tuning';
 import { playerFrame } from '../presentation/playerFrame';
-import type { GameRuntime, RenderPlayer } from '../presentation/types';
+import type { GameRuntime, RenderPlayer, PresentationHooks } from '../presentation/types';
 import { AdventureVisuals } from '../presentation/AdventureVisuals';
 import { ConversationVisuals } from '../presentation/ConversationVisuals';
+import { MainBabeEnding } from '../presentation/MainBabeEnding';
+import { ENDING_FRAMES, endingFrameName } from '../presentation/endingFrames';
 
 interface Avatar { sprite: Phaser.GameObjects.Sprite; name: Phaser.GameObjects.Text; layers: Map<string, Phaser.GameObjects.Sprite> }
 export class TowerScene extends Phaser.Scene {
@@ -21,7 +23,9 @@ export class TowerScene extends Phaser.Scene {
   private ready = false;
   private adventureVisuals?: AdventureVisuals;
   private conversations?: ConversationVisuals;
-  constructor(private manifest: AssetManifest, private runtime: GameRuntime, private onReady: () => void, private onError: (message: string) => void) { super('Tower'); }
+  private ending?: MainBabeEnding;
+  private babe?: Phaser.GameObjects.Sprite;
+  constructor(private manifest: AssetManifest, private runtime: GameRuntime, private onReady: () => void, private onError: (message: string) => void, private hooks: PresentationHooks = {}) { super('Tower'); }
   preload(): void {
     for (const [key, texture] of Object.entries(this.manifest.textures)) this.load.image(key, assetUrl(texture.file));
     for (const [key, font] of Object.entries(this.manifest.fonts)) this.load.bitmapFont(key, assetUrl(font.texture), assetUrl(font.data));
@@ -38,6 +42,7 @@ export class TowerScene extends Phaser.Scene {
   }
   update(_time: number, delta: number): void {
     if (!this.ready) return;
+    if (this.ending) { this.ending.update(); return; }
     this.runtime.advance(delta);
     this.render();
     const state = this.runtime.frame().self.state;
@@ -69,7 +74,7 @@ export class TowerScene extends Phaser.Scene {
     let avatar = this.avatars.get(player.id);
     if (!avatar) {
       avatar = {
-        sprite: this.add.sprite(0, 0, 'king/base', 'idle').setOrigin(0.5, 1),
+        sprite: this.add.sprite(0, 0, 'king/base', 'idle').setOrigin(0.5, 1).setName('player:' + player.id),
         name: this.add.text(0, 0, '', { fontFamily: 'monospace', fontSize: V.nameFontSize, color: '#ffffff', stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5, 1).setDepth(V.nameDepth),
         layers: new Map(),
       };
@@ -99,6 +104,12 @@ export class TowerScene extends Phaser.Scene {
     this.avatar(frame.self, true);
     this.adventureVisuals?.render(frame);
     this.conversations?.render(frame, this.npcSprites);
+    if (frame.ending && !this.ending) {
+      for (const avatar of this.avatars.values()) { avatar.sprite.setVisible(false); avatar.name.setVisible(false); for (const sprite of avatar.layers.values()) sprite.setVisible(false); }
+      this.babe?.setVisible(false);
+      this.ending = new MainBabeEnding(this, this.manifest, frame.ending, key => this.hooks.onSound?.(key), () => this.hooks.onEndingComplete?.());
+      this.hooks.onEndingStart?.(() => this.ending?.skip());
+    }
   }
   private addFrames(key: string, columns: number, rows: number): void {
     const info = this.manifest.textures[key]!, texture = this.textures.get(key);
@@ -114,7 +125,7 @@ export class TowerScene extends Phaser.Scene {
   }
   private drawScreen(index: number): void {
     for (const visual of this.visuals) visual.destroy();
-    this.visuals = []; this.background = []; this.weather = []; this.npcSprites = []; this.props = []; this.screen = index;
+    this.visuals = []; this.background = []; this.weather = []; this.npcSprites = []; this.props = []; this.babe = undefined; this.screen = index;
     const screen = this.manifest.screens[index]!, top = -index * V.height;
     this.cameras.main.setScroll(0, top);
     for (const key of screen.layers) this.visuals.push(this.add.image(0, top, key).setOrigin(0).setDepth(key.includes('/foreground/') ? V.foregroundDepth : key.includes('/midground/') ? 3 : 0));
@@ -142,6 +153,11 @@ export class TowerScene extends Phaser.Scene {
       this.addFrames(npc.texture, npc.cells.X, npc.cells.Y);
       const sprite = this.add.sprite(npc.position.X, top + npc.position.Y, npc.texture, '0').setOrigin(0.5, 1).setDepth(9).setFlipX(npc.bubble.direction === 'Left');
       this.visuals.push(sprite); this.npcSprites.push({ data: npc, sprite });
+    }
+    if (index === this.runtime.frame().self.state.screen && index === this.manifest.screens.length - 1) {
+      const frame = ENDING_FRAMES['babe.idle0']!, texture = this.textures.get('king/base'), name = endingFrameName('babe.idle0');
+      if (!texture.has(name)) texture.add(name, 0, frame.x, frame.y, frame.width, frame.height);
+      this.babe = this.add.sprite(348, top + 138, 'king/base', name).setDepth(9); this.visuals.push(this.babe);
     }
   }
 }

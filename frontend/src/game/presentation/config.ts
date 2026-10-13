@@ -5,6 +5,7 @@ export const PRESENTATION = Object.freeze({
   effectVolume: 0.65, ambienceVolume: 0.6,
   bubblePadding: 7, bubbleMargin: 5, bubbleOffsetY: 32, npcTalkingFrameSeconds: 0.2,
   readableLineHeight: 12, readableOffsetX: 10, readableOffsetY: 40,
+  endingDepth: 80, endingPictureGuardMs: 2000,
   foregroundDepth: 20, selfDepth: 10, peerDepth: 8, nameDepth: 30,
 });
 export const PLAYER_FRAMES = ['idle', 'walk_one', 'walk_smear', 'walk_two', 'charge', 'up', 'fall', 'splat', 'bounce', 'stretch_one', 'stretch_smear', 'stretch_two', 'look_up'] as const;

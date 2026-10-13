@@ -10,6 +10,7 @@ export class AudioBus {
   private ambience: HTMLAudioElement[] = [];
   private screen = -1;
   private music: string | null = null;
+  private musicLoop = true;
   private disposed = false;
   private suspended = false;
   private fetches = new AbortController();
@@ -57,15 +58,19 @@ export class AudioBus {
       this.stream(key, stream.volume * PRESENTATION.ambienceVolume);
     }
   }
-  setMusic(key: string): void {
-    if (this.music === key || this.disposed) return;
-    this.music = key; this.screen = -1; this.clearAmbience();
-    if (this.enabled) this.stream(key, PRESENTATION.ambienceVolume);
+  setMusic(key: string, loop = true): void {
+    if ((this.music === key && this.musicLoop === loop) || this.disposed) return;
+    this.music = key; this.musicLoop = loop; this.screen = -1; this.clearAmbience();
+    if (this.enabled) this.stream(key, PRESENTATION.ambienceVolume, loop);
   }
-  private stream(key: string, volume: number): void {
+  beginEnding(): void {
+    this.suspended = false; this.setMusic('audio/music/ending', false);
+    if (this.enabled) void this.unlock().then(() => Promise.all(Object.keys(this.manifest.sounds).filter(key => key.startsWith('audio/babe/')).map(key => this.load(key)))).catch(cause => this.report(cause));
+  }
+  private stream(key: string, volume: number, loop = true): void {
     const asset = this.manifest.sounds[key]; if (!asset) return;
     const audio = new Audio(assetUrl(asset.file));
-    audio.loop = true; audio.volume = Math.min(1, volume); audio.preload = 'auto';
+    audio.loop = loop; audio.volume = Math.min(1, volume); audio.preload = 'auto';
     audio.onerror = () => this.report(new Error('Could not load ambience'));
     this.ambience.push(audio); this.playStream(audio);
   }
@@ -86,7 +91,7 @@ export class AudioBus {
     if (enabled === this.enabled) return;
     this.enabled = enabled;
     if (!enabled) { this.clearAmbience(); this.stopEffects(); }
-    else { const screen = this.screen, music = this.music; this.screen = -1; this.music = null; if (music) this.setMusic(music); else this.setScreen(screen); void this.unlock(); }
+    else { const screen = this.screen, music = this.music, loop = this.musicLoop; this.screen = -1; this.music = null; if (music) this.setMusic(music, loop); else this.setScreen(screen); void this.unlock(); }
   }
   pause(paused: boolean): void {
     this.suspended = paused;

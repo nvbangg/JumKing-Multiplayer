@@ -29,6 +29,10 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
   const [menu, setMenu] = useState<'pause' | 'options' | 'controls' | 'inventory'>('pause');
   const [, setInventoryRevision] = useState(0);
   const [optionError, setOptionError] = useState('');
+  const [ending, setEnding] = useState<'playing' | 'picture' | null>(null);
+  const [pictureReady, setPictureReady] = useState(false);
+  const skipEnding = useRef<(() => void) | null>(null);
+  useEffect(() => { if (ending !== 'picture') return; const timer = setTimeout(() => setPictureReady(true), PRESENTATION.endingPictureGuardMs); return () => clearTimeout(timer); }, [ending]);
   const [state, setState] = useState<PlayerState | null>(null);
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
@@ -44,7 +48,7 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
     try { await storage.save(); setSaveStatus('SAVED'); setSaveError(''); }
     catch (cause) { session.pause(); input.current?.cancel(); setPaused(true); setSaveStatus('FAILED'); setSaveError(cause instanceof Error ? cause.message : 'Could not save Solo'); throw cause; }
   };
-  const pause = () => { pauseRequested.current = true; runtime.current?.pause(); audio.current?.pause(true); input.current?.cancel(); setMenu('pause'); setPaused(true); void flush().catch(() => {}); };
+  const pause = () => { if (runtime.current?.simulation.finished) { skipEnding.current?.(); return; } pauseRequested.current = true; runtime.current?.pause(); audio.current?.pause(true); input.current?.cancel(); setMenu('pause'); setPaused(true); void flush().catch(() => {}); };
   const updateOptions = (key: keyof Options) => {
     const next = { ...options, [key]: !options[key] }; setOptions(next); audio.current?.setEnabled(next.sound);
     try { saveOptions(next); setOptionError(''); } catch { setOptionError('Options could not be saved on this device'); }
@@ -93,7 +97,7 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
         throw cause;
       });
       if (disposed) { await storage?.close(); return; }
-      try { if (storage?.run.snapshot) { session.game.restore(storage.run.snapshot); session.simulation.cancelInput(); savedScreen = storage.run.snapshot.physics.screen; } }
+      try { if (storage?.run.snapshot) { session.restore(storage.run.snapshot); savedScreen = storage.run.snapshot.physics.screen; } }
       catch (cause) { await storage?.close(); throw cause; }
       writer.current = storage;
       runtime.current = session;
@@ -101,7 +105,10 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
       if (pauseRequested.current) { session.pause(); controls.cancel(); audio.current.pause(true); }
       if (storage) setSaveStatus('SAVED');
       activity();
-      game = renderer.createGame(container.current!, manifest, session, () => { setReady(true); setState(session.simulation.snapshot()); }, message => { session.pause(); controls.cancel(); setError(message); });
+      game = renderer.createGame(container.current!, manifest, session, () => { setReady(true); setState(session.simulation.snapshot()); }, message => { session.pause(); controls.cancel(); setError(message); }, {
+        onEndingStart: skip => { skipEnding.current = skip; controls.cancel(); setPaused(false); setEnding('playing'); audio.current?.beginEnding(); },
+        onEndingComplete: () => setEnding('picture'), onSound: key => audio.current?.play(key),
+      });
     })().catch(cause => { if (!disposed) setError(cause instanceof Error ? cause.message : 'Unable to load game'); });
     return () => {
       disposed = true; controller.abort(); clearInterval(afk); clearInterval(autosave);
@@ -136,8 +143,9 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
       if (onExit) onExit(); else location.href = '/';
     })(); }}>Back</button></div>}
     {saveError && <p className="save-error" role="alert">{saveError}</p>}
-    {ready && <div className="game-hud"><span>Jumps: {state?.jumps ?? 0}{options.displayTimer && <span className="timer" aria-label="Play time">{duration(ticksToMs(state?.ticks || 0))}</span>}</span><button onClick={pause}>Menu</button></div>}
-    {ready && !paused && <TouchControls input={input} flying={state?.freeFlight} />}
+    {ready && !ending && <div className="game-hud"><span>Jumps: {state?.jumps ?? 0}{options.displayTimer && <span className="timer" aria-label="Play time">{duration(ticksToMs(state?.ticks || 0))}</span>}</span><button onClick={pause}>Menu</button></div>}
+    {ready && !paused && !ending && <TouchControls input={input} flying={state?.freeFlight} />}
+    {ending && <div className="ending-actions">{ending === 'playing' ? <button onClick={() => skipEnding.current?.()}>Skip</button> : <button disabled={!pictureReady || leaving} onClick={() => { void leave(); }}>{leaving ? 'Saving…' : 'Back to Menu'}</button>}</div>}
     {paused && <section className="game-overlay" aria-label="Game menu"><MenuPanel title={menu === 'pause' ? 'Paused' : menu === 'options' ? 'Options' : menu === 'inventory' ? 'Inventory' : 'Controls'} onBack={menu === 'pause' ? undefined : () => setMenu(menu === 'controls' ? 'options' : 'pause')}>
       {menu === 'pause' && <><button disabled={leaving} onClick={() => { pauseRequested.current = false; input.current?.resume(); runtime.current?.resume(); audio.current?.pause(false); setPaused(false); }}>Resume</button>
         <button onClick={() => setMenu('options')}>Options</button>

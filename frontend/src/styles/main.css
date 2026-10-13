@@ -16,6 +16,9 @@ button { cursor: pointer; }
 .game-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 1rem; background: #000b; }
 .game-overlay .menu-panel { width: min(500px, 90vw); max-height: 90dvh; overflow-y: auto; }
 .game-hud .timer { padding-left: 20px; }
+.ending-actions { position: absolute; bottom: max(16px, env(safe-area-inset-bottom)); right: max(16px, env(safe-area-inset-right)); }
+.ending-actions button { background: #080808dd; color: #ede7d3; border: 1px solid #72684d; font-size: 20px; padding: 10px 18px; }
+.ending-actions button:disabled { opacity: .5; }
 .game-overlay button { min-width: 180px; background: #08090c; color: #ede7d3; border: 2px solid #6b6250; padding: .7rem; }
 .touch-controls { display: none; position: absolute; bottom: max(16px, env(safe-area-inset-bottom)); left: max(16px, env(safe-area-inset-left)); right: max(16px, env(safe-area-inset-right)); justify-content: space-between; gap: 16px; pointer-events: none; }
 .touch-controls > div { display: flex; flex-wrap: wrap; gap: 10px; }

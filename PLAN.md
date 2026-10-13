@@ -37,7 +37,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 - [x] Hoàn thiện audio/Options; kiểm tra lựa chọn, audio unlock/cache và lưu settings.
 - [x] Triển khai collectibles/inventory/equipment/merchant/quests trong hai simulation; kiểm tra fixtures/restore.
 - [x] Hoàn thiện NPC/readables/hội thoại; kiểm tra ID/state/trigger và focus/input.
-- [ ] Hoàn thiện Solo ending/Skip; kiểm tra đúng Finish, không credit/phát trùng.
+- [x] Hoàn thiện Solo ending/Skip; kiểm tra đúng Finish, không credit/phát trùng.
 - [ ] Thêm Options/điều khiển Fly Mode; kiểm tra quyền Solo dev, nhấn đúp, di chuyển và restore.
 
 ## Phase 04 — Account và contracts
@@ -126,5 +126,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 03 — audio/Options | PASS — build/type-check, 33 unit tests; Chrome giải mã/cache SFX và phát ambience thật, Pause/mute/đổi vùng dừng stream cũ; Sound/Timer lưu qua home/game/reload, Fullscreen vào/thoát, Controls/Escape đúng focus. Audio bị chặn báo lỗi nhưng Solo vẫn nhảy; kiểm tra 5 E2E liên quan và 3 audio cases |
 | Phase 03 — adventure | PASS — 40 frontend tests, 20 backend tests + 6 MySQL integration/JAR web; hai engine khớp 49 checkpoint/34.365 ticks oracle pickup/Raven/merchant/NPC/readable và full route physics 16.957 ticks. Chrome 9 E2E: pickup/trang bị/wardrobe, nâng IndexedDB giữ save, Continue/History và 43 screen. Manifest còn Main Babe: 129 texture/51 âm thanh; bổ sung hidden walls, loại quest/music ngoài map. Hiển thị hội thoại/ending theo các mốc tiếp theo |
 | Phase 03 — hội thoại | PASS — build/type-check, 40 unit tests; 4 Chrome E2E kiểm tra bitmap font/NPC typewriter/readable, 43 screen và input. Old Man nói trong khi người chơi vẫn nhảy; đổi screen ẩn bubble cũ. Nội dung tra bằng ID, merchant thay giá, animation theo state; không thêm pause hội thoại |
+| Phase 03 — ending | PASS — build/type-check, 42 unit tests, 4 đường animation khớp tọa độ native; Chrome chạy trọn timeline Shoes/Raven và Skip/ảnh kết thúc, không credit/callback trùng. Continue đúng Finish cấp Crown trước autosave, clock giữ 16.957 ticks, một History; xem trực tiếp 2 screenshots. Renderer 43 screen phân biệt avatar với Babe |
 | Phase 03–07 còn lại | NOT RUN — chưa triển khai và nghiệm thu hệ thống |
 | Phase 08 | Chưa thực hiện |

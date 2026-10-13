@@ -3,5 +3,7 @@ import type { AdventureState } from '../simulation/Adventure';
 import type { WorldState } from '../simulation/GameSimulation';
 
 export interface RenderPlayer { id: string; nickname: string; color: string; state: PlayerState; equipment: string[]; adventure?: AdventureState }
-export interface WorldFrame { self: RenderPlayer; peers: RenderPlayer[]; world?: WorldState }
+export interface EndingSignal { id: string; screen: number; equipped: string[]; ravenDone: boolean }
+export interface PresentationHooks { onEndingStart?: (skip: () => void) => void; onEndingComplete?: () => void; onSound?: (key: string) => void }
+export interface WorldFrame { self: RenderPlayer; peers: RenderPlayer[]; world?: WorldState; ending?: EndingSignal }
 export interface GameRuntime { advance(deltaMs: number): void; frame(): WorldFrame }

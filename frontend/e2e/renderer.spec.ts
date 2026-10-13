@@ -29,7 +29,7 @@ test('renderer draws all 43 screens and keeps self above translucent peers', asy
         state = states.find(candidate => candidate.screen === screen) || { ...states[0]!, screen, x: 231, y: -screen * 360 + 302 };
         await frames();
         const scene = game.scene.getScene('Tower');
-        const sprites = scene.children.list.filter((child: { type: string; texture?: { key: string } }) => child.type === 'Sprite' && child.texture?.key === 'king/base');
+        const sprites = scene.children.list.filter((child: { type: string; name: string; texture?: { key: string } }) => child.type === 'Sprite' && child.texture?.key === 'king/base' && child.name.startsWith('player:'));
         if (sprites.length !== 2 || !sprites.some((sprite: { alpha: number }) => sprite.alpha === 1) || !sprites.some((sprite: { alpha: number }) => sprite.alpha === 0.7)) failures.push('Avatar opacity ' + screen);
         const self = sprites.find((sprite: { alpha: number }) => sprite.alpha === 1);
         const peer = sprites.find((sprite: { alpha: number }) => sprite.alpha === 0.7);

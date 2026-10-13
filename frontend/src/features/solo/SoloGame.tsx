@@ -59,8 +59,10 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
       const map = parseMap(await response.json());
       if (disposed) return;
       let finished = false;
+      let savedScreen = 0;
       const session = new SoloRuntime(map, () => controls.read(), frame => {
         writer.current?.observe(frame, map.progressOriginY, session.simulation.finished);
+        if (frame.screen !== savedScreen) { savedScreen = frame.screen; void flush().catch(() => {}); }
         if (session.simulation.finished && !finished) { finished = true; controls.cancel(); void flush().catch(() => {}); }
         const now = performance.now();
         if (now - lastHud >= PRESENTATION.hudIntervalMs) { setState(frame); lastHud = now; }
@@ -70,7 +72,7 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
         throw cause;
       });
       if (disposed) { await storage?.close(); return; }
-      try { if (storage?.run.snapshot) { session.simulation.restore(storage.run.snapshot); session.simulation.cancelInput(); } }
+      try { if (storage?.run.snapshot) { session.simulation.restore(storage.run.snapshot); session.simulation.cancelInput(); savedScreen = storage.run.snapshot.screen; } }
       catch (cause) { await storage?.close(); throw cause; }
       writer.current = storage;
       runtime.current = session;
@@ -95,18 +97,28 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
     try { await flush(); await writer.current?.close(); writer.current = null; if (onExit) onExit(); else location.href = '/'; }
     catch { closing.current = false; setLeaving(false); }
   };
+  const discardUnsaved = async () => {
+    if (leaving || !window.confirm('Leave without saving your latest progress?')) return;
+    closing.current = true; runtime.current?.pause(); input.current?.cancel(); setLeaving(true);
+    try { await writer.current?.close(); }
+    catch { /* Giải phóng phiên ngay cả khi storage không còn truy cập được. */ }
+    writer.current = null;
+    if (onExit) onExit(); else location.href = '/';
+  };
   return <main className="play-page">
     <div className="game-viewport" ref={container} aria-label="Main Babe game" />
     {!ready && !error && <p className="game-message" role="status">Loading…</p>}
-    {error && <div className="game-message" role="alert"><p>{error}</p><button onClick={() => {
-      void writer.current?.close().finally(() => { writer.current = null; });
+    {error && <div className="game-message" role="alert"><p>{error}</p><button onClick={() => { void (async () => {
+      try { await writer.current?.close(); } catch { }
+      writer.current = null;
       if (onExit) onExit(); else location.href = '/';
-    }}>Back</button></div>}
+    })(); }}>Back</button></div>}
     {saveError && <p className="save-error" role="alert">{saveError}</p>}
     {ready && <div className="game-hud"><span>Jumps: {state?.jumps ?? 0}</span><button onClick={pause}>Menu</button></div>}
     {paused && <section className="game-overlay" aria-label="Game menu"><h2>Paused</h2>
       <button disabled={leaving} onClick={() => { pauseRequested.current = false; input.current?.resume(); runtime.current?.resume(); setPaused(false); }}>Resume</button>
       <button disabled={leaving} onClick={() => { void leave(); }}>{leaving ? 'Saving…' : 'Save & Exit'}</button>
+      {saveStatus === 'FAILED' && <button disabled={leaving} onClick={() => { void discardUnsaved(); }}>Leave Without Saving</button>}
       <small role="status">{saveStatus === 'SAVED' ? 'Saved' : saveStatus === 'PENDING' ? 'Saving…' : 'Save failed'}</small>
     </section>}
   </main>;

@@ -31,7 +31,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 - [x] Chuẩn hóa assets/nội dung Main Babe, manifest/ATTRIBUTION; kiểm tra ID, nguồn và tải tài nguyên.
 - [x] Hoàn thiện renderer/sprite/animation/camera/môi trường; kiểm tra toàn tuyến và chuyển screen.
 - [x] Hoàn thiện khung frontend/menu và các màn hình chức năng; kiểm tra navigation/focus, responsive và trạng thái lỗi. Tích hợp chức năng online theo Phase 04–06.
-- [ ] Triển khai Solo save/Continue/Pause/New Game/Stats local; kiểm tra profile/UUID/revision, sync queue, offline/storage và tự Pause khi hidden/blur/AFK.
+- [x] Triển khai Solo save/Continue/Pause/New Game/Stats local; kiểm tra profile/UUID/revision, sync queue, offline/storage và tự Pause khi hidden/blur/AFK.
 - [ ] Hoàn thiện Solo History local; kiểm tra terminal summaries, Guest/Account tách biệt và không mất lịch sử khi thay save.
 - [ ] Hoàn thiện keyboard/touch/gamepad; kiểm tra charge, multi-touch và cancel input.
 - [ ] Hoàn thiện audio/Options; kiểm tra lựa chọn, audio unlock/cache và lưu settings.
@@ -120,5 +120,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 03 — assets | PASS — manifest/hashes, 120 texture/53 âm thanh/4 NPC; 29 frontend tests và Chrome decode texture/tải audio/font; nguồn Jump King gốc ghi trong ATTRIBUTION. Giấy phép phân phối lại chưa được cung cấp |
 | Phase 03 — renderer | PASS — 30 frontend tests, type-check/build; Chrome kiểm tra 43 screen/camera, opacity/depth sprite và trang bị, nickname; Solo nhảy/Pause/Resume thật và xem screenshot. Chưa có save/menu chính hoàn chỉnh/audio/điều khiển cảm ứng |
 | Phase 03 — frontend/menu | PASS — 30 unit tests và 5 Chrome E2E cho menu/forms, keyboard/focus, desktop/mobile, lỗi offline và Save/Continue/refresh; kiểm tra screenshots. Adapter gọi HTTP/WS thật; backend Account/Community/Room và tích hợp online chưa triển khai, kiểm chứng ở Phase 04–06 |
+| Phase 03 — Solo save | PASS — IndexedDB thật: Save/Continue/refresh, New Game giữ totals, writer lock/revision/profile, ACK cũ và sai owner, storage bị chặn, blur cancel charge và AFK 60 giây; hàng chờ local tồn tại qua mở lại DB. Đồng bộ HTTP theo Phase 04; state adventure được bổ sung cùng nội dung game |
 | Phase 03–07 còn lại | NOT RUN — chưa triển khai và nghiệm thu hệ thống |
 | Phase 08 | Chưa thực hiện |

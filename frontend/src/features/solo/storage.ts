@@ -45,6 +45,22 @@ export async function currentSolo(profile: string): Promise<SoloRun | null> {
   const runs = await soloRuns(profile);
   return runs.find(run => run.status === 'ACTIVE') || null;
 }
+export async function pendingSoloRuns(profile: string): Promise<SoloRun[]> {
+  return (await soloRuns(profile)).filter(run => run.revision > run.syncedRevision);
+}
+export async function acknowledgeSolo(profile: string, id: string, revision: number): Promise<void> {
+  if (!Number.isSafeInteger(revision) || revision < 1) throw new Error('Invalid Solo sync acknowledgement');
+  const db = await openStore();
+  try {
+    const tx = db.transaction('runs', 'readwrite'), done = completed(tx);
+    try {
+      const runs = tx.objectStore('runs'), stored: SoloRun | undefined = await request(runs.get(id));
+      if (!stored || stored.profile !== profile || revision > stored.revision) throw new Error('Solo sync acknowledgement does not match this profile');
+      if (revision > stored.syncedRevision) runs.put({ ...stored, syncedRevision: revision });
+      await done;
+    } catch (cause) { try { tx.abort(); } catch { } await done.catch(() => {}); throw cause; }
+  } finally { db.close(); }
+}
 function terminalTime(startedAt: string): string { return new Date(Math.max(Date.now(), Date.parse(startedAt))).toISOString(); }
 async function exclusiveWriter(profile: string): Promise<(() => Promise<void>) | null> {
   if (!navigator.locks) return null;
@@ -150,10 +166,12 @@ export class SoloWriter {
     this.closed = true;
     try {
       const tx = this.db.transaction('profiles', 'readwrite'), done = completed(tx);
-      const store = tx.objectStore('profiles');
-      const profile: Profile = await request(store.get(this.observed.profile));
-      if (profile?.writerId === this.writerId) store.put({ ...profile, writerId: null, leaseExpiresAt: 0 });
-      await done;
+      try {
+        const store = tx.objectStore('profiles');
+        const profile: Profile = await request(store.get(this.observed.profile));
+        if (profile?.writerId === this.writerId) store.put({ ...profile, writerId: null, leaseExpiresAt: 0 });
+        await done;
+      } catch (cause) { try { tx.abort(); } catch { } await done.catch(() => {}); throw cause; }
     } finally { this.db.close(); await this.releaseLock?.(); }
   }
 }

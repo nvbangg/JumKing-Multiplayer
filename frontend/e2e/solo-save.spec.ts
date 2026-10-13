@@ -71,3 +71,46 @@ test('real IndexedDB enforces writer ownership, revision and profile separation'
   expect(result).toMatchObject({ rejected: true, sameId: true, jumps: 1, accountRuns: 1, guestRuns: 1 });
   expect(result.revision).toBeGreaterThan(1);
 });
+
+test('pending sync survives reopen and late acknowledgements preserve newer revisions', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(async () => {
+    const path = '/src/features/solo/storage.ts', simulationPath = '/src/game/simulation/Simulation.ts';
+    const { SoloWriter, pendingSoloRuns, acknowledgeSolo, soloRuns } = await import(path);
+    const { Simulation } = await import(simulationPath);
+    const map = await (await fetch('/shared/maps/main-babe.json')).json(), simulation = new Simulation(map);
+    const writer = await SoloWriter.open('sync-account', 'new', simulation.snapshot());
+    const first = writer.run;
+    simulation.tick({ left: false, right: false, jump: false });
+    writer.observe(simulation.snapshot(), map.progressOriginY, false);
+    const second = await writer.save(); await writer.close();
+    await acknowledgeSolo('sync-account', first.id, first.revision);
+    const pending = await pendingSoloRuns('sync-account');
+    let wrongOwner = false, future = false;
+    try { await acknowledgeSolo('other-account', first.id, second.revision); } catch { wrongOwner = true; }
+    try { await acknowledgeSolo('sync-account', first.id, second.revision + 1); } catch { future = true; }
+    await acknowledgeSolo('sync-account', first.id, second.revision);
+    await acknowledgeSolo('sync-account', first.id, first.revision);
+    const [stored] = await soloRuns('sync-account');
+    return { wrongOwner, future, pending: pending.length, revision: pending[0].revision, synced: pending[0].syncedRevision, remaining: (await pendingSoloRuns('sync-account')).length, finalSynced: stored.syncedRevision };
+  });
+  expect(result).toMatchObject({ wrongOwner: true, future: true, pending: 1, synced: 1, remaining: 0 });
+  expect(result.revision).toBeGreaterThan(result.synced);
+  expect(result.finalSynced).toBe(result.revision);
+});
+
+test('blur cancels charging and the AFK deadline pauses without a release jump', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/play');
+  await expect(page.getByRole('button', { name: 'Menu', exact: true })).toBeVisible();
+  await page.keyboard.down('Space');
+  await page.clock.runFor(100);
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await page.keyboard.up('Space');
+  await expect(page.getByRole('heading', { name: 'Paused', exact: true })).toBeVisible();
+  await expect(page.getByText('Jumps: 0', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Resume', exact: true }).click();
+  await page.clock.fastForward(60001);
+  await expect(page.getByRole('heading', { name: 'Paused', exact: true })).toBeVisible();
+  await expect(page.getByText('Jumps: 0', { exact: true })).toBeVisible();
+});

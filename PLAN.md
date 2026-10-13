@@ -23,7 +23,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 - [x] Đóng gói shared vào hai build; kiểm tra nạp dữ liệu từ artifact.
 - [x] Triển khai TypeScript simulation và state codec; kiểm tra terrain/charge/collision bằng fixtures.
 - [x] Triển khai Java simulation; kiểm tra số học từng tick và restore/replay khớp fixtures TypeScript.
-- [ ] Triển khai bay/thoát solid trong hai simulation; kiểm tra input, biên và restore.
+- [x] Triển khai bay/thoát solid trong hai simulation; kiểm tra input, biên và restore.
 - [ ] Hoàn thiện input replay từ spawn tới Finish; kiểm tra toàn tuyến không dùng bay/teleport.
 
 ## Phase 03 — Solo và presentation
@@ -115,5 +115,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 02 — artifact | PASS — Vite dist/shared và JAR classpath/shared nạp cùng JSON; kiểm tra byte trong JAR, không đóng gói fixtures; SharedData defensive copy, Maven test/build và integration MySQL thật |
 | Phase 02 — TypeScript | PASS — type-check, 22 tests; 11 oracle traces/2.640 ticks so sánh state chính xác, charge/auto/re-arm/cancel, collision/slope/ice/snow/wind và codec restore/replay |
 | Phase 02 — Java | PASS — Maven test (10); Java khớp 2.640 oracle ticks, codec restore/replay và full Main Babe route: 43 screen, 228 jumps, 0 falls, Finish hợp lệ |
+| Phase 02 — Fly simulation | PASS — 26 frontend tests/13 backend tests; gate mặc định, movement/cancel, phasing thẳng xuống tới body clear, restore khi tắt quyền và fallback đáy giữ counters |
 | Phase 01–07 còn lại | NOT RUN — chưa triển khai và nghiệm thu hệ thống |
 | Phase 08 | Chưa thực hiện |

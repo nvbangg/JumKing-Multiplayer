@@ -12,7 +12,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 
 ## Phase 01 — Nền tảng
 
-- [ ] Khởi tạo React/TypeScript/Phaser, lockfile, npm scripts và .gitignore frontend; kiểm tra build/trang khởi động.
+- [x] Khởi tạo React/TypeScript/Phaser, lockfile, npm scripts và .gitignore frontend; kiểm tra build/trang khởi động.
 - [ ] Khởi tạo Spring Boot/Java, Maven Wrapper, package, health check và .gitignore backend; kiểm tra test/build/start.
 - [ ] Triển khai schema ba bảng và JDBC/MySQL config/validation; kiểm tra ràng buộc, indexes và transactions trên instance cô lập.
 - [ ] Hoàn thiện config mẫu, Vite proxy và Maven web/JAR; kiểm tra development, đóng gói và refresh route UI.
@@ -107,5 +107,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phần | Kết quả |
 | --- | --- |
 | Phase 00 | PASS — 9 tài liệu, 67 links/anchors nội bộ; đối chiếu contracts, Source of Truth, yêu cầu học phần; git diff --check |
-| Phase 01–07 | NOT RUN — chưa triển khai và nghiệm thu hệ thống |
+| Phase 01 — frontend | PASS — npm run check, npm test (1), npm run build, Chrome E2E (1); npm audit không phát hiện lỗ hổng |
+| Phase 01–07 còn lại | NOT RUN — chưa triển khai và nghiệm thu hệ thống |
 | Phase 08 | Chưa thực hiện |

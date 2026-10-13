@@ -1,0 +1,8 @@
+:root { font-family: ui-monospace, monospace; color: #ede7d3; background: #08090c; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 280px; }
+.home { min-height: 100dvh; display: grid; place-content: center; }
+h1 { color: #e4bb68; text-align: center; letter-spacing: .12em; font-size: clamp(2rem, 8vw, 4rem); }
+button, input, select { font: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid #e4bb68; outline-offset: 4px; }

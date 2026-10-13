@@ -29,7 +29,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 ## Phase 03 — Solo và presentation
 
 - [x] Chuẩn hóa assets/nội dung Main Babe, manifest/ATTRIBUTION; kiểm tra ID, nguồn và tải tài nguyên.
-- [ ] Hoàn thiện renderer/sprite/animation/camera/môi trường; kiểm tra toàn tuyến và chuyển screen.
+- [x] Hoàn thiện renderer/sprite/animation/camera/môi trường; kiểm tra toàn tuyến và chuyển screen.
 - [ ] Hoàn thiện frontend theo các chức năng đã thiết kế; kiểm tra navigation/focus, responsive và trạng thái lỗi.
 - [ ] Triển khai Solo save/Continue/Pause/New Game/Stats local; kiểm tra profile/UUID/revision, sync queue, offline/storage và tự Pause khi hidden/blur/AFK.
 - [ ] Hoàn thiện Solo History local; kiểm tra terminal summaries, Guest/Account tách biệt và không mất lịch sử khi thay save.
@@ -118,5 +118,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 02 — Fly simulation | PASS — 26 frontend tests/13 backend tests; gate mặc định, movement/cancel, phasing thẳng xuống tới body clear, restore khi tắt quyền và fallback đáy giữ counters |
 | Phase 02 — route | PASS — hai simulation khớp 265 checkpoint oracle trên tuyến 16.957 ticks, restore giữa đường; đủ 43 screen, 228 jumps, 0 falls, Finish, không Fly/teleport |
 | Phase 03 — assets | PASS — manifest/hashes, 120 texture/53 âm thanh/4 NPC; 29 frontend tests và Chrome decode texture/tải audio/font; nguồn Jump King gốc ghi trong ATTRIBUTION. Giấy phép phân phối lại chưa được cung cấp |
+| Phase 03 — renderer | PASS — 30 frontend tests, type-check/build; Chrome kiểm tra 43 screen/camera, opacity/depth sprite và trang bị, nickname; Solo nhảy/Pause/Resume thật và xem screenshot. Chưa có save/menu chính hoàn chỉnh/audio/điều khiển cảm ứng |
 | Phase 03–07 còn lại | NOT RUN — chưa triển khai và nghiệm thu hệ thống |
 | Phase 08 | Chưa thực hiện |

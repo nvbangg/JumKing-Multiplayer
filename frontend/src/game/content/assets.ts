@@ -14,6 +14,7 @@ export interface Npc {
   name: string; screen: number; texture: string; position: { X: number; Y: number }; cells: { X: number; Y: number };
   busy: { sprite_index: number; duration: number }[]; talking: { sprite_index: number; duration: number }[];
   intro: string[]; looping: string[][]; screenQuotes: { screen: number; lines: string[] }[];
+  bubble: { direction: string; width: number };
 }
 export interface AssetManifest {
   screens: VisualScreen[];
@@ -22,6 +23,7 @@ export interface AssetManifest {
   fonts: Record<string, { texture: string; data: string; lineHeight: number }>;
   hashes: Record<string, string>;
   npcs: Npc[];
+  skins: { item: string; texture: string; layer: string }[];
 }
 export function assetUrl(file: string): string {
   if (!file || file.split('/').some(segment => !segment || segment === '.' || segment === '..') || file.includes('\\') || file.includes(':')) throw new Error('Invalid asset path');

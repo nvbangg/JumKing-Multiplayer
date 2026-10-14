@@ -211,6 +211,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
             if (room.state.equals("COUNTDOWN")) cancelCountdown(room);
             if (room.match != null && room.match.players.containsKey(player.id)) { var racer = room.match.players.get(player.id); racer.input.clear(); racer.game.physics().cancelInput(); }
             player.connection = null; player.disconnectedAt = time.nanos(); chooseHost(room); broadcast(room);
+            if (room.state.equals("PLAYING") && room.players.values().stream().noneMatch(member -> member.connection != null)) save(room, true);
         }); } catch (RejectedExecutionException busy) { connection.close(org.springframework.web.socket.CloseStatus.SERVICE_OVERLOAD); }
     }
     private void requireHost(Room room, Member player) { if (!player.id.equals(room.host)) throw new ApiException(403, "FORBIDDEN", "Only the Host can perform this action"); }

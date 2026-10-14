@@ -8,7 +8,7 @@ import { duration, soloStatistics } from '../features/records/format';
 import { HistoryList } from '../features/records/HistoryList';
 import { HistoryDetail } from '../features/records/HistoryDetail';
 import { MenuPanel } from '../components/MenuPanel';
-import { api, backendOrigin, clearCsrf } from '../network/api';
+import { api, ApiError, backendOrigin, clearCsrf } from '../network/api';
 import { GameSocket, type MatchResult, type RoomState } from '../network/GameSocket';
 import { EMPTY_STATS, type HistoryItem, type Identity, type Statistics, type LeaderboardEntry } from '../network/contracts';
 import { Lobby } from '../features/rooms/Lobby';
@@ -188,7 +188,13 @@ export function App() {
   };
 
   if (screen === 'play') return <SoloGame {...launch} onExit={() => { setOptions(readOptions()); back(); }} />;
-  if (screen === 'online' && room && socket.current) return <OnlineGame room={room} socket={socket.current} onHome={() => { socket.current?.close(); socket.current = null; setRoom(null); setScreen('home'); }} />;
+  if (screen === 'online' && room && socket.current) return <OnlineGame room={room} socket={socket.current} onHome={() => {
+    socket.current?.close(); socket.current = null; setRoom(null); setScreen('home'); clearCsrf();
+    void api<Identity>('/auth/me').then(setIdentity).catch(cause => {
+      if (cause instanceof ApiError && ['SESSION_EXPIRED', 'UNAUTHENTICATED'].includes(cause.code)) setIdentity(initialIdentity);
+      else setError(cause instanceof Error ? cause.message : 'Identity could not be refreshed');
+    });
+  }} />;
   return <main className="home">
     <header className="brand"><h1><img src="/assets/title_logo.png" alt="JumpKing" /></h1></header>
     <div className={screen === 'home' ? 'home-layout' : 'single-panel'}>

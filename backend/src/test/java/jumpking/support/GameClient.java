@@ -41,6 +41,11 @@ public final class GameClient implements AutoCloseable {
         String token = cookies.getCookieStore().getCookies().stream().filter(cookie -> cookie.getName().equals("JK_GUEST")).findFirst().orElseThrow().getValue();
         owner = TestDatabase.get().jdbc.queryForObject("SELECT id FROM users WHERE guest_token_hash=?", Long.class, jumpking.identity.GuestIdentity.hash(token));
     }
+    public void login(String email, String password) throws Exception {
+        csrf = request("/auth/csrf", "GET", null).path("token").asText();
+        owner = request("/auth/login", "POST", Map.of("email", email, "password", password)).path("account").path("id").asLong();
+        csrf = request("/auth/csrf", "GET", null).path("token").asText();
+    }
     public void connect() {
         socket = http.newWebSocketBuilder().header("Origin", "http://allowed.test").connectTimeout(Duration.ofSeconds(3))
             .buildAsync(URI.create(origin.replace("http", "ws") + "/ws/game"), new WebSocket.Listener() {
@@ -73,6 +78,6 @@ public final class GameClient implements AutoCloseable {
         while (!condition.getAsBoolean() && System.nanoTime() < deadline) Thread.sleep(10);
         assertThat(condition.getAsBoolean()).as("Condition before deadline").isTrue();
     }
-    public void disconnect() { if (socket != null) { socket.sendClose(WebSocket.NORMAL_CLOSURE, "").join(); socket = null; } }
+    public void disconnect() { if (socket != null) { if (!socket.isOutputClosed()) socket.sendClose(WebSocket.NORMAL_CLOSURE, "").join(); socket = null; } }
     @Override public void close() { disconnect(); http.close(); }
 }

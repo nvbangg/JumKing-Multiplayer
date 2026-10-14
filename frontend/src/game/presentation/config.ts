@@ -7,5 +7,6 @@ export const PRESENTATION = Object.freeze({
   readableLineHeight: 12, readableOffsetX: 10, readableOffsetY: 40,
   endingDepth: 80, endingPictureGuardMs: 2000,
   foregroundDepth: 20, selfDepth: 10, peerDepth: 8, nameDepth: 30,
+  dialogueFrameDepth: 32, dialogueTextDepth: 33,
 });
 export const PLAYER_FRAMES = ['idle', 'walk_one', 'walk_smear', 'walk_two', 'charge', 'up', 'fall', 'splat', 'bounce', 'stretch_one', 'stretch_smear', 'stretch_two', 'look_up'] as const;

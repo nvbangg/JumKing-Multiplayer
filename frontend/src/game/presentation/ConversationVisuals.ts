@@ -21,8 +21,8 @@ export class ConversationVisuals {
   private bubble(id: string, font: string, framed: boolean): Bubble {
     let bubble = this.bubbles.get(id);
     if (!bubble) {
-      bubble = { text: this.scene.add.bitmapText(0, 0, font, '').setDepth(31).setTint(0xe4dfcd).setName('dialogue:' + id), full: '', wrapped: '' };
-      if (framed) bubble.frame = this.scene.add.graphics().setDepth(30);
+      bubble = { text: this.scene.add.bitmapText(0, 0, font, '').setDepth(V.dialogueTextDepth).setTint(0xe4dfcd).setName('dialogue:' + id), full: '', wrapped: '' };
+      if (framed) bubble.frame = this.scene.add.graphics().setDepth(V.dialogueFrameDepth);
       this.bubbles.set(id, bubble);
     }
     bubble.text.setVisible(true); bubble.frame?.setVisible(true); return bubble;

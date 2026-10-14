@@ -1,12 +1,11 @@
 package jumpking.identity;
 
-import java.sql.Timestamp;
 import java.time.Clock;
 import java.util.function.Consumer;
 import jumpking.network.ApiException;
 import jumpking.room.Memberships;
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DataIntegrityViolationException;
+import jumpking.records.PlayRunRepository;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
@@ -16,15 +15,16 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class AccountService {
-    private final JdbcTemplate jdbc;
+    private final UserRepository users;
+    private final PlayRunRepository runs;
     private final PasswordEncoder passwords;
     private final AuthenticationManager authentication;
     private final TransactionTemplate transactions;
     private final Memberships memberships;
     private final Clock clock;
-    public AccountService(JdbcTemplate jdbc, PasswordEncoder passwords, AuthenticationManager authentication,
+    public AccountService(UserRepository users, PlayRunRepository runs, PasswordEncoder passwords, AuthenticationManager authentication,
             TransactionTemplate transactions, Memberships memberships, Clock clock) {
-        this.jdbc = jdbc; this.passwords = passwords; this.authentication = authentication;
+        this.users = users; this.runs = runs; this.passwords = passwords; this.authentication = authentication;
         this.transactions = transactions; this.memberships = memberships; this.clock = clock;
     }
     public IdentityContext.Account register(AccountCredentials.Registration form, Long guest, Consumer<IdentityContext.Account> authenticated) {
@@ -32,17 +32,17 @@ public class AccountService {
         return memberships.changingIdentity(guest, null, () -> {
             try {
                 var account = transactions.execute(status -> {
-                    if (guest == null) jdbc.update("INSERT INTO users(type,username,email,password_hash,created_at) VALUES ('ACCOUNT',?,?,?,?)",
-                        form.username(), form.email(), encoded, Timestamp.from(clock.instant()));
+                    if (guest == null) users.saveAndFlush(User.account(form.username(), form.email(), encoded, clock.instant()));
                     else {
-                        var type = jdbc.queryForObject("SELECT type FROM users WHERE id=? FOR UPDATE", String.class, guest);
-                        if (!"GUEST".equals(type) || jdbc.update("UPDATE users SET type='ACCOUNT',username=?,email=?,password_hash=?,guest_token_hash=NULL WHERE id=? AND merged_into_user_id IS NULL",
-                                form.username(), form.email(), encoded, guest) != 1) throw new ApiException(409, "CONFLICT", "This Guest identity has changed");
+                        var user = users.lockById(guest).orElseThrow(() -> new ApiException(409, "CONFLICT", "This Guest identity has changed"));
+                        if (!"GUEST".equals(user.getType()) || user.getMergedIntoUserId() != null) throw new ApiException(409, "CONFLICT", "This Guest identity has changed");
+                        user.setType("ACCOUNT"); user.setUsername(form.username()); user.setEmail(form.email());
+                        user.setPasswordHash(encoded); user.setGuestTokenHash(null); users.saveAndFlush(user);
                     }
                     return account(form.email());
                 });
                 authenticated.accept(account); return account;
-            } catch (DuplicateKeyException duplicate) { throw new ApiException(409, "CONFLICT", "Username or email is unavailable"); }
+            } catch (DataIntegrityViolationException duplicate) { throw new ApiException(409, "CONFLICT", "Username or email is unavailable"); }
         });
     }
     public IdentityContext.Account login(AccountCredentials.Login form, Long current, Consumer<IdentityContext.Account> authenticated) {
@@ -53,11 +53,10 @@ public class AccountService {
         return memberships.changingIdentity(current, Long.valueOf(account.id()), () -> { authenticated.accept(account); return account; });
     }
     public boolean guestHistory(Long guest) {
-        return guest != null && jdbc.queryForObject("SELECT COUNT(*) FROM play_runs WHERE user_id=? AND kind='ROOM'", Long.class, guest) > 0;
+        return guest != null && runs.existsByUserIdAndKind(guest, "ROOM");
     }
     private IdentityContext.Account account(String email) {
-        return jdbc.queryForObject("SELECT id,username,email FROM users WHERE type='ACCOUNT' AND email=?",
-            (row, index) -> new IdentityContext.Account(Long.toString(row.getLong("id")), row.getString("username"), row.getString("email")), email);
+        return users.findByTypeAndEmail("ACCOUNT", email).map(IdentityContext::accountView).orElseThrow(AccountService::invalidCredentials);
     }
     private static ApiException invalidCredentials() { return new ApiException(401, "INVALID_CREDENTIALS", "Email or password is incorrect"); }
 }

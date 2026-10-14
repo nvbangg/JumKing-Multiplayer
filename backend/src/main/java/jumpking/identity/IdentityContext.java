@@ -2,7 +2,6 @@ package jumpking.identity;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jumpking.network.ApiException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -11,16 +10,15 @@ import org.springframework.stereotype.Component;
 public class IdentityContext {
     public record Account(String id, String username, String email) {}
     public record Me(boolean authenticated, boolean guest, Account account) {}
-    private final JdbcTemplate jdbc;
+    private final UserRepository users;
     private final GuestIdentity guests;
-    public IdentityContext(JdbcTemplate jdbc, GuestIdentity guests) { this.jdbc = jdbc; this.guests = guests; }
+    public IdentityContext(UserRepository users, GuestIdentity guests) { this.users = users; this.guests = guests; }
     public Account account() {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken) return null;
-        return jdbc.query("SELECT id,username,email FROM users WHERE type='ACCOUNT' AND email=?",
-            (row, index) -> new Account(Long.toString(row.getLong("id")), row.getString("username"), row.getString("email")), authentication.getName())
-            .stream().findFirst().orElse(null);
+        return users.findByTypeAndEmail("ACCOUNT", authentication.getName()).map(IdentityContext::accountView).orElse(null);
     }
+    static Account accountView(User user) { return new Account(user.getId().toString(), user.getUsername(), user.getEmail()); }
     public Account requireAccount() {
         Account account = account(); if (account == null) throw new ApiException(401, "UNAUTHENTICATED", "Sign in to continue"); return account;
     }

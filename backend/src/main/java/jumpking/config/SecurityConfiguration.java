@@ -11,7 +11,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.web.servlet.ServletListenerRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.jdbc.core.JdbcTemplate;
+import jumpking.identity.UserRepository;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -43,11 +43,12 @@ public class SecurityConfiguration {
     @Bean org.springframework.security.web.context.HttpSessionSecurityContextRepository securityContexts() {
         return new org.springframework.security.web.context.HttpSessionSecurityContextRepository();
     }
-    @Bean UserDetailsService userDetailsService(JdbcTemplate jdbc) {
-        return email -> jdbc.query("SELECT email,password_hash FROM users WHERE type='ACCOUNT' AND email=?",
-            (row, index) -> User.withUsername(row.getString("email")).password(row.getString("password_hash")).roles("ACCOUNT").build(), email)
-            .stream().findFirst().orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
+    @Bean UserDetailsService userDetailsService(UserRepository users) {
+        return email -> users.findByTypeAndEmail("ACCOUNT", email)
+            .map(user -> User.withUsername(user.getEmail()).password(user.getPasswordHash()).roles("ACCOUNT").build())
+            .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
     }
+
     @Bean ServletListenerRegistrationBean<SessionAuthority> sessionListener(SessionAuthority authority) {
         return new ServletListenerRegistrationBean<>(authority);
     }

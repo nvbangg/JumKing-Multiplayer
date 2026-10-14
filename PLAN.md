@@ -14,7 +14,7 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 
 ## Phase 02 — Chuyển persistence
 
-- [ ] Chuyển Account/Guest/session và authentication sang UserRepository; hồi quy đăng nhập.
+- [x] Chuyển Account/Guest/session và authentication sang UserRepository; hồi quy đăng nhập.
 - [ ] Chuyển merge/ownership và Solo metrics; kiểm thử locking/idempotency/rollback.
 - [ ] Chuyển Community checkpoint/New Run/Finish và worker; hồi quy Continue/retry.
 - [ ] Chuyển Room writer/recovery; kiểm thử ghi/finalize đúng một lần.
@@ -61,7 +61,9 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 
 | Mốc | Kiểm chứng |
 | --- | --- |
-| Phase 00–01 | PASS — 69 links/anchors; backend unit tests và 16 MySQL integration tests (IdentityIT, JpaPersistenceIT), JSON/timestamp round-trip. Schema/database cá nhân không thay đổi. Các Service JDBC chuyển theo Phase 02; gameplay mới chưa nghiệm thu. |
+| Phase 00–01 | PASS — 68 links/anchors; backend unit tests và 16 MySQL integration tests (IdentityIT, JpaPersistenceIT), JSON/timestamp round-trip. Schema/database cá nhân không thay đổi. Các Service JDBC chuyển theo Phase 02; gameplay mới chưa nghiệm thu. |
+
+| Phase 02 — Identity | PASS — 51 unit tests, 18 MySQL integration tests; 22 Chrome online và 1 identity-race PASS. Account/Guest/authentication dùng UserRepository, không đổi contract/session hoặc database cá nhân. |
 
 ## Lịch sử triển khai trước thay đổi kiến trúc
 

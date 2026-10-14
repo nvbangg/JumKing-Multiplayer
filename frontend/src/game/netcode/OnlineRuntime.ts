@@ -1,6 +1,6 @@
 import { GameSimulation, type GameSnapshot } from '../simulation/GameSimulation';
 import type { GameMap, PlayerInput, PlayerState } from '../simulation/types';
-import type { GameRuntime, RenderPlayer, WorldFrame } from '../presentation/types';
+import type { GameRuntime, RenderPlayer, RenderPose, WorldFrame } from '../presentation/types';
 import type { GameSocket, RoomState } from '../../network/GameSocket';
 import { PHYSICS } from '../simulation/tuning';
 import { PRESENTATION } from '../presentation/config';
@@ -12,7 +12,7 @@ import { NETWORK } from '../../network/config';
 export interface OnlineSnapshot {
   roomId: string; serverTick: number; playId: string; generation: number; elapsedTimeMs: number; remainingTimeMs: number | null;
   self: { lastProcessedInputSeq: number; status: string; paused: boolean; simulation: GameSnapshot; metrics: Record<string, unknown> };
-  peers: { playerId: string; nickname: string; colorSlot: number; state: PlayerState; equipment: string[]; status: string }[];
+  peers: { playerId: string; nickname: string; colorSlot: number; state: RenderPose; equipment: string[]; status: string }[];
 }
 export class OnlineRuntime implements GameRuntime {
   readonly game: GameSimulation;

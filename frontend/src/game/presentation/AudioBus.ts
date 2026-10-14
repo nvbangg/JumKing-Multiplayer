@@ -74,7 +74,7 @@ export class AudioBus {
     audio.onerror = () => this.report(new Error('Could not load ambience'));
     this.ambience.push(audio); this.playStream(audio);
   }
-  play(key: string, volume = PRESENTATION.effectVolume): void {
+  play(key: string, volume: number = PRESENTATION.effectVolume): void {
     const context = this.context, buffer = this.buffers.get(key);
     if (!this.enabled || this.suspended || this.disposed || context?.state !== 'running' || !buffer) return;
     const source = context.createBufferSource(), gain = context.createGain();
@@ -82,10 +82,10 @@ export class AudioBus {
     source.onended = () => { this.sources.delete(source); source.disconnect(); gain.disconnect(); };
     this.sources.add(source); source.start();
   }
-  effect(effect: MovementEffect, state: PlayerState): void {
+  effect(effect: MovementEffect, state: Pick<PlayerState, 'snow' | 'ice'>, volume: number = PRESENTATION.effectVolume): void {
     const name = effect.toLowerCase();
     const variant = state.snow && effect !== 'BUMP' ? 'snow/king_' + name : state.ice && ['JUMP', 'LAND'].includes(effect) ? 'ice/king_' + name : 'king_' + name;
-    this.play('audio/jump_king/' + variant);
+    this.play('audio/jump_king/' + variant, volume);
   }
   setEnabled(enabled: boolean): void {
     if (enabled === this.enabled) return;

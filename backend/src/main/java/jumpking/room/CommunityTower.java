@@ -76,7 +76,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
         final LinkedHashMap<String, Member> players = new LinkedHashMap<>();
         final SerialExecutor actor;
         final AtomicBoolean tickQueued = new AtomicBoolean();
-        long serverTick, nextTick = time.nanos();
+        long serverTick, eventSeq, nextTick = time.nanos();
         final ScheduledFuture<?> timer;
         Tower(String id) {
             this.id = id; actor = new SerialExecutor(workers.executor(), limits.commandQueue(), error -> players.values().forEach(player -> { player.paused = true; player.saveStatus = "FAILED"; }));
@@ -105,6 +105,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
         }
         void tick(long now) {
             serverTick++;
+            var effects = new ArrayList<ObjectNode>();
             for (Member player : List.copyOf(players.values())) {
                 if (player.loading || player.operation) continue;
                 if (player.finished || player.leaving && player.paused) continue;
@@ -112,7 +113,10 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                     var frame = player.input.poll(now);
                     if (frame.cancel() || player.pausePending) player.game.physics().cancelInput();
                     var input = player.pausePending ? PlayerInput.NEUTRAL : frame.input();
-                    player.game.tick(input); double progress = player.game.physics().progress();
+                    var events = player.game.tick(input); double progress = player.game.physics().progress();
+                    var pose = player.game.physics().snapshot();
+                    for (String effect : events.movement()) effects.add(json.createObjectNode().put("eventSeq", ++eventSeq).put("playerId", player.id).put("playId", player.stored.id())
+                        .put("screen", pose.screen).put("effect", effect).put("terrain", pose.snow ? "SNOW" : pose.ice ? "ICE" : "NORMAL"));
                     if (progress > player.maximum) { player.maximum = progress; player.peakTicks = player.game.physics().snapshot().ticks; }
                     if (player.game.finished()) { player.finished = true; player.finishedAt = clock.instant(); player.paused = true; player.pausedAt = now; player.pausePending = false; save(this, player, true, () -> {
                         if (player.connection != null) player.connection.send("PLAYER_FINISHED", Map.of("playerId", player.id, "playId", player.stored.id(), "result", summary(player), "showEnding", true));
@@ -123,6 +127,11 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                     }
                 }
                 if (!player.loading && !player.finished && !player.saving && !player.paused && !player.pausePending && !player.saveStatus.equals("FAILED") && now - player.lastSave >= checkpointMs * 1_000_000L) save(this, player, false, () -> {});
+            }
+            if (!effects.isEmpty()) for (Member receiver : players.values()) if (receiver.connection != null && !receiver.loading) {
+                int screen = receiver.game.physics().snapshot().screen;
+                var visible = effects.stream().filter(event -> event.path("screen").asInt() == screen || event.path("playerId").asText().equals(receiver.id)).toList();
+                if (!visible.isEmpty()) receiver.connection.send("PLAYER_EFFECTS", Map.of("roomId", id, "events", visible));
             }
             if (serverTick % (physics.tickRate / rules.path("snapshotRate").asInt()) == 0) snapshots(this);
         }
@@ -397,7 +406,9 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
             var peers = value.putArray("peers");
             for (Member peer : tower.players.values()) if (peer != self && !peer.loading) {
                 var p = peers.addObject().put("playerId", peer.id).put("nickname", peer.identity.username()).put("colorSlot", peer.slot.color()).put("status", peer.finished ? "FINISHED" : "ACTIVE");
-                p.set("state", json.valueToTree(peer.game.physics().snapshot())); p.set("equipment", peer.game.adventure().snapshot().path("equipped"));
+                ObjectNode pose = json.valueToTree(peer.game.physics().snapshot());
+                pose.retain(List.of("x", "y", "vx", "vy", "grounded", "charge", "direction", "splat", "knocked", "ice", "snow", "wind", "screen", "ticks", "jumps", "falls"));
+                p.set("state", pose); p.set("equipment", peer.game.adventure().snapshot().path("equipped"));
             }
             self.connection.snapshot(value);
         }

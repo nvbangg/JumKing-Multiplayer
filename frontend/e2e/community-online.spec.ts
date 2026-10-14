@@ -21,6 +21,14 @@ function observe(page: Page) {
     });
   }); return state;
 }
+async function observeSound(page: Page) {
+  await page.evaluate(async () => {
+    const path = '/src/game/presentation/AudioBus.ts', { AudioBus } = await import(path);
+    const original = AudioBus.prototype.effect; const calls: { effect: string; volume: number }[] = [];
+    Object.assign(window, { onlineSoundCalls: calls });
+    AudioBus.prototype.effect = function (effect: string, state: { snow: boolean; ice: boolean }, volume: number) { calls.push({ effect, volume }); original.call(this, effect, state, volume); };
+  });
+}
 async function jump(page: Page) {
   await page.bringToFront();
   if (await page.getByRole('button', { name: 'Resume', exact: true }).isVisible()) await page.getByRole('button', { name: 'Resume', exact: true }).click();
@@ -38,6 +46,7 @@ test('two Accounts share server simulation, see each other jump, leave and Conti
     for (const context of [first, second]) await context.addInitScript(() => { if (location.protocol === 'http:' || location.protocol === 'https:') localStorage.setItem('jumpking.options', JSON.stringify({ sound: false, displayTimer: true })); });
     const a = await first.newPage(), b = await second.newPage(), observedA = observe(a), observedB = observe(b);
     const nameA = await account(a, 'tower_a'), nameB = await account(b, 'tower_b');
+    await observeSound(a); await observeSound(b);
     await a.bringToFront(); await a.getByRole('button', { name: 'Community Tower', exact: true }).click(); await a.getByRole('button', { name: 'New Game', exact: true }).click();
     await expect(a.getByRole('button', { name: 'Menu', exact: true })).toBeVisible({ timeout: 15_000 });
     await expect.poll(() => observedA.snapshots.length).toBeGreaterThan(0);
@@ -51,6 +60,11 @@ test('two Accounts share server simulation, see each other jump, leave and Conti
     await expect.poll(() => observedB.snapshots.at(-1)?.peers[0]?.state.jumps).toBeGreaterThan(0);
     await jump(b); await expect.poll(() => observedB.snapshots.at(-1)?.self.simulation.physics.jumps).toBeGreaterThan(0);
     await expect.poll(() => observedA.snapshots.at(-1)?.peers[0]?.state.jumps).toBeGreaterThan(0);
+    const sounds = await a.evaluate(() => (window as unknown as { onlineSoundCalls: { effect: string; volume: number }[] }).onlineSoundCalls);
+    expect(sounds.filter(call => call.effect === 'JUMP' && call.volume === 0.65)).toHaveLength(1);
+    expect(sounds.filter(call => call.effect === 'JUMP' && call.volume === 0.35)).toHaveLength(1);
+    expect(observedA.snapshots.at(-1)!.peers[0]!.state).not.toHaveProperty('directions');
+    expect(observedA.snapshots.at(-1)!.peers[0]).not.toHaveProperty('adventure');
     expect(observedA.errors).toEqual([]); expect(observedB.errors).toEqual([]);
     await a.screenshot({ path: info.outputPath('community-two-players.png') });
     await leave(a);

@@ -11,6 +11,8 @@ import { MenuPanel } from '../../components/MenuPanel';
 import { OptionsButtons, ControlsHelp } from '../solo/OptionsPanel';
 import { readOptions, saveOptions, type Options } from '../solo/options';
 import { duration } from '../records/format';
+import { PlayerEffects } from '../../game/netcode/PlayerEffects';
+import { PRESENTATION } from '../../game/presentation/config';
 
 export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room: RoomState; onHome: () => void }) {
   const container = useRef<HTMLDivElement>(null), runtime = useRef<OnlineRuntime | null>(null), input = useRef<InputController | null>(null), audio = useRef<AudioBus | null>(null);
@@ -31,12 +33,19 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
   useEffect(() => {
     let disposed = false, game: { destroy(removeCanvas: boolean): void } | undefined;
     const controller = new AbortController();
+    const effects = new PlayerEffects();
     const controls = new InputController(() => {}, () => pauseRef.current(), () => runtime.current?.cancel()); input.current = controls;
     const hidden = () => { if (document.hidden) pauseRef.current(); }; const blur = () => pauseRef.current();
     document.addEventListener('visibilitychange', hidden); window.addEventListener('blur', blur);
     const unsubscribe = socket.subscribe((type, payload) => {
       try {
         if (type === 'GAME_SNAPSHOT') runtime.current?.receive(payload);
+        if (type === 'PLAYER_EFFECTS' && runtime.current?.latest) {
+          const session = runtime.current;
+          for (const effect of effects.receive(payload, latestRoom.current.roomId, socket.selfId || '', session.latest!.playId, session.game.physics.snapshot().screen)) {
+            audio.current?.effect(effect.effect, { snow: effect.terrain === 'SNOW', ice: effect.terrain === 'ICE' }, effect.playerId === socket.selfId ? PRESENTATION.effectVolume : PRESENTATION.peerEffectVolume);
+          }
+        }
         if (type === 'CONNECTION_CLOSED') { if (runtime.current) runtime.current.menu = true; controls.cancel(); audio.current?.pause(true); setDisconnected(true); setMenu('pause'); setError('Disconnected from the game server'); }
         if (type === 'RECONNECT_OK') { setDisconnected(false); setError(''); }
         if (type === 'COMMUNITY_RUN_STATE' || type === 'SAVE_STATUS') { if (typeof payload.saveStatus === 'string') setSaveStatus(payload.saveStatus); }

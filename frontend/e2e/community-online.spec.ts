@@ -65,6 +65,17 @@ test('two Accounts share server simulation, see each other jump, leave and Conti
     expect(sounds.filter(call => call.effect === 'JUMP' && call.volume === 0.35)).toHaveLength(1);
     expect(observedA.snapshots.at(-1)!.peers[0]!.state).not.toHaveProperty('directions');
     expect(observedA.snapshots.at(-1)!.peers[0]).not.toHaveProperty('adventure');
+    await a.bringToFront();
+    if (await a.getByRole('button', { name: 'Resume', exact: true }).isVisible()) await a.getByRole('button', { name: 'Open Chat', exact: true }).click();
+    else await a.getByRole('button', { name: 'Chat', exact: true }).click();
+    const text = '<img src=x onerror="window.chatInjected=true"> hello';
+    await a.getByLabel('Message', { exact: true }).fill(text); await a.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(a.getByRole('log')).toContainText(text); expect(await a.evaluate(() => 'chatInjected' in window)).toBe(false);
+    await a.getByRole('button', { name: 'Close chat', exact: true }).click();
+    await b.bringToFront();
+    if (await b.getByRole('button', { name: 'Resume', exact: true }).isVisible()) await b.getByRole('button', { name: 'Open Chat', exact: true }).click();
+    else await b.getByRole('button', { name: 'Chat', exact: true }).click();
+    await expect(b.getByRole('log')).toContainText(text); await b.getByRole('button', { name: 'Close chat', exact: true }).click();
     expect(observedA.errors).toEqual([]); expect(observedB.errors).toEqual([]);
     await a.screenshot({ path: info.outputPath('community-two-players.png') });
     await leave(a);
@@ -73,6 +84,7 @@ test('two Accounts share server simulation, see each other jump, leave and Conti
     await a.getByRole('button', { name: 'Community Tower', exact: true }).click(); await a.getByRole('button', { name: 'Continue', exact: true }).click();
     await expect(a.getByRole('button', { name: 'Menu', exact: true })).toBeVisible();
     await expect.poll(() => observedA.snapshots.at(-1)?.playId).toBe(runId); expect(observedA.snapshots.at(-1)!.self.simulation.physics.jumps).toBeGreaterThan(0);
+    await a.getByRole('button', { name: 'Chat', exact: true }).click(); await expect(a.getByRole('log')).toContainText(text); await a.getByRole('button', { name: 'Close chat', exact: true }).click();
     await leave(a); await leave(b);
   } finally { await first.close(); await second.close(); }
 });

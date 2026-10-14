@@ -47,12 +47,15 @@ class CommunityLifecycleIT {
             client.register(); client.connect(); var join = client.ok("JOIN_COMMUNITY", Map.of());
             client.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT"));
             step(client, 29_999);
+            client.ok("CHAT_SEND", Map.of("text", "Chat does not count as a movement input"));
             client.input(Map.of("playId", join.path("playId").asText(), "generation", 1, "seq", 1, "left", false, "right", false, "jump", false));
             client.ok("GET_ROOM_STATE", Map.of());
             step(client, 30_000); assertThat(client.snapshot().path("self").path("paused").asBoolean()).isFalse();
             time.advance(1); client.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT") && message.path("payload").path("self").path("paused").asBoolean());
             assertThat(client.snapshot().path("self").path("paused").asBoolean()).isTrue();
             long stoppedTicks = client.snapshot().path("self").path("simulation").path("physics").path("ticks").asLong();
+            client.ok("CHAT_SEND", Map.of("text", "Chat is available while paused"));
+            assertThat(client.command("CHAT_SEND", Map.of("text", "Too fast")).path("payload").path("code").asText()).isEqualTo("RATE_LIMITED");
             client.ok("HEARTBEAT", Map.of("nonce", "still-paused")); step(client, 899_999);
             assertThat(memberships.find(client.owner)).isNotNull(); assertThat(client.snapshot().path("self").path("simulation").path("physics").path("ticks").asLong()).isEqualTo(stoppedTicks);
             time.advance(1); client.await(message -> message.path("type").asText().equals("ROOM_LEFT"));

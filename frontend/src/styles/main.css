@@ -65,6 +65,15 @@ button { cursor: pointer; }
 .results-table th, .results-table td { padding: 10px 6px; text-align: left; border-bottom: 1px solid #302c20; }
 .results-table th { color: #aaa28b; font-weight: normal; }
 .self-result, .winner { color: #e4bb68; }
+.game-hud > span:last-child { display: flex; gap: 8px; }
+.chat-panel { position: absolute; z-index: 4; left: 16px; bottom: max(16px, env(safe-area-inset-bottom)); width: min(340px, calc(100vw - 32px)); padding: 10px; background: #08090cef; border: 1px solid #6b6250; font-size: 15px; }
+.chat-panel header { display: flex; justify-content: space-between; align-items: center; }
+.chat-panel button, .chat-panel input { color: #ede7d3; background: #08090c; border: 1px solid #6b6250; padding: 6px; }
+.chat-panel .chat-messages { max-height: 25dvh; overflow-y: auto; overflow-wrap: anywhere; }
+.chat-panel p { margin: 6px 0; }
+.chat-panel form { display: flex; gap: 6px; margin-top: 8px; }
+.chat-panel input { min-width: 0; width: 100%; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (max-width: 680px) {
   .home { justify-content: flex-start; padding: 28px 20px; }
   .brand { margin-bottom: 28px; }

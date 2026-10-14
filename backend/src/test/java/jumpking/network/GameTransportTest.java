@@ -13,7 +13,7 @@ import org.springframework.web.socket.*;
 
 class GameTransportTest {
     private final ObjectMapper json = new ObjectMapper();
-    private NetworkSettings limits(int controls) { return new NetworkSettings(30, 2, 32, 256, 64, 20, 16384, 120, 120, controls, 240, 4, 8, 5000, 30000, 500, 60); }
+    private NetworkSettings limits(int controls) { return new NetworkSettings(30, 2, 32, 256, 64, 20, 16384, 120, 120, controls, 240, 4, 8, 5000, 30000, 500, 60, 200, 50, 1000); }
     private GameEnvelope envelope(String type, String payload) { return GameEnvelope.parse(json, "{\"v\":1,\"type\":\"" + type + "\",\"requestId\":\"test\",\"payload\":" + payload + "}"); }
     private GameEnvelope input(long sequence, String extras) {
         return GameEnvelope.parse(json, "{\"v\":1,\"type\":\"PLAYER_INPUT\",\"payload\":{\"playId\":\"run\",\"generation\":1,\"seq\":" + sequence + ",\"left\":false,\"right\":true,\"jump\":true" + extras + "}}");

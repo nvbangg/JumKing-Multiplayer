@@ -38,6 +38,7 @@ export class GameSocket {
   selfId: string | null = null;
   lastSnapshot: Record<string, unknown> | null = null;
   playContext: { playId: string; generation: number } | null = null;
+  chatHistory: Record<string, unknown>[] = [];
   private listeners = new Set<(type: string, payload: Record<string, unknown>) => void>();
   private profile: string | null = null;
   private restoring: Promise<void> | null = null;
@@ -113,6 +114,15 @@ export class GameSocket {
         else request.resolve(message);
       }
       if (message.type === 'ROOM_JOINED' || message.type === 'RECONNECT_OK') this.selfId = message.payload.playerId as string;
+      if (message.type === 'ROOM_JOINED') this.chatHistory = [];
+      if (message.type === 'CHAT_HISTORY' || message.type === 'CHAT_MESSAGE') {
+        if (!Array.isArray(message.payload.messages)) { this.disconnect(socket, 'Invalid chat history', 1002); return; }
+        const items = message.payload.messages as Record<string, unknown>[];
+        if (items.some(item => !item || typeof item.id !== 'string' || typeof item.playerId !== 'string' || typeof item.nickname !== 'string' || typeof item.text !== 'string'
+            || typeof item.sentAt !== 'string' || !Number.isInteger(item.colorSlot))) { this.disconnect(socket, 'Invalid chat message', 1002); return; }
+        const merged = new Map((message.type === 'CHAT_HISTORY' ? [] : this.chatHistory).map(item => [item.id, item]));
+        for (const item of items) merged.set(item.id, item); this.chatHistory = [...merged.values()].slice(-NETWORK.chatHistory);
+      }
       if (message.type === 'ROOM_JOINED' && this.profile) void saveReconnect(this.profile, message.payload).catch(() => this.onMessage('ERROR', { code: 'STORAGE_UNAVAILABLE', message: 'Reconnect context could not be saved on this device' }));
       if (message.type === 'ROOM_LEFT' && this.profile) void clearReconnect(this.profile).catch(() => this.onMessage('ERROR', { code: 'STORAGE_UNAVAILABLE', message: 'Reconnect context could not be cleared on this device' }));
       if (message.type === 'GAME_SNAPSHOT') this.lastSnapshot = message.payload;

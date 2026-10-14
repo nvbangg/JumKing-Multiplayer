@@ -57,7 +57,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 - [x] Hoàn thiện Pause/Resume/AFK/Save & Exit theo gameplay; kiểm tra hidden/blur, clock, đang rơi, save status và hạn giữ slot.
 - [x] Hoàn thiện Join ID/transfer/reconnect; kiểm tra capacity, membership, biên deadline và Continue sau hết hạn.
 - [x] Đồng bộ ngoại hình/nhãn tên/animation/audio peers; kiểm tra self/peers, camera/screen, slot reuse và dedupe effects.
-- [ ] Hoàn thiện chat Community; kiểm tra focus, plain text, history và giới hạn.
+- [x] Hoàn thiện chat Community; kiểm tra focus, plain text, history và giới hạn.
 - [ ] Hoàn thiện leaderboard/UI; kiểm tra best từng Account, comparator, đồng hạng và dữ liệu đã commit.
 - [ ] Hoàn thiện thống kê tổng; kiểm tra Guest local/Room, Account cả ba kiểu chơi, best và chống cộng trùng.
 - [ ] Hoàn thiện History Solo/Community và contract chung; kiểm tra ownership, pagination, pending/sync và terminal state.
@@ -141,5 +141,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 05 — Pause | PASS — type-check/build, 58 frontend/38 backend unit tests, 34 MySQL/HTTP/WS integration tests và 12 Chrome E2E online. Blur hủy charge, không launch; pause trên không tiếp tục physics/clock tới grounded, Resume đổi generation và không tính thời gian nghỉ. Frame trung tính/heartbeat không reset AFK; kiểm tra đúng biên 1 phút, 15 phút và 5 phút bằng monotonic clock. Trigger gây lỗi MySQL xác minh Save & Exit giữ membership, Resume không vượt lỗi lưu, bỏ trigger rồi tiếp tục được. SAVED/PENDING/FAILED phản ánh worker |
 | Phase 05 — membership/reconnect | PASS — type-check/build, unit tests, MySQL/WS integration và 13 Chrome E2E online; IndexedDB riêng được test thêm trên Chrome. Reload khôi phục đúng identity/token/run, vào lại paused; Leave xác nhận xóa token. 11 WS clients thật kiểm tra đủ 10 slot/màu, tự tạo sảnh kế tiếp, Join đầy không đổi membership, transfer giữ một ACTIVE, sai owner/token và socket cũ không chiếm quyền. Test clock xác minh Continue sau hết hạn; cleanup client bỏ CANCEL của context cũ khi chuyển sảnh |
 | Phase 05 — presentation online | PASS — type-check/build, 59 frontend unit tests, backend/MySQL regression và 13 Chrome E2E online. Peers chỉ nhận pose/trang bị công khai; hai người có nhãn tên/màu riêng qua renderer chung, cùng bộ camera/animation đã test 43 screens. Server gửi effects theo screen, client dedupe eventSeq và bỏ self event của lượt cũ; Chrome xác minh một JUMP tự thân/một JUMP peer với mức âm lượng riêng, replay không phát lặp. Slot/membership đã nghiệm thu ở mốc trước |
+| Phase 05 — chat | PASS — type-check/build, 59 frontend/39 backend unit tests, 36 MySQL integration tests và 13 Chrome E2E online. Hai Account gửi/nhận text và nhận lại 50 tin gần nhất khi Join; HTML không thực thi. Kiểm tra Unicode, cooldown, focus/cancel và chat không gia hạn AFK/pause; lịch sử chỉ ở RAM của sảnh |
 | Phase 05 còn lại–07 | NOT RUN — chưa nghiệm thu đầy đủ |
 | Phase 08 | Chưa thực hiện |

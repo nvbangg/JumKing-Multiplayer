@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class CommunityTower implements GameCommandHandler, AutoCloseable {
-    private static final Set<String> COMMANDS = Set.of("JOIN_COMMUNITY", "JOIN_ROOM", "GET_ROOM_STATE", "LEAVE_ROOM", "PLAYER_INPUT", "CANCEL_INPUT", "RECONNECT", "SET_COMMUNITY_PAUSED", "EQUIP_ITEM", "NEW_COMMUNITY_RUN");
+    private static final Set<String> COMMANDS = Set.of("JOIN_COMMUNITY", "JOIN_ROOM", "GET_ROOM_STATE", "LEAVE_ROOM", "PLAYER_INPUT", "CANCEL_INPUT", "RECONNECT", "SET_COMMUNITY_PAUSED", "EQUIP_ITEM", "NEW_COMMUNITY_RUN", "CHAT_SEND");
     private final GameWorkers workers;
     private final RoomDirectory directory;
     private final Memberships memberships;
@@ -74,6 +74,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
     private final class Tower {
         final String id;
         final LinkedHashMap<String, Member> players = new LinkedHashMap<>();
+        final ChatLog chat = new ChatLog(clock, time, limits.chatCodePoints(), limits.chatHistory(), limits.chatIntervalMs());
         final SerialExecutor actor;
         final AtomicBoolean tickQueued = new AtomicBoolean();
         long serverTick, eventSeq, nextTick = time.nanos();
@@ -155,7 +156,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
             if (command.type().equals("RECONNECT")) { reconnect(tower, player, connection, command); return; }
             if (player.connection != connection) throw new ApiException(409, "INVALID_RECONNECT", "Reconnect with your saved token");
             if (player.loading) throw new ApiException(409, "CONFLICT", "Community save is still loading");
-            if (player.operation && !command.type().equals("GET_ROOM_STATE")) throw new ApiException(409, "CONFLICT", "Community save is changing");
+            if (player.operation && !Set.of("GET_ROOM_STATE", "CHAT_SEND").contains(command.type())) throw new ApiException(409, "CONFLICT", "Community save is changing");
             switch (command.type()) {
                 case "GET_ROOM_STATE" -> { GameEnvelope.fields(command.payload(), Set.of()); connection.reply(command, "ROOM_STATE", state(tower)); }
                 case "LEAVE_ROOM" -> { GameEnvelope.fields(command.payload(), Set.of()); requestLeave(tower, player, command); }
@@ -193,6 +194,12 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                     connection.reply(command, "COMMUNITY_RUN_STATE", runPayload(player)); save(tower, player, true, () -> runState(player));
                 }
                 case "NEW_COMMUNITY_RUN" -> newRun(tower, player, command);
+                case "CHAT_SEND" -> {
+                    GameEnvelope.fields(command.payload(), Set.of("text"));
+                    var message = tower.chat.send(player.id, player.identity.username(), player.slot.color(), GameEnvelope.text(command.payload(), "text"));
+                    var payload = Map.of("messages", List.of(message)); connection.reply(command, "CHAT_MESSAGE", payload);
+                    for (Member peer : tower.players.values()) if (peer != player && peer.connection != null && !peer.loading) peer.connection.send("CHAT_MESSAGE", payload);
+                }
                 default -> throw GameEnvelope.invalid();
             }
         }));
@@ -257,7 +264,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                             player.game = game; player.stored = stored; player.revision = player.savedRevision = stored.revision(); player.maximum = stored.maximum(); player.peakTicks = stored.peak(); player.loading = false;
                             player.input.reset(stored.id(), player.generation); player.lastPhysical = time.nanos();
                             if (player.connection == null) pause(player);
-                            connection.reply(command, "ROOM_JOINED", joined(player)); broadcast(tower); runState(player); snapshots(tower);
+                            connection.reply(command, "ROOM_JOINED", joined(player)); broadcast(tower); chatHistory(tower, player); runState(player); snapshots(tower);
                         });
                     } catch (Exception error) { tower.actor.execute(() -> { remove(tower, player); connection.error(command, error instanceof ApiException api ? api : saveError()); }); }
                 });
@@ -282,10 +289,10 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                         if (!connection.open()) { next.connection = null; next.disconnectedAt = time.nanos(); }
                         target.players.put(next.id, next);
                         source.actor.execute(() -> {
-                            old.operationFailure = null; source.players.remove(old.id); old.connection = null;
+                            old.operationFailure = null; source.players.remove(old.id); source.chat.leave(old.id); old.connection = null;
                             if (directory.release(old.slot)) { towers.remove(source.id, source); source.timer.cancel(false); } else broadcast(source);
                         });
-                        connection.reply(command, "ROOM_JOINED", joined(next)); broadcast(target); runState(next); snapshots(target);
+                        connection.reply(command, "ROOM_JOINED", joined(next)); broadcast(target); chatHistory(target, next); runState(next); snapshots(target);
                     } catch (Exception error) { source.actor.execute(() -> transferFailed(old, command, slot, error)); }
                 });
             } catch (Exception error) { transferFailed(old, command, slot, error); }
@@ -305,7 +312,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
         var old = player.connection; player.connection = connection; player.generation++; player.input.reset(player.stored.id(), player.generation);
         pause(player); player.pausedAt = time.nanos();
         if (old != null && old != connection) old.close(org.springframework.web.socket.CloseStatus.NORMAL);
-        connection.reply(command, "RECONNECT_OK", context(player)); broadcast(tower); runState(player); snapshots(tower);
+        connection.reply(command, "RECONNECT_OK", context(player)); broadcast(tower); chatHistory(tower, player); runState(player); snapshots(tower);
     }
     private void pause(Member player) {
         player.input.clear(); if (player.game == null) return; player.game.physics().cancelInput();
@@ -358,6 +365,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
     }
     private void remove(Tower tower, Member player) {
         if (tower.players.remove(player.id) == null) return;
+        tower.chat.leave(player.id);
         memberships.release(player.identity.owner(), new Memberships.Membership(tower.id, player.id));
         boolean empty = directory.release(player.slot);
         if (player.connection != null) {
@@ -388,6 +396,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
         return value;
     }
     private void broadcast(Tower tower) { var state = state(tower); tower.players.values().forEach(player -> { if (player.connection != null && !player.loading) player.connection.send("ROOM_STATE", state); }); }
+    private void chatHistory(Tower tower, Member player) { if (player.connection != null) player.connection.send("CHAT_HISTORY", Map.of("messages", tower.chat.history())); }
     private Map<String, Object> context(Member player) { return Map.of("roomId", player.slot.roomId(), "playerId", player.id, "generation", player.generation, "playId", player.stored.id()); }
     private Map<String, Object> joined(Member player) { var value = new LinkedHashMap<>(context(player)); value.put("kind", "COMMUNITY"); value.put("reconnectToken", player.token); return value; }
     private Map<String, Object> summary(Member player) {

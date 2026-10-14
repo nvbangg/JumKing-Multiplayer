@@ -1,12 +1,10 @@
 package jumpking.records;
 
-import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
 import jumpking.game.RoomRanking;
 import jumpking.network.ApiException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 /** Một bản ghi tích lũy của toàn roster; match và metrics được commit cùng transaction. */
@@ -24,17 +22,20 @@ public class RoomRuns {
     }
     private record Match(String roomCode, String mode, Integer minutes, Instant startedAt, Instant endedAt, long duration, String reason) {}
     private record Stored(Run run, long revision) {}
-    private final JdbcTemplate jdbc;
+    private final MatchRepository matchRepository;
+    private final PlayRunRepository runRepository;
     private final RunOwners owners;
     private final Clock clock;
     private final int capacity;
-    public RoomRuns(JdbcTemplate jdbc, RunOwners owners, Clock clock, jumpking.game.SharedData shared) { this.jdbc = jdbc; this.owners = owners; this.clock = clock; capacity = shared.rules().path("capacity").asInt(); }
+    public RoomRuns(MatchRepository matchRepository, PlayRunRepository runRepository, RunOwners owners, Clock clock, jumpking.game.SharedData shared) { this.matchRepository = matchRepository; this.runRepository = runRepository; this.owners = owners; this.clock = clock; capacity = shared.rules().path("capacity").asInt(); }
     public void save(Write write) {
         validate(write);
         owners.writeAll(write.runs.stream().map(Run::owner).toList(), ownership -> {
             var next = write.runs.stream().map(run -> run.owned(ownership.get(run.owner))).toList();
-            var matches = matches(write.id);
-            var old = runs(write.id);
+            var matchEntity = matchRepository.lockById(write.id).orElse(null);
+            var matches = matchEntity == null ? List.<Match>of() : List.of(matchView(matchEntity));
+            var entities = runRepository.lockByMatchId(write.id);
+            var old = stored(entities);
             var desired = new Match(write.roomCode, write.mode, write.minutes, write.startedAt, write.endedAt, write.duration, write.reason);
             if (!matches.isEmpty()) {
                 var previous = matches.getFirst();
@@ -55,19 +56,31 @@ public class RoomRuns {
                 }
             } else {
                 if (!old.isEmpty()) throw conflict();
-                jdbc.update("INSERT INTO matches(id,room_code,mode,time_limit_minutes,started_at) VALUES (?,?,?,?,?)", write.id, write.roomCode, write.mode, write.minutes, ts(write.startedAt));
-                for (var run : next) jdbc.update("INSERT INTO play_runs(id,user_id,kind,match_id,status,nickname,started_at,updated_at) VALUES (?,?,'ROOM',?,'ACTIVE',?,?,?)", run.id, run.owner, write.id, run.nickname, ts(write.startedAt), ts(clock.instant()));
+                matchEntity = new jumpking.records.Match(); matchEntity.setId(write.id); matchEntity.setRoomCode(write.roomCode);
+                matchEntity.setMode(write.mode); matchEntity.setTimeLimitMinutes(write.minutes); matchEntity.setStartedAt(write.startedAt);
+                matchEntity = matchRepository.saveAndFlush(matchEntity);
             }
-            jdbc.update("UPDATE matches SET duration_ticks=?,ended_at=?,end_reason=? WHERE id=?", write.duration, ts(write.endedAt), write.reason, write.id);
-            for (var run : next) jdbc.update("UPDATE play_runs SET revision=?,status=?,play_ticks=?,jumps=?,falls=?,current_progress=?,max_progress=?,peak_reached_ticks=?,finish_ticks=?,`rank`=?,is_winner=?,ended_at=?,updated_at=? WHERE id=? AND match_id=? AND user_id=?",
-                write.revision, run.status, run.ticks, run.jumps, run.falls, run.progress, run.maximum, run.peak, run.finish, run.rank, run.winner, ts(run.endedAt), ts(clock.instant()), run.id, write.id, run.owner);
+            matchEntity.setDurationTicks(write.duration); matchEntity.setEndedAt(write.endedAt); matchEntity.setEndReason(write.reason);
+            var byId = new HashMap<String, PlayRun>(); entities.forEach(run -> byId.put(run.getId(), run));
+            for (var run : next) {
+                var entity = byId.get(run.id);
+                if (entity == null) {
+                    entity = new PlayRun(); entity.setId(run.id); entity.setUserId(run.owner); entity.setKind("ROOM");
+                    entity.setMatchId(write.id); entity.setNickname(run.nickname); entity.setStartedAt(write.startedAt);
+                }
+                entity.setRevision(write.revision); entity.setStatus(run.status); entity.setPlayTicks(run.ticks); entity.setJumps(run.jumps); entity.setFalls(run.falls);
+                entity.setCurrentProgress(run.progress); entity.setMaxProgress(run.maximum); entity.setPeakReachedTicks(run.peak);
+                entity.setFinishTicks(run.finish); entity.setRank(run.rank); entity.setWinner(run.winner);
+                entity.setEndedAt(run.endedAt); entity.setUpdatedAt(clock.instant()); runRepository.save(entity);
+            }
+            runRepository.flush();
             return null;
         });
     }
     /** Chỉ gọi lúc khởi động, trước khi nhận gameplay mới; không phục hồi Room từ metrics. */
     public void recoverAborted() {
-        for (String id : jdbc.queryForList("SELECT id FROM matches WHERE ended_at IS NULL ORDER BY id", String.class)) {
-            var match = matches(id).getFirst(); var stored = runs(id);
+        for (var entity : matchRepository.findByEndedAtIsNullOrderById()) {
+            String id = entity.getId(); var match = matchView(entity); var stored = stored(runRepository.findByMatchId(id));
             var ended = millis(clock.instant()); if (ended.isBefore(match.startedAt)) ended = match.startedAt;
             for (var value : stored) if (value.run.endedAt != null && value.run.endedAt.isAfter(ended)) ended = value.run.endedAt;
             final Instant deadline = ended;
@@ -83,14 +96,12 @@ public class RoomRuns {
                 match.startedAt, deadline, match.duration, "ABORTED", abandoned));
         }
     }
-    private List<Match> matches(String id) {
-        return jdbc.query("SELECT room_code,mode,time_limit_minutes,started_at,ended_at,duration_ticks,end_reason FROM matches WHERE id=? FOR UPDATE",
-            (row, index) -> new Match(row.getString("room_code"), row.getString("mode"), row.getObject("time_limit_minutes", Integer.class), row.getTimestamp("started_at").toInstant(), instant(row.getTimestamp("ended_at")), row.getLong("duration_ticks"), row.getString("end_reason")), id);
+    private static Match matchView(jumpking.records.Match match) {
+        return new Match(match.getRoomCode(), match.getMode(), match.getTimeLimitMinutes(), match.getStartedAt(), match.getEndedAt(), match.getDurationTicks(), match.getEndReason());
     }
-    private List<Stored> runs(String id) {
-        return jdbc.query("SELECT id,user_id,nickname,status,play_ticks,jumps,falls,current_progress,max_progress,peak_reached_ticks,finish_ticks,`rank`,is_winner,ended_at,revision FROM play_runs WHERE match_id=? AND kind='ROOM' FOR UPDATE",
-            (row, index) -> new Stored(new Run(row.getString("id"), row.getLong("user_id"), row.getString("nickname"), row.getString("status"), row.getLong("play_ticks"), row.getInt("jumps"), row.getInt("falls"),
-                row.getDouble("current_progress"), row.getDouble("max_progress"), row.getLong("peak_reached_ticks"), row.getObject("finish_ticks", Long.class), row.getObject("rank", Integer.class), row.getBoolean("is_winner"), instant(row.getTimestamp("ended_at"))), row.getLong("revision")), id);
+    private static List<Stored> stored(List<PlayRun> runs) {
+        return runs.stream().map(run -> new Stored(new Run(run.getId(), run.getUserId(), run.getNickname(), run.getStatus(), run.getPlayTicks(), run.getJumps(), run.getFalls(),
+            run.getCurrentProgress(), run.getMaxProgress(), run.getPeakReachedTicks(), run.getFinishTicks(), run.getRank(), run.getWinner(), run.getEndedAt()), run.getRevision())).toList();
     }
     private void validate(Write value) {
         if (value.revision < 1 || value.duration < 0 || value.startedAt == null || value.runs.size() < 2 || value.runs.size() > capacity
@@ -112,7 +123,5 @@ public class RoomRuns {
         }
     }
     private static Instant millis(Instant time) { return time == null ? null : time.truncatedTo(java.time.temporal.ChronoUnit.MILLIS); }
-    private static Instant instant(Timestamp time) { return time == null ? null : time.toInstant(); }
-    private static Timestamp ts(Instant time) { return time == null ? null : Timestamp.from(time); }
     private static ApiException conflict() { return new ApiException(409, "CONFLICT", "Room results conflict with the committed match"); }
 }

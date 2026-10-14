@@ -27,6 +27,21 @@ class AccountBrowserIT {
     private static final int VITE_PORT = freePort();
     @LocalServerPort int port;
     @Autowired PasswordEncoder passwords;
+    @Autowired jumpking.records.CommunityRuns communityRuns;
+    @Autowired jumpking.game.SharedData shared;
+    @Autowired com.fasterxml.jackson.databind.ObjectMapper json;
+    private record FinishFixture(long owner, String email, String password, String run) {}
+    private FinishFixture finishFixture() throws Exception {
+        var jdbc = TestDatabase.get().jdbc;
+        String name = "finish_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12), email = name + "@example.test", password = java.util.UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO users(type,username,email,password_hash,created_at) VALUES ('ACCOUNT',?,?,?,UTC_TIMESTAMP(3))", name, email, passwords.encode(password));
+        long owner = jdbc.queryForObject("SELECT id FROM users WHERE email=?", Long.class, email);
+        var before = jumpking.support.MainBabeRoute.beforeFinish(shared, json);
+        var stored = communityRuns.open(owner, false, null, before);
+        var physics = before.physics(); double progress = Math.max(0, shared.map().path("progressOriginY").asDouble() - physics.y - shared.physics().path("bodyHeight").asDouble());
+        communityRuns.save(new jumpking.records.CommunityRuns.Write(stored.id(), owner, 2, "ACTIVE", before, progress, progress, physics.ticks, null));
+        return new FinishFixture(owner, email, password, stored.id());
+    }
     private record MergeFixture(long guest, long account, String token, String username, String email, String password, String run) {}
     private MergeFixture mergeFixture() {
         var jdbc = TestDatabase.get().jdbc; String name = "merge_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
@@ -73,12 +88,15 @@ class AccountBrowserIT {
             var merge = mergeFixture();
             builder.environment().put("E2E_MERGE_USERNAME", merge.username); builder.environment().put("E2E_MERGE_EMAIL", merge.email);
             builder.environment().put("E2E_MERGE_PASSWORD", merge.password); builder.environment().put("E2E_MERGE_GUEST", merge.token);
+            var finish = finishFixture();
+            builder.environment().put("E2E_FINISH_EMAIL", finish.email); builder.environment().put("E2E_FINISH_PASSWORD", finish.password); builder.environment().put("E2E_FINISH_RUN", finish.run);
             browser = builder.redirectErrorStream(true).redirectOutput(Path.of("target/auth-browser-test.log").toFile()).start();
             assertThat(browser.waitFor(300, TimeUnit.SECONDS)).as("Browser test timeout; inspect target/auth-browser-test.log").isTrue();
             assertThat(browser.exitValue()).as("Inspect target/auth-browser-test.log and frontend/test-results").isZero();
             var jdbc = TestDatabase.get().jdbc;
             assertThat(jdbc.queryForObject("SELECT user_id FROM play_runs WHERE id=?", Long.class, merge.run)).isEqualTo(merge.account);
             assertThat(jdbc.queryForObject("SELECT merged_into_user_id FROM users WHERE id=?", Long.class, merge.guest)).isEqualTo(merge.account);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM play_runs WHERE id=? AND status='FINISHED' AND snapshot IS NULL AND finish_ticks=16957", Integer.class, finish.run)).isEqualTo(1);
         } finally {
             if (browser != null && browser.isAlive()) { browser.destroyForcibly(); browser.waitFor(5, TimeUnit.SECONDS); }
             vite.destroy(); if (!vite.waitFor(10, TimeUnit.SECONDS)) { vite.destroyForcibly(); vite.waitFor(5, TimeUnit.SECONDS); }

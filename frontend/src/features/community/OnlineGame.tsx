@@ -24,9 +24,13 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
   const [transferId, setTransferId] = useState('');
   const [disconnected, setDisconnected] = useState(false);
   const [chatOpen, setChatOpen] = useState(false), [messages, setMessages] = useState<ChatMessage[]>(() => socket.chatHistory as unknown as ChatMessage[]);
+  const [ending, setEnding] = useState<'playing' | 'picture' | null>(null), [pictureReady, setPictureReady] = useState(false);
+  const endingActive = useRef(false), skipEnding = useRef<(() => void) | null>(null);
+  useEffect(() => { if (ending !== 'picture') return; const timer = setTimeout(() => setPictureReady(true), PRESENTATION.endingPictureGuardMs); return () => clearTimeout(timer); }, [ending]);
   const latestRoom = useRef(room); latestRoom.current = room;
   const pauseRef = useRef<() => void>(() => {});
   const pause = () => {
+    if (endingActive.current) { skipEnding.current?.(); return; }
     if (!runtime.current || runtime.current.menu) return;
     runtime.current.menu = true; runtime.current.cancel(); input.current?.cancel(); audio.current?.pause(true); setMenu('pause');
     if (room.kind === 'COMMUNITY') { setSaveStatus('PENDING'); void socket.command('SET_COMMUNITY_PAUSED', { paused: true }).catch(cause => setError(cause.message)); }
@@ -44,6 +48,7 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
     const unsubscribe = socket.subscribe((type, payload) => {
       try {
         if (type === 'GAME_SNAPSHOT') runtime.current?.receive(payload);
+        if (type === 'PLAYER_FINISHED') runtime.current?.finish(payload);
         if (type === 'PLAYER_EFFECTS' && runtime.current?.latest) {
           const session = runtime.current;
           for (const effect of effects.receive(payload, latestRoom.current.roomId, socket.selfId || '', session.latest!.playId, session.game.physics.snapshot().screen)) {
@@ -65,8 +70,12 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
         if (snapshot.self.paused && !session.menu) { session.menu = true; controls.cancel(); setMenu('pause'); audio.current?.pause(true); }
       }, config.features.flyEnabled, message => { setError(message); setMenu('pause'); controls.cancel(); });
       runtime.current = session;
+      if (socket.lastFinish) session.finish(socket.lastFinish);
       if (socket.lastSnapshot) session.receive(socket.lastSnapshot);
-      game = renderer.createGame(container.current!, manifest, session, () => { setReady(true); if (document.hidden || !document.hasFocus()) pauseRef.current(); }, setError);
+      game = renderer.createGame(container.current!, manifest, session, () => { setReady(true); if (document.hidden || !document.hasFocus()) pauseRef.current(); }, setError, {
+        onEndingStart: skip => { skipEnding.current = skip; endingActive.current = true; controls.cancel(); session.cancel(); setMenu(null); setChatOpen(false); setPictureReady(false); setEnding('playing'); audio.current?.beginEnding(); },
+        onEndingComplete: () => setEnding('picture'), onSound: key => audio.current?.play(key),
+      });
     })().catch(cause => { if (!disposed) setError(cause instanceof Error ? cause.message : 'Unable to load online game'); });
     return () => { disposed = true; controller.abort(); unsubscribe(); controls.dispose(); runtime.current?.cancel(); runtime.current = null; input.current = null; game?.destroy(true); audio.current?.dispose(); audio.current = null;
       document.removeEventListener('visibilitychange', hidden); window.removeEventListener('blur', blur);
@@ -91,20 +100,27 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
     const next = { ...options, [key]: !options[key] }; setOptions(next); audio.current?.setEnabled(next.sound);
     try { saveOptions(next); } catch { setError('Options could not be saved on this device'); }
   };
+  const newGame = async () => {
+    if (pending) return;
+    const finished = runtime.current?.latest?.self.status === 'FINISHED';
+    if (!finished && !window.confirm('Replace your unfinished Community game?')) return;
+    setPending(true); setError('');
+    try {
+      await socket.command('NEW_COMMUNITY_RUN', { expectedRunId: finished ? null : runtime.current?.latest?.playId });
+      endingActive.current = false; skipEnding.current = null; setEnding(null); setPictureReady(false);
+      if (runtime.current) runtime.current.menu = false; input.current?.resume(); audio.current?.pause(false); setMenu(null);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'New Game failed'); } finally { setPending(false); }
+  };
   return <main className="play-page">
     <div className="game-viewport" ref={container} aria-label="Online Main Babe game" />
     {!ready && <p className="game-message" role="status">Loading…</p>}
-    {ready && <div className="game-hud"><span>Jumps: {jumps}{options.displayTimer && <span className="timer" aria-label="Play time">{duration(elapsed)}</span>}</span><span className="room-code" aria-label="Room ID">{room.roomId}</span><span><button onClick={() => { runtime.current?.cancel(); input.current?.cancel(); setChatOpen(true); }}>Chat</button><button onClick={pause}>Menu</button></span></div>}
-    {ready && !menu && !chatOpen && <TouchControls input={input} flying={false} />}
+    {ready && !ending && <div className="game-hud"><span>Jumps: {jumps}{options.displayTimer && <span className="timer" aria-label="Play time">{duration(elapsed)}</span>}</span><span className="room-code" aria-label="Room ID">{room.roomId}</span><span><button onClick={() => { runtime.current?.cancel(); input.current?.cancel(); setChatOpen(true); }}>Chat</button><button onClick={pause}>Menu</button></span></div>}
+    {ready && !ending && !menu && !chatOpen && <TouchControls input={input} flying={false} />}
+    {ending && <div className="ending-actions">{ending === 'playing' ? <button onClick={() => skipEnding.current?.()}>Skip</button> : <><button disabled={!pictureReady || pending} onClick={() => { void newGame(); }}>New Game</button><button disabled={!pictureReady || pending || disconnected} onClick={() => { void command('LEAVE_ROOM'); }}>Back to Menu</button></>}</div>}
     {ready && chatOpen && <ChatPanel messages={messages} colors={rules.appearanceColors} onSend={async text => { await socket.command('CHAT_SEND', { text }); }} onClose={() => { setChatOpen(false); if (!runtime.current?.menu) input.current?.resume(); }} />}
     {menu && <section className="game-overlay" aria-label="Game menu"><MenuPanel title={menu === 'pause' ? 'Paused' : menu === 'options' ? 'Options' : 'Controls'} onBack={menu === 'pause' ? undefined : () => setMenu(menu === 'controls' ? 'options' : 'pause')}>
       {menu === 'pause' && <>{disconnected ? <><button disabled={pending} onClick={() => { setPending(true); void socket.reconnect().catch(cause => setError(cause.message)).finally(() => setPending(false)); }}>Reconnect</button><button onClick={onHome}>Back to Menu</button></> : <button disabled={pending} onClick={() => { void resume(); }}>Resume</button>}<button onClick={() => setMenu('options')}>Options</button><button onClick={() => { runtime.current?.cancel(); input.current?.cancel(); setChatOpen(true); }}>Open Chat</button>
-        {room.kind === 'COMMUNITY' && <button disabled={pending || disconnected} onClick={() => { if (!window.confirm('Replace your unfinished Community game?')) return; void (async () => {
-          setPending(true); setError('');
-          try { await socket.command('NEW_COMMUNITY_RUN', { expectedRunId: runtime.current?.latest?.self.status === 'FINISHED' ? null : runtime.current?.latest?.playId });
-            if (runtime.current) runtime.current.menu = false; input.current?.resume(); audio.current?.pause(false); setMenu(null);
-          } catch (cause) { setError(cause instanceof Error ? cause.message : 'New Game failed'); } finally { setPending(false); }
-        })(); }}>New Game</button>}
+        {room.kind === 'COMMUNITY' && <button disabled={pending || disconnected} onClick={() => { void newGame(); }}>New Game</button>}
         <button disabled={pending || disconnected} onClick={() => { void command('LEAVE_ROOM'); }}>{room.kind === 'COMMUNITY' ? 'Save & Exit' : 'Leave Room'}</button>{room.kind === 'COMMUNITY' && <small role="status">{saveStatus === 'SAVED' ? 'Saved' : saveStatus === 'FAILED' ? 'Save failed' : 'Saving…'}</small>}</>}
       {menu === 'pause' && room.kind === 'COMMUNITY' && <form className="menu-form" onSubmit={event => { event.preventDefault(); void command('JOIN_ROOM', { roomId: transferId }); }}>
         <label>Community ID<input value={transferId} minLength={6} maxLength={6} pattern="[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}" required onChange={event => setTransferId(event.currentTarget.value.toUpperCase())} /></label>

@@ -141,7 +141,7 @@ Client nhận diện nhấn đúp khi Fly Mode được bật và gửi freeFlig
 | GAME_SNAPSHOT | {roomId,serverTick,playId,generation,self,peers,elapsedTimeMs,remainingTimeMs} |
 | COMMUNITY_RUN_STATE | {run:RunSummary,generation,paused,pausePending,saveStatus} |
 | PLAYER_EFFECTS | {roomId,events:[{eventSeq,playerId,playId,screen,effect,terrain}]} |
-| PLAYER_FINISHED | {playerId,playId,result,showEnding}; Community riêng người Finish |
+| PLAYER_FINISHED | {playerId,playId,result,showEnding,ending:{screen,equipped,ravenDone}}; Community riêng người Finish sau commit |
 | GAME_FINISHED | {playId,reason,durationMs,results,saveStatus}; Room broadcast |
 | SAVE_STATUS | {playId,revision,saveStatus}; chỉ owner checkpoint hoặc members của match |
 | CHAT_MESSAGE / CHAT_HISTORY | {messages:[{id,playerId,nickname,text,sentAt,colorSlot}]} |

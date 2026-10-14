@@ -37,6 +37,7 @@ export class GameSocket {
   private pending = new Map<string, { resolve: (value: Message) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   selfId: string | null = null;
   lastSnapshot: Record<string, unknown> | null = null;
+  lastFinish: Record<string, unknown> | null = null;
   playContext: { playId: string; generation: number } | null = null;
   chatHistory: Record<string, unknown>[] = [];
   private listeners = new Set<(type: string, payload: Record<string, unknown>) => void>();
@@ -126,10 +127,15 @@ export class GameSocket {
       if (message.type === 'ROOM_JOINED' && this.profile) void saveReconnect(this.profile, message.payload).catch(() => this.onMessage('ERROR', { code: 'STORAGE_UNAVAILABLE', message: 'Reconnect context could not be saved on this device' }));
       if (message.type === 'ROOM_LEFT' && this.profile) void clearReconnect(this.profile).catch(() => this.onMessage('ERROR', { code: 'STORAGE_UNAVAILABLE', message: 'Reconnect context could not be cleared on this device' }));
       if (message.type === 'GAME_SNAPSHOT') this.lastSnapshot = message.payload;
+      if (message.type === 'PLAYER_FINISHED') this.lastFinish = message.payload;
+      if (message.type === 'ROOM_LEFT') this.lastFinish = null;
       if (['ROOM_JOINED', 'RECONNECT_OK', 'GAME_STARTED', 'COMMUNITY_RUN_STATE'].includes(message.type)) {
         const run = message.payload.run as { id?: unknown } | undefined;
         const playId = message.type === 'COMMUNITY_RUN_STATE' ? run?.id : message.payload.playId, generation = message.payload.generation;
-        if (typeof playId === 'string' && typeof generation === 'number' && Number.isSafeInteger(generation) && generation > 0) this.playContext = { playId, generation };
+        if (typeof playId === 'string' && typeof generation === 'number' && Number.isSafeInteger(generation) && generation > 0) {
+          if (this.lastFinish && this.lastFinish.playId !== playId) this.lastFinish = null;
+          this.playContext = { playId, generation };
+        }
       }
       this.onMessage(message.type, message.payload);
       for (const listener of this.listeners) listener(message.type, message.payload);

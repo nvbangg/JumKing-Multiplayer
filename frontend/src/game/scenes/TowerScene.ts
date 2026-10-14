@@ -24,6 +24,7 @@ export class TowerScene extends Phaser.Scene {
   private adventureVisuals?: AdventureVisuals;
   private conversations?: ConversationVisuals;
   private ending?: MainBabeEnding;
+  private endingId?: string;
   private babe?: Phaser.GameObjects.Sprite;
   constructor(private manifest: AssetManifest, private runtime: GameRuntime, private onReady: () => void, private onError: (message: string) => void, private hooks: PresentationHooks = {}) { super('Tower'); }
   preload(): void {
@@ -42,7 +43,10 @@ export class TowerScene extends Phaser.Scene {
   }
   update(_time: number, delta: number): void {
     if (!this.ready) return;
-    if (this.ending) { this.ending.update(); return; }
+    if (this.ending) {
+      if (this.runtime.frame().ending?.id === this.endingId) { this.ending.update(); return; }
+      this.ending.dispose(); this.ending = undefined; this.endingId = undefined; this.screen = -1;
+    }
     this.runtime.advance(delta);
     this.render();
     const state = this.runtime.frame().self.state;
@@ -105,6 +109,7 @@ export class TowerScene extends Phaser.Scene {
     this.adventureVisuals?.render(frame);
     this.conversations?.render(frame, this.npcSprites);
     if (frame.ending && !this.ending) {
+      this.endingId = frame.ending.id;
       for (const avatar of this.avatars.values()) { avatar.sprite.setVisible(false); avatar.name.setVisible(false); for (const sprite of avatar.layers.values()) sprite.setVisible(false); }
       this.babe?.setVisible(false);
       this.ending = new MainBabeEnding(this, this.manifest, frame.ending, key => this.hooks.onSound?.(key), () => this.hooks.onEndingComplete?.());

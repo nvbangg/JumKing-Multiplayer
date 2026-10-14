@@ -14,6 +14,21 @@ function snapshot(game: GameSimulation, tick: number, ack: number, generation = 
   return { roomId: room.roomId, serverTick: tick, playId: 'run', generation, elapsedTimeMs: 0, remainingTimeMs: null,
     self: { lastProcessedInputSeq: ack, status: 'ACTIVE', paused: false, simulation: game.snapshot(), metrics: {} }, peers: [] };
 }
+test('online ending waits for the private committed notice and matching finished snapshot', () => {
+  const socket = new GameSocket(() => {}, () => {}); socket.selfId = 'self'; socket.playContext = { playId: 'run', generation: 1 };
+  const game = new GameSimulation(map), runtime = new OnlineRuntime(map, socket, room, () => right, () => {}, false);
+  const notice = { playerId: 'self', playId: 'run', showEnding: true, ending: { screen: 42, equipped: ['Shoes'], ravenDone: true } };
+  runtime.receive(snapshot(game, 1, 0) as unknown as Record<string, unknown>);
+  runtime.finish({ ...notice, playerId: 'other' }); expect(runtime.frame().ending).toBeUndefined();
+  runtime.finish(notice); expect(runtime.frame().ending).toBeUndefined();
+  const finished = snapshot(game, 2, 0); finished.self.status = 'FINISHED'; finished.self.paused = true;
+  runtime.receive(finished as unknown as Record<string, unknown>);
+  expect(runtime.frame().ending).toEqual({ id: 'run', screen: 42, equipped: ['Shoes'], ravenDone: true });
+  runtime.finish({ ...notice, ending: { ...notice.ending, equipped: ['Crown'] } }); expect(runtime.frame().ending!.equipped).toEqual(['Shoes']);
+  socket.playContext = { playId: 'next', generation: 2 };
+  runtime.receive({ ...snapshot(game, 3, 0, 2), playId: 'next' } as unknown as Record<string, unknown>);
+  expect(runtime.frame().ending).toBeUndefined(); runtime.finish(notice); expect(runtime.frame().ending).toBeUndefined();
+});
 test('prediction responds before an ACK and replays only unacknowledged input after correction', () => {
   const local = new GameSimulation(map), server = new GameSimulation(map), prediction = new Prediction(local, 180);
   for (let seq = 1; seq <= 20; seq++) { prediction.push(seq, right); if (seq <= 7) server.tick(right); }

@@ -61,7 +61,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 - [x] Hoàn thiện leaderboard/UI; kiểm tra best từng Account, comparator, đồng hạng và dữ liệu đã commit.
 - [x] Hoàn thiện thống kê tổng; kiểm tra Guest local/Room, Account cả ba kiểu chơi, best và chống cộng trùng.
 - [ ] Hoàn thiện History Solo/Community và contract chung; kiểm tra ownership, pagination, pending/sync và terminal state.
-- [ ] Hoàn thiện Community Finish/ending riêng; kiểm tra flush/finalize, Skip/New Run và peers tiếp tục.
+- [x] Hoàn thiện Community Finish/ending riêng; kiểm tra flush/finalize, Skip/New Run và peers tiếp tục.
 - [ ] Tích hợp Fly Mode online; kiểm tra server gate, prediction/checkpoint và thành tích.
 
 ## Phase 06 — Room
@@ -144,5 +144,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 05 — chat | PASS — type-check/build, 59 frontend/39 backend unit tests, 36 MySQL integration tests và 13 Chrome E2E online. Hai Account gửi/nhận text và nhận lại 50 tin gần nhất khi Join; HTML không thực thi. Kiểm tra Unicode, cooldown, focus/cancel và chat không gia hạn AFK/pause; lịch sử chỉ ở RAM của sảnh |
 | Phase 05 — leaderboard | PASS — type-check/build, 59 frontend unit tests, MySQL regression và 13 Chrome E2E online. SQL chọn một Community run hoàn chỉnh/Account, tính RANK trước LIMIT, đồng hạng 1,1,3; không ghép peak/time khác lượt hoặc lấy Solo. Chrome đối chiếu tên/rank/peak với API sau Save & Exit; leaderboard chỉ nằm trong Community menu |
 | Phase 05 — thống kê | PASS — frontend unit/type-check/build và MySQL regression. Tổng ticks đổi sang ms sau khi cộng; SQL gộp ba kiểu chơi, best chỉ từ Finish, Room matches/wins đếm DISTINCT sau Merge. Test dữ liệu Room bằng fixtures; writer gameplay Room theo Phase 06. Chrome kiểm tra tổng Community + Solo đã sync sau reload không cộng lại local |
+| Phase 05 — Finish/ending | PASS — 60 frontend unit tests, type-check/build, 37 MySQL integration tests và 16 Chrome E2E online. Checkpoint trước Finish được tạo bằng toàn tuyến input không cheat; server Finish ở tick 16.957, commit một kết quả/xóa snapshot rồi mới gửi ending riêng. Chrome kiểm tra Skip/ảnh kết, New Game xóa camera/animation cũ và peer vẫn nhảy; đã xem screenshot. Notice giữ trang phục trước Crown và dedupe theo lượt |
 | Phase 05 còn lại–07 | NOT RUN — chưa nghiệm thu đầy đủ |
 | Phase 08 | Chưa thực hiện |

@@ -1,6 +1,6 @@
 import { GameSimulation, type GameSnapshot } from '../simulation/GameSimulation';
 import type { GameMap, PlayerInput, PlayerState } from '../simulation/types';
-import type { GameRuntime, RenderPlayer, RenderPose, WorldFrame } from '../presentation/types';
+import type { EndingSignal, GameRuntime, RenderPlayer, RenderPose, WorldFrame } from '../presentation/types';
 import type { GameSocket, RoomState } from '../../network/GameSocket';
 import { PHYSICS } from '../simulation/tuning';
 import { PRESENTATION } from '../presentation/config';
@@ -18,6 +18,7 @@ export class OnlineRuntime implements GameRuntime {
   readonly game: GameSimulation;
   latest: OnlineSnapshot | null = null;
   menu = false;
+  private ending?: EndingSignal;
   private accumulatedMs = 0;
   private sequence = 0;
   private prediction: Prediction;
@@ -28,6 +29,13 @@ export class OnlineRuntime implements GameRuntime {
     this.prediction = new Prediction(this.game, NETWORK.maxInputFrames);
   }
   updateRoom(room: RoomState): void { this.room = room; }
+  finish(payload: Record<string, unknown>): void {
+    if (payload.playerId !== this.socket.selfId || payload.showEnding !== true || typeof payload.playId !== 'string') return;
+    if (this.socket.playContext && payload.playId !== this.socket.playContext.playId) return;
+    const ending = payload.ending as Partial<EndingSignal> | undefined;
+    if (!ending || !Number.isInteger(ending.screen) || ending.screen !== this.game.physics.map.finish.screen || !Array.isArray(ending.equipped) || ending.equipped.some(item => typeof item !== 'string') || typeof ending.ravenDone !== 'boolean') throw new Error('Invalid ending state');
+    this.ending ??= { id: payload.playId, screen: ending.screen!, equipped: [...ending.equipped], ravenDone: ending.ravenDone };
+  }
   receive(payload: Record<string, unknown>): void {
     const value = payload as unknown as OnlineSnapshot;
     if (value.roomId !== this.room.roomId || !Number.isSafeInteger(value.serverTick) || value.serverTick < 0 || !Number.isSafeInteger(value.generation) || value.generation < 1 || typeof value.playId !== 'string') throw new Error('Invalid game snapshot');
@@ -38,6 +46,7 @@ export class OnlineRuntime implements GameRuntime {
     if (value.self.lastProcessedInputSeq > this.sequence) throw new Error('Server acknowledged an unsent input');
     this.prediction.reconcile(value.self.simulation, value.self.lastProcessedInputSeq, !this.menu && !value.self.paused && value.self.status === 'ACTIVE');
     this.peers.receive(value, performance.now()); this.latest = value; this.changed(this.game.physics.snapshot(), value);
+    if (this.ending && this.ending.id !== value.playId) this.ending = undefined;
   }
   advance(deltaMs: number): void {
     if (!this.latest || this.menu || this.latest.self.paused || this.latest.self.status !== 'ACTIVE') { this.accumulatedMs = 0; return; }
@@ -64,6 +73,7 @@ export class OnlineRuntime implements GameRuntime {
     const saved = this.game.snapshot(), self = this.room.members.find(member => member.playerId === this.socket.selfId);
     const color = (slot: number) => rules.appearanceColors[slot] || rules.appearanceColors[0]!;
     const peers: RenderPlayer[] = this.peers.frame(performance.now()).map(peer => ({ id: peer.playerId, nickname: peer.nickname, color: color(peer.colorSlot), state: peer.state, equipment: peer.equipment }));
-    return { self: { id: this.socket.selfId || 'self', nickname: self?.nickname || 'Player', color: color(self?.colorSlot || 0), state: saved.physics, equipment: saved.adventure.equipped, adventure: saved.adventure }, peers, world: saved.world };
+    return { self: { id: this.socket.selfId || 'self', nickname: self?.nickname || 'Player', color: color(self?.colorSlot || 0), state: saved.physics, equipment: saved.adventure.equipped, adventure: saved.adventure }, peers, world: saved.world,
+      ...(this.ending?.id === this.latest?.playId && this.latest?.self.status === 'FINISHED' ? { ending: this.ending } : {}) };
   }
 }

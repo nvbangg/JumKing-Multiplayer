@@ -4,7 +4,9 @@ import { currentSolo, soloRuns, StorageUnavailable, type SoloRun } from '../feat
 import { readOptions, saveOptions } from '../features/solo/options';
 import { AuthForm } from '../features/account/AuthForm';
 import { StatisticsPanel } from '../features/records/StatisticsPanel';
-import { duration, soloHistory, soloStatistics } from '../features/records/format';
+import { duration, soloStatistics } from '../features/records/format';
+import { HistoryList } from '../features/records/HistoryList';
+import { HistoryDetail } from '../features/records/HistoryDetail';
 import { MenuPanel } from '../components/MenuPanel';
 import { api, backendOrigin, clearCsrf } from '../network/api';
 import { GameSocket, type MatchResult, type RoomState } from '../network/GameSocket';
@@ -38,8 +40,8 @@ export function App() {
   const [activeSolo, setActiveSolo] = useState<SoloRun | null>(null);
   const [launch, setLaunch] = useState<SoloLaunch>(restoredLaunch);
   const [statistics, setStatistics] = useState<Statistics>({ ...EMPTY_STATS });
-  const [history, setHistory] = useState<HistoryItem[]>([]);
   const [detail, setDetail] = useState<HistoryItem | null>(null);
+  const [detailLocal, setDetailLocal] = useState(false);
   const [communityRun, setCommunityRun] = useState<{ id: string } | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
@@ -53,7 +55,6 @@ export function App() {
   const [pending, setPending] = useState(false);
   const [recordsRevision, setRecordsRevision] = useState(0);
   const [syncError, setSyncError] = useState('');
-  const [pendingHistory, setPendingHistory] = useState<Set<string>>(new Set());
   const sync = useRef<SoloSync | null>(null);
   const socket = useRef<GameSocket | null>(null);
   const profile = identity.account ? backendOrigin() + ':account:' + identity.account.id : 'guest';
@@ -77,7 +78,7 @@ export function App() {
     return () => { disposed = true; controller.abort(); music?.dispose(); };
   }, [playing, options.sound]);
   useEffect(() => {
-    setActiveSolo(null); setCommunityRun(null); setStatistics({ ...EMPTY_STATS }); setHistory([]); setDetail(null);
+    setActiveSolo(null); setCommunityRun(null); setStatistics({ ...EMPTY_STATS }); setDetail(null);
   }, [profile]);
   const back = () => {
     const next = screen === 'controls' ? 'options' : screen === 'leaderboard' ? 'community' : screen === 'detail' ? 'history' : 'home';
@@ -119,9 +120,7 @@ export function App() {
     void soloRuns(profile).then(runs => {
       if (disposed) return;
       setActiveSolo(runs.find(run => run.status === 'ACTIVE') || null);
-      setPendingHistory(new Set(identity.authenticated ? runs.filter(run => run.revision > run.syncedRevision).map(run => run.id) : []));
       if (!identity.authenticated) setStatistics(soloStatistics(runs));
-      if (screen === 'history') setHistory(soloHistory(runs));
     }).catch(cause => { if (!disposed) setError(cause instanceof Error ? cause.message : 'Browser storage is unavailable'); });
     if (identity.authenticated || identity.guest) {
       void api<{ total: Statistics }>('/profile/me').then(result => {
@@ -140,12 +139,6 @@ export function App() {
       setLeaderboardLoading(true);
       void api<{ entries: LeaderboardEntry[] }>('/leaderboard?limit=100').then(result => { if (!disposed) setLeaderboard(result.entries); }).catch(cause => { if (!disposed) setError(cause.message); }).finally(() => { if (!disposed) setLeaderboardLoading(false); });
     }
-    if (screen === 'history' && (identity.authenticated || identity.guest)) void api<{ items: HistoryItem[] }>('/history?page=0&size=100').then(async result => {
-      const local = soloHistory(await soloRuns(profile));
-      const combined = new Map(local.map(item => [item.kind + ':' + item.id, item]));
-      for (const item of result.items) combined.set(item.kind + ':' + item.id, item);
-      if (!disposed) setHistory([...combined.values()].sort((a, b) => b.endedAt.localeCompare(a.endedAt) || a.kind.localeCompare(b.kind) || b.id.localeCompare(a.id)));
-    }).catch(cause => { if (!disposed) setError(cause.message); });
     return () => { disposed = true; };
   }, [profile, screen, identity.authenticated, identity.guest, recordsRevision]);
 
@@ -215,8 +208,8 @@ export function App() {
           <button onClick={() => setScreen('leaderboard')}>Leaderboard</button>
         </>}
         {screen === 'leaderboard' && <>{leaderboardLoading ? <p role="status">Loading…</p> : <ol className="leaderboard" aria-label="Community leaderboard">{leaderboard.map(entry => <li key={entry.id}><span>{entry.rank}. {entry.username}</span><strong>{entry.finishTimeMs === null ? Math.floor(entry.maxProgress) + ' px' : duration(entry.finishTimeMs)}</strong></li>)}</ol>}{!leaderboardLoading && !leaderboard.length && !error && <p>No results yet.</p>}</>}
-        {screen === 'history' && <div className="history-list">{history.map(item => <button key={item.kind + ':' + item.id} onClick={() => { setDetail(item); setScreen('detail'); }}><span className="kind-label">{item.kind}</span><span>{new Date(item.endedAt).toLocaleDateString()} · {item.status}{item.kind === 'SOLO' && pendingHistory.has(item.id) ? ' · Pending sync' : ''}</span><span>{duration(item.finishTimeMs ?? item.playTimeMs)}</span></button>)}{!history.length && <p>No completed games.</p>}</div>}
-        {screen === 'detail' && detail && <dl className="record-detail"><dt>Type</dt><dd>{detail.kind}</dd><dt>Result</dt><dd>{detail.status}</dd><dt>Play Time</dt><dd>{duration(detail.playTimeMs)}</dd><dt>Finish Time</dt><dd>{duration(detail.finishTimeMs)}</dd><dt>Jumps</dt><dd>{detail.jumps}</dd><dt>Falls</dt><dd>{detail.falls}</dd><dt>Peak</dt><dd>{Math.floor(detail.maxProgress)} px</dd>{detail.room && <><dt>Room</dt><dd>{detail.room.roomCode}</dd><dt>Mode</dt><dd>{detail.room.mode}</dd><dt>Rank</dt><dd>{detail.room.rank}</dd></>}</dl>}
+        {screen === 'history' && <HistoryList profile={profile} authenticated={identity.authenticated} hasIdentity={identity.authenticated || identity.guest} revision={recordsRevision} onSelect={(item, local) => { setDetail(item); setDetailLocal(local); setScreen('detail'); }} />}
+        {screen === 'detail' && detail && <HistoryDetail key={detail.kind + ':' + detail.id} item={detail} local={detailLocal} />}
         {screen === 'options' && <OptionsButtons options={options} flyAllowed={flyAllowed} onChange={updateOptions} onControls={() => setScreen('controls')} onError={setError} />}
         {screen === 'controls' && <ControlsHelp flyAllowed={flyAllowed} />}
         {screen === 'nickname' && <form className="menu-form" onSubmit={event => {

@@ -8,6 +8,7 @@ export function Lobby({ room, selfId, pending, command, socket }: {
   const host = room.hostPlayerId === selfId;
   return <>
     <p className="room-code">Room ID <code>{room.roomId}</code></p>
+    {room.state === 'COUNTDOWN' && <p role="status">Starting…</p>}
     <ul className="players">{room.members.map(member => <li key={member.playerId}>
       <span>{member.nickname}</span><span>{member.playerId === room.hostPlayerId ? 'Host' : ''}{!member.connected ? ' · Offline' : ''}{member.nextMatchConfirmed ? ' · Confirmed' : ''}</span>
     </li>)}</ul>

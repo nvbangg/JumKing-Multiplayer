@@ -156,13 +156,19 @@ export function App() {
     if (!socket.current) socket.current = new GameSocket((type, payload) => {
       if (type === 'ROOM_STATE') {
         const next = payload as unknown as RoomState;
+        if (!next.roomId) { setRoom(null); setScreen('home'); return; }
         setRoom(next);
         if (next.kind === 'COMMUNITY') { setScreen('online'); return; }
+        if (next.result && typeof next.result === 'object') { resultRef.current = next.result as MatchResult; setResult(next.result as MatchResult); }
+        if (next.state === 'PLAYING' || next.state === 'PAUSED') { setScreen('online'); return; }
         const self = next.members?.find(member => member.playerId === socket.current?.selfId);
         setScreen(resultRef.current && self?.nextMatchConfirmed !== true && (next.state === 'WAITING' || next.state === 'FINISHED') ? 'results' : 'lobby');
       }
       else if (type === 'GAME_FINISHED') { const finished = payload as unknown as MatchResult; resultRef.current = finished; setResult(finished); setScreen('results'); }
       else if (type === 'GAME_STARTED') { resultRef.current = null; setResult(null); }
+      else if (type === 'SAVE_STATUS' && resultRef.current !== null && resultRef.current.playId === payload.playId && ['PENDING', 'SAVED', 'FAILED'].includes(String(payload.saveStatus))) {
+        const updated = { ...resultRef.current, saveStatus: payload.saveStatus as MatchResult['saveStatus'] }; resultRef.current = updated; setResult(updated);
+      }
       else if (type === 'ROOM_LEFT') { setRoom(null); setResult(null); resultRef.current = null; socket.current?.close(); socket.current = null; back(); }
       else if (type === 'ERROR') setError(String(payload.message));
     }, () => setError('Disconnected from the game server'));

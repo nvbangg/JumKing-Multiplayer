@@ -43,6 +43,13 @@ class RoomLobbyIT {
             assertThat(next.path("settings").path("timeLimitMinutes").asInt()).isEqualTo(2);
             clients.get(10).ok("JOIN_ROOM", Map.of("roomId", room, "nickname", "Replacement"));
             assertThat(clients.get(10).ok("GET_ROOM_STATE", Map.of()).path("members").get(9).path("colorSlot").asInt()).isZero();
+            invalid.put("timeLimitMinutes", null); clients.get(1).ok("UPDATE_ROOM_SETTINGS", invalid);
+            clients.get(1).ok("START_GAME", Map.of());
+            var snapshot = clients.get(1).await(message -> message.path("type").asText().equals("GAME_SNAPSHOT")).path("payload");
+            assertThat(snapshot.path("peers").size()).isEqualTo(9);
+            var result = clients.get(1).ok("END_MATCH", Map.of()); assertThat(result.path("results").size()).isEqualTo(10);
+            clients.get(1).await(message -> message.path("type").asText().equals("ROOM_STATE") && message.path("payload").path("result").path("saveStatus").asText().equals("SAVED"));
+            assertThat(TestDatabase.get().jdbc.queryForObject("SELECT COUNT(*) FROM play_runs WHERE match_id=?", Integer.class, result.path("playId").asText())).isEqualTo(10);
         } finally {
             for (var client : clients) { try { if (client.socket != null) client.ok("LEAVE_ROOM", Map.of()); } catch (Exception ignored) { } client.close(); }
         }

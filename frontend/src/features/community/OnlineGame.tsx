@@ -47,9 +47,11 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
   useEffect(() => {
     let disposed = false, game: { destroy(removeCanvas: boolean): void } | undefined;
     const controller = new AbortController();
+    let lastActivity = performance.now();
     const effects = new PlayerEffects(), adventureEffects = new AdventureEffects();
     let cueManifest: Awaited<ReturnType<typeof loadManifest>> | null = null;
-    const controls = new InputController(() => {}, () => pauseRef.current(), () => { runtime.current?.cancel(); flight.current?.cancel(); }, now => flight.current?.press(now)); input.current = controls;
+    const controls = new InputController(() => { lastActivity = performance.now(); }, () => pauseRef.current(), () => { runtime.current?.cancel(); flight.current?.cancel(); }, now => flight.current?.press(now)); input.current = controls;
+    const afk = window.setInterval(() => { if (latestRoom.current.kind === 'ROOM' && runtime.current && !runtime.current.menu && performance.now() - lastActivity >= rules.afkMs) pauseRef.current(); }, PRESENTATION.afkPollMs);
     const hidden = () => { if (document.hidden) pauseRef.current(); }; const blur = () => pauseRef.current();
     document.addEventListener('visibilitychange', hidden); window.addEventListener('blur', blur);
     const unsubscribe = socket.subscribe((type, payload) => {
@@ -70,7 +72,7 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
           }
         }
         if (type === 'CONNECTION_CLOSED') { if (runtime.current) runtime.current.menu = true; controls.cancel(); audio.current?.pause(true); setDisconnected(true); setMenu('pause'); setError('Disconnected from the game server'); }
-        if (type === 'RECONNECT_OK') { setDisconnected(false); setError(''); }
+        if (type === 'RECONNECT_OK') { setDisconnected(false); setError(''); if (runtime.current) runtime.current.menu = true; controls.cancel(); setMenu('pause'); }
         if (type === 'CHAT_MESSAGE' || type === 'CHAT_HISTORY') setMessages(socket.chatHistory as unknown as ChatMessage[]);
         if (type === 'COMMUNITY_RUN_STATE' || type === 'SAVE_STATUS') { if (typeof payload.saveStatus === 'string') setSaveStatus(payload.saveStatus); }
       } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid game state'); runtime.current?.cancel(); }
@@ -86,6 +88,7 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
         if (snapshot.self.paused && !session.menu) { session.menu = true; controls.cancel(); setMenu('pause'); audio.current?.pause(true); }
       }, config.features.flyEnabled, message => { setError(message); setMenu('pause'); controls.cancel(); });
       runtime.current = session;
+      if (socket.resumeRequired) { session.menu = true; controls.cancel(); setMenu('pause'); audio.current?.pause(true); }
       flight.current = new FlightToggle(config.features.flyEnabled, () => session.flying, enabled => { session.setFlight(enabled); setFlying(enabled); });
       flight.current.setEnabled(readOptions().fly);
       if (socket.lastFinish) session.finish(socket.lastFinish);
@@ -95,7 +98,7 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
         onEndingComplete: () => setEnding('picture'), onSound: key => audio.current?.play(key),
       });
     })().catch(cause => { if (!disposed) setError(cause instanceof Error ? cause.message : 'Unable to load online game'); });
-    return () => { disposed = true; controller.abort(); unsubscribe(); controls.dispose(); runtime.current?.cancel(); runtime.current = null; input.current = null; flight.current = null; game?.destroy(true); audio.current?.dispose(); audio.current = null;
+    return () => { disposed = true; controller.abort(); clearInterval(afk); unsubscribe(); controls.dispose(); runtime.current?.cancel(); runtime.current = null; input.current = null; flight.current = null; game?.destroy(true); audio.current?.dispose(); audio.current = null;
       document.removeEventListener('visibilitychange', hidden); window.removeEventListener('blur', blur);
     };
   }, [socket, room.roomId]);
@@ -112,7 +115,7 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
       catch (cause) { setError(cause instanceof Error ? cause.message : 'Resume failed'); return; }
       finally { setPending(false); }
     }
-    if (runtime.current) runtime.current.menu = false; input.current?.resume(); audio.current?.pause(false); setMenu(null);
+    socket.resumeRequired = false; if (runtime.current) runtime.current.menu = false; input.current?.resume(); audio.current?.pause(false); setMenu(null);
   };
   const updateOptions = (key: keyof Options) => {
     const next = { ...options, [key]: !options[key] }; setOptions(next); audio.current?.setEnabled(next.sound);
@@ -141,6 +144,7 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
       {menu === 'pause' && <>{disconnected ? <><button disabled={pending} onClick={() => { setPending(true); void socket.reconnect().catch(cause => setError(cause.message)).finally(() => setPending(false)); }}>Reconnect</button><button onClick={onHome}>Back to Menu</button></> : <button disabled={pending} onClick={() => { void resume(); }}>Resume</button>}<button onClick={() => setMenu('options')}>Options</button><button onClick={() => { runtime.current?.cancel(); input.current?.cancel(); setChatOpen(true); }}>Open Chat</button>
         {room.kind === 'COMMUNITY' && <button disabled={pending || disconnected} onClick={() => { void newGame(); }}>New Game</button>}
         <button onClick={() => setMenu('inventory')}>Inventory</button>
+        {room.kind === 'ROOM' && room.hostPlayerId === socket.selfId && room.state === 'PLAYING' && <button disabled={pending || disconnected} onClick={() => { void command('END_MATCH'); }}>End Match</button>}
         <button disabled={pending || disconnected} onClick={() => { void command('LEAVE_ROOM'); }}>{room.kind === 'COMMUNITY' ? 'Save & Exit' : 'Leave Room'}</button>{room.kind === 'COMMUNITY' && <small role="status">{saveStatus === 'SAVED' ? 'Saved' : saveStatus === 'FAILED' ? 'Save failed' : 'Saving…'}</small>}</>}
       {menu === 'pause' && room.kind === 'COMMUNITY' && <form className="menu-form" onSubmit={event => { event.preventDefault(); void command('JOIN_ROOM', { roomId: transferId }); }}>
         <label>Community ID<input value={transferId} minLength={6} maxLength={6} pattern="[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}" required onChange={event => setTransferId(event.currentTarget.value.toUpperCase())} /></label>

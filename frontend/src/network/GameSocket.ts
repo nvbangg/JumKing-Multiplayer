@@ -41,6 +41,7 @@ export class GameSocket {
   lastSnapshot: Record<string, unknown> | null = null;
   lastFinish: Record<string, unknown> | null = null;
   playContext: { playId: string; generation: number } | null = null;
+  resumeRequired = false;
   chatHistory: Record<string, unknown>[] = [];
   private roomId: string | null = null;
   private listeners = new Set<(type: string, payload: Record<string, unknown>) => void>();
@@ -120,6 +121,8 @@ export class GameSocket {
         else request.resolve(message);
       }
       if (message.type === 'ROOM_JOINED' || message.type === 'RECONNECT_OK') { this.selfId = message.payload.playerId as string; this.roomId = message.payload.roomId as string; }
+      if (message.type === 'RECONNECT_OK') this.resumeRequired = true;
+      if (message.type === 'ROOM_JOINED' || message.type === 'GAME_STARTED') this.resumeRequired = false;
       if (message.type === 'ROOM_JOINED') this.chatHistory = [];
       if (message.type === 'CHAT_HISTORY' || message.type === 'CHAT_MESSAGE') {
         if (message.payload.roomId !== this.roomId) return;

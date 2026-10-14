@@ -70,7 +70,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 - [x] Hoàn thiện Create/Join Room và Lobby/settings/Host; kiểm tra permissions và capacity.
 - [x] Triển khai transaction roster/metrics và comparator Room; kiểm tra revision, rollback, Merge và đồng hạng bằng fixtures.
 - [x] Tích hợp chat Room; kiểm tra history/focus/input và giới hạn.
-- [ ] Hoàn thiện Race Start/countdown/Finish/Results; kiểm tra 1/2/max người và Finish cùng tick.
+- [x] Hoàn thiện Race Start/countdown/Finish/Results; kiểm tra 1/2/max người và Finish cùng tick.
 - [ ] Hoàn thiện End/Leave/Host transfer/reconnect; kiểm tra deadlines, khóa Join, re-authentication và Host khi mọi người offline.
 - [ ] Hoàn thiện Host Pause/Resume Room; kiểm tra clock/state/input, giữ RAM, hết hạn, chuyển Host/reconnect và restart.
 - [ ] Hoàn thiện Play Again từng người; kiểm tra room code/settings, xác nhận/AFK/Join mới, roster và match/History mới.
@@ -153,5 +153,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 06 — Lobby | PASS — backend units và RoomLobbyIT với 11 WS/Guest thật: giới hạn 10 người/màu, giải phóng slot, Host-only settings và chuyển Host. Chrome hai Guest tạo/join qua ID, đồng bộ Time Limit/No Walk, không có History khi chưa Start; Start một người bị khóa trên UI. Điều kiện Start phía server/countdown theo mốc Race |
 | Phase 06 — dữ liệu/xếp hạng | PASS — RoomRanking tests cho bốn mode: Finish/time, current/peak, 1,1,3, DNF và không tạo winner khi chưa Finish. RoomRunsIT trên MySQL: match/roster atomic, rollback bằng trigger lỗi, revision/retry không nhân rows; writer cũ resolve Guest đã Merge. Khóa owners tăng dần cho cả roster. Tích hợp gameplay/History/restart theo các mốc tiếp theo |
 | Phase 06 — chat | PASS — type-check/build, 63 frontend unit tests, 42 integration tests và 18 Chrome E2E online. Hai Guest chat trong Lobby bằng nickname, HTML chỉ là text; history/cooldown/Unicode dùng chung ChatLog. Packet gắn room ID, client bỏ state/chat/save/result của room/play cũ; actor kiểm tra lại membership trước xử lý command sau transfer |
+| Phase 06 — Race | PASS — type-check/build, 63 frontend/44 backend unit tests, 45 integration tests và 19 Chrome E2E online; chạy thêm RoomRaceIT/RoomLobbyIT sau review config. Một người/không phải Host không Start; countdown khóa Join/settings, hủy không ghi History. Hai browser Start/nhảy/Host End/Results/History; 10 WS players cùng chạy/lưu đủ roster. Checkpoint native xác minh hai Finish cùng tick 16.957, đồng hạng nhất/finalize một lần. Room dùng checkpoint interval chung; cấu hình 25 ms được kiểm tra autosave khi chưa End. Lifecycle, modes và writer/restart theo các mốc còn lại |
 | Phase 06 còn lại–07 | NOT RUN — chưa nghiệm thu đầy đủ |
 | Phase 08 | Chưa thực hiện |

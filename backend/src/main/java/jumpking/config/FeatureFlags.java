@@ -11,7 +11,7 @@ public class FeatureFlags {
     public FeatureFlags(Environment environment) {
         flyEnabled = environment.acceptsProfiles(Profiles.of("local"))
             && !environment.acceptsProfiles(Profiles.of("prod"))
-            && Boolean.parseBoolean(environment.getProperty("FLY_ENABLED", "false"));
+            && Boolean.parseBoolean(environment.getProperty("app.fly-enabled", environment.getProperty("FLY_ENABLED", "false")));
     }
 
     public boolean flyEnabled() { return flyEnabled; }

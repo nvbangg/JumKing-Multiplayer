@@ -1,4 +1,4 @@
-const HTTP_TIMEOUT_MS = 8000;
+import { NETWORK } from './config';
 export class ApiError extends Error {
   constructor(readonly code: string, message: string) { super(message); }
 }
@@ -18,7 +18,7 @@ export async function api<T>(path: string, method = 'GET', body?: unknown): Prom
     if (!csrf || typeof csrf.token !== 'string' || typeof csrf.headerName !== 'string') { csrf = null; throw new ApiError('PROTOCOL_ERROR', 'The server returned an invalid CSRF response'); }
   }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), HTTP_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), NETWORK.timeoutMs);
   try {
     const response = await fetch(backendOrigin() + '/api' + path, {
       method, credentials: 'include', signal: controller.signal,

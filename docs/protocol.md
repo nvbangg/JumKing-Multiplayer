@@ -47,6 +47,8 @@ HTTP JSON body tối đa 16 KiB. Register: username 3–32 letters/numbers/_/-, 
 
 GameMap={width,screenHeight,tileSize,progressOriginY,spawn,finish,screens}; spawn={x,y}, finish={screen,minCenterX,requiresGrounded}, screen={tiles:string[],wind:boolean}.
 
+game-config trả tuning/rules từ shared; appearances=[{colorSlot,color}] ánh xạ slot sang màu hex. features do server quyết định theo cấu hình/profile, không nhận từ client.
+
 RunSummary={id,status,currentProgress,maxProgress,elapsedTimeMs,peakReachedTimeMs,finishTimeMs}; LeaderboardEntry thêm {rank,username}.
 
 History summary={id,kind,startedAt,endedAt,status,playTimeMs,jumps,falls,currentProgress,maxProgress,finishTimeMs,room}; room=null cho Solo/Community, Room có {mode,roomCode,durationMs,rank,isWinner}. Detail Room thêm {timeLimitMinutes,endReason,participants}; detail Solo/Community dùng summary. Participant={runId,nickname,status,rank,isWinner,currentProgress,maxProgress,finishTimeMs,playTimeMs,jumps,falls}. Ownership, thứ tự và summary sau Merge theo data.

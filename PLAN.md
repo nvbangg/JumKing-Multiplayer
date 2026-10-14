@@ -45,7 +45,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 - [x] Triển khai Guest/session/CSRF/Origin và HTTP errors; kiểm tra cookies, idle/absolute, quyền và rate limits.
 - [x] Hoàn thiện Register/Login/Logout và UI Account; kiểm tra validation, session rotation và ownership.
 - [x] Hoàn thiện Merge/Skip Guest Room History; kiểm tra pointer/writer đồng thời, nhiều lượt cùng match và Stats không cộng trùng.
-- [ ] Triển khai map/game-config API và HTTP/WS adapter; kiểm tra contract, credentials, endpoints và lỗi kết nối.
+- [x] Triển khai map/game-config API và HTTP/WS adapter; kiểm tra contract, credentials, endpoints và lỗi kết nối.
 - [ ] Hoàn thiện Solo metrics sync; kiểm tra owner, hai thiết bị, revision/retry, pending History và local/server totals.
 - [ ] Hoàn thiện WS transport/registry/executor, sequence/heartbeat/queues; kiểm tra quotas, socket cũ và slow consumers.
 
@@ -132,5 +132,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 04 — identity/security | PASS — 22 unit tests + 13 MySQL/HTTP/JAR integration tests; Guest opaque/hash và hết hạn, CSRF/CORS/Origin, cookies Secure/HttpOnly/Lax, body thường/chunked, quyền Account, idle/absolute và rate theo IP/identity. Session authority dùng chung HTTP/WS; tích hợp thu hồi socket theo mốc WS transport |
 | Phase 04 — Account | PASS — type-check/build, 46 frontend unit tests, 22 backend unit tests + 19 integration tests, gồm harness chạy 2 Chrome E2E với backend/MySQL thật. Kiểm tra BCrypt/Unicode/strict JSON, trùng credentials, lỗi Login đồng nhất, đổi session/CSRF, Logout, Guest đăng ký giữ owner Room, membership guard và hai browser identities; xem screenshot Account. Guest Solo giữ riêng; Merge theo mốc tiếp theo |
 | Phase 04 — Merge | PASS — type-check/build, 46 frontend/24 backend unit tests + 23 MySQL integration tests và 3 Chrome E2E. Merge/Skip qua UI thật; UUID/counters giữ nguyên, SUM không nhân đôi và COUNT DISTINCT một trận khi Account sở hữu hai lượt. Kiểm tra retry cùng đích, chặn đổi đích, writer đồng thời/đến muộn, trigger gây lỗi để xác minh rollback; registry không giữ lock khi chờ JDBC. Profile/History API dùng các phép tổng hợp này ở Phase 05–06 |
+| Phase 04 — map/contracts | PASS — type-check/build, 52 frontend/24 backend unit tests, 24 integration tests và 4 Chrome E2E. HTTP trả đúng shared map/tuning/rules, 10 appearance slots và server flag; adapter kiểm tra envelope/size, handshake chung, pending cleanup, socket cũ, heartbeat/nonce và timeout không replay mutation. Chrome xác minh map/config và handshake bị từ chối; WS endpoint/dispatch theo mốc transport |
 | Phase 04–07 còn lại | NOT RUN — chưa triển khai và nghiệm thu hệ thống |
 | Phase 08 | Chưa thực hiện |

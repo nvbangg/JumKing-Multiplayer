@@ -56,3 +56,16 @@ test('Guest Room history offers Skip and merges only after explicit confirmation
   await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
   expect((await context.cookies()).find(cookie => cookie.name === 'JK_GUEST')).toBeUndefined();
 });
+
+test('public map/config match the server contract and a rejected handshake closes cleanly', async ({ page }) => {
+  let connections = 0; page.on('websocket', socket => { if (new URL(socket.url()).pathname === '/ws/game') connections++; }); await page.goto('/');
+  const result = await page.evaluate(async () => {
+    const path = '/src/network/GameSocket.ts', { GameSocket } = await import(path);
+    const map = await (await fetch('/api/map')).json(), config = await (await fetch('/api/game-config')).json();
+    let disconnected = 0; const socket = new GameSocket(() => {}, () => { disconnected++; });
+    const first = socket.connect(), second = socket.connect(); const shared = first === second;
+    const attempts = await Promise.allSettled([first, second]); socket.close();
+    return { screens: map.screens.length, appearances: config.appearances.length, fly: config.features.flyEnabled, shared, disconnected, rejected: attempts.every(result => result.status === 'rejected') };
+  });
+  expect(result).toEqual({ screens: 43, appearances: 10, fly: false, shared: true, disconnected: 1, rejected: true }); expect(connections).toBe(1);
+});

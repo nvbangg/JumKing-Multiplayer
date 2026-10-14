@@ -10,6 +10,9 @@ class FeatureFlagsTest {
         assertThat(new FeatureFlags(env).flyEnabled()).isFalse();
         env.setActiveProfiles("local");
         assertThat(new FeatureFlags(env).flyEnabled()).isTrue();
+        env.setProperty("app.fly-enabled", "false");
+        assertThat(new FeatureFlags(env).flyEnabled()).isFalse();
+        env.setProperty("app.fly-enabled", "true");
         env.setActiveProfiles("local", "prod");
         assertThat(new FeatureFlags(env).flyEnabled()).isFalse();
         env.setActiveProfiles("prod");

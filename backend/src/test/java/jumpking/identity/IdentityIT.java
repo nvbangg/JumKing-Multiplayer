@@ -78,6 +78,18 @@ class IdentityIT {
         jdbc.update("INSERT INTO play_runs(id,user_id,kind,match_id,status,nickname,started_at,updated_at) VALUES (?,?,'ROOM',?,'ACTIVE','Guest Player',UTC_TIMESTAMP(3),UTC_TIMESTAMP(3))",
             java.util.UUID.randomUUID().toString(), guest, match);
     }
+    @Test void publicMapAndConfigComeFromPackagedSharedDataAndServerFlags() throws Exception {
+        try (var client = client()) {
+            var map = client.send("/map", "GET", null); var config = client.send("/game-config", "GET", null);
+            assertThat(map.statusCode()).isEqualTo(200); assertThat(config.statusCode()).isEqualTo(200);
+            var shared = new jumpking.game.SharedData(json);
+            assertThat(tree(map)).isEqualTo(shared.map()); assertThat(tree(config).path("physics")).isEqualTo(shared.physics());
+            assertThat(tree(config).path("rules")).isEqualTo(shared.rules()); assertThat(tree(config).path("features").path("flyEnabled").asBoolean()).isFalse();
+            assertThat(tree(config).path("appearances").size()).isEqualTo(10);
+            assertThat(tree(config).path("appearances").get(0).path("color").asText()).isEqualTo("#ffffff");
+            assertThat(config.body()).doesNotContain("password", "guest_token", "allowed-origins");
+        }
+    }
 
     @Test void meDoesNotCreateIdentityAndGuestUsesHashedOpaqueCookie() throws Exception {
         try (var client = client()) {

@@ -1,8 +1,22 @@
 import { ApiError, backendOrigin } from './api';
 import { uuid } from './ids';
+import { NETWORK } from './config';
 
-const NETWORK = Object.freeze({ timeoutMs: 8000, heartbeatMs: 10000, maxPending: 64 });
 interface Message { v: number; type: string; payload: Record<string, unknown>; requestId?: string }
+const SERVER_TYPES = new Set(['ROOM_JOINED', 'ROOM_STATE', 'ROOM_LEFT', 'GAME_STARTED', 'GAME_SNAPSHOT', 'COMMUNITY_RUN_STATE',
+  'PLAYER_EFFECTS', 'PLAYER_FINISHED', 'GAME_FINISHED', 'SAVE_STATUS', 'CHAT_MESSAGE', 'CHAT_HISTORY', 'RECONNECT_OK', 'PONG', 'ERROR']);
+function parseMessage(data: unknown): Message {
+  if (typeof data !== 'string' || new TextEncoder().encode(data).length > NETWORK.maxMessageBytes) throw new Error('Invalid message size');
+  const value: unknown = JSON.parse(data);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid envelope');
+  const message = value as Message;
+  if (Object.keys(message).some(key => !['v', 'type', 'payload', 'requestId'].includes(key)) || message.v !== 1 || !SERVER_TYPES.has(message.type)
+    || !message.payload || typeof message.payload !== 'object' || Array.isArray(message.payload)
+    || (message.requestId !== undefined && (typeof message.requestId !== 'string' || !message.requestId.length || message.requestId.length > 64))) throw new Error('Invalid protocol');
+  if (message.type === 'ERROR' && (typeof message.payload.code !== 'string' || typeof message.payload.message !== 'string')) throw new Error('Invalid error');
+  if (['ROOM_JOINED', 'RECONNECT_OK'].includes(message.type) && (typeof message.payload.playerId !== 'string' || !message.payload.playerId)) throw new Error('Invalid player');
+  return message;
+}
 export interface RoomMember { playerId: string; nickname: string; username: string | null; colorSlot: number; connected: boolean; paused: boolean | null; nextMatchConfirmed: boolean | null }
 export interface RoomState {
   roomId: string; kind: 'ROOM' | 'COMMUNITY'; state: 'WAITING' | 'COUNTDOWN' | 'PLAYING' | 'PAUSED' | 'FINISHED';
@@ -17,41 +31,61 @@ export interface MatchResult { playId: string; reason: string; durationMs: numbe
 export class GameSocket {
   private socket: WebSocket | null = null;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
+  private connecting: Promise<void> | null = null;
+  private cancelConnect: (() => void) | null = null;
   private pending = new Map<string, { resolve: (value: Message) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   selfId: string | null = null;
   constructor(private onMessage: (type: string, payload: Record<string, unknown>) => void, private onDisconnect: () => void) {}
-  async connect(): Promise<void> {
-    if (this.socket?.readyState === WebSocket.OPEN) return;
-    const url = new URL('/ws/game', backendOrigin()); url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-    const socket = new WebSocket(url); this.socket = socket;
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => { socket.close(); reject(new ApiError('CONNECTION_FAILED', 'Connection timed out')); }, NETWORK.timeoutMs);
-      socket.onopen = () => { clearTimeout(timer); resolve(); };
-      socket.onerror = () => { clearTimeout(timer); reject(new ApiError('CONNECTION_FAILED', 'Unable to connect to the game server')); };
-      socket.onclose = () => {
-        clearTimeout(timer); reject(new ApiError('CONNECTION_FAILED', 'The game connection was closed'));
-        if (this.socket !== socket) return;
-        this.clearPending(); if (this.heartbeat) clearInterval(this.heartbeat); this.heartbeat = null; this.onDisconnect();
-      };
-      socket.onmessage = event => {
-        if (this.socket !== socket) return;
-        let message: Message;
-        try { message = JSON.parse(event.data); }
-        catch { socket.close(1002, 'Invalid message'); return; }
-        if (message.v !== 1 || typeof message.type !== 'string' || !message.payload || typeof message.payload !== 'object') { socket.close(1002, 'Invalid protocol'); return; }
-        const request = message.requestId ? this.pending.get(message.requestId) : undefined;
-        if (request && message.requestId) {
-          clearTimeout(request.timer); this.pending.delete(message.requestId);
-          if (message.type === 'ERROR') request.reject(new ApiError(String(message.payload.code), String(message.payload.message)));
-          else request.resolve(message);
-        }
-        if (message.type === 'ROOM_JOINED' || message.type === 'RECONNECT_OK') this.selfId = String(message.payload.playerId);
-        this.onMessage(message.type, message.payload);
-      };
-    });
-    this.heartbeat = setInterval(() => {
-      if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ v: 1, type: 'HEARTBEAT', payload: { nonce: uuid() }, requestId: uuid() }));
-    }, NETWORK.heartbeatMs);
+  connect(): Promise<void> {
+    if (this.socket?.readyState === WebSocket.OPEN) return Promise.resolve();
+    if (this.connecting) return this.connecting;
+    if (this.socket) this.close();
+    this.selfId = null;
+    let socket: WebSocket;
+    try {
+      const url = new URL('/ws/game', backendOrigin()); url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+      socket = new WebSocket(url);
+    } catch (error) { return Promise.reject(error instanceof ApiError ? error : new ApiError('CONNECTION_FAILED', 'Unable to connect to the game server')); }
+    this.socket = socket;
+    let resolve!: () => void, reject!: (error: Error) => void, settled = false;
+    const connection = new Promise<void>((success, failure) => { resolve = success; reject = failure; });
+    this.connecting = connection;
+    const finish = (error?: Error) => {
+      if (settled) return; settled = true; clearTimeout(timer);
+      if (this.connecting === connection) this.connecting = null;
+      if (this.cancelConnect === cancel) this.cancelConnect = null;
+      if (error) reject(error); else resolve();
+    };
+    const cancel = () => finish(new ApiError('CONNECTION_FAILED', 'The game connection was closed'));
+    this.cancelConnect = cancel;
+    const timer = setTimeout(() => this.disconnect(socket, 'Connection timed out'), NETWORK.timeoutMs);
+    socket.onopen = () => {
+      if (this.socket !== socket) { cancel(); return; }
+      finish();
+      this.heartbeat = setInterval(() => {
+        if (this.socket !== socket || socket.readyState !== WebSocket.OPEN) return;
+        const nonce = uuid();
+        void this.command('HEARTBEAT', { nonce }).then(reply => {
+          if (reply.type !== 'PONG' || reply.payload.nonce !== nonce) this.disconnect(socket, 'Invalid heartbeat', 1002);
+        }).catch(() => this.disconnect(socket, 'The game server is not responding'));
+      }, NETWORK.heartbeatMs);
+    };
+    socket.onerror = () => this.disconnect(socket, 'Unable to connect to the game server');
+    socket.onclose = () => this.disconnect(socket, 'The game connection was closed');
+    socket.onmessage = event => {
+      if (this.socket !== socket) return;
+      let message: Message;
+      try { message = parseMessage(event.data); } catch { this.disconnect(socket, 'Invalid protocol', 1002); return; }
+      const request = message.requestId ? this.pending.get(message.requestId) : undefined;
+      if (request && message.requestId) {
+        clearTimeout(request.timer); this.pending.delete(message.requestId);
+        if (message.type === 'ERROR') request.reject(new ApiError(message.payload.code as string, message.payload.message as string));
+        else request.resolve(message);
+      }
+      if (message.type === 'ROOM_JOINED' || message.type === 'RECONNECT_OK') this.selfId = message.payload.playerId as string;
+      this.onMessage(message.type, message.payload);
+    };
+    return connection;
   }
   command(type: string, payload: Record<string, unknown> = {}): Promise<Message> {
     if (this.socket?.readyState !== WebSocket.OPEN) return Promise.reject(new ApiError('CONNECTION_FAILED', 'The game connection is unavailable'));
@@ -60,15 +94,27 @@ export class GameSocket {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { this.pending.delete(requestId); reject(new ApiError('COMMAND_TIMEOUT', 'The server has not confirmed this action')); }, NETWORK.timeoutMs);
       this.pending.set(requestId, { resolve, reject, timer });
-      this.socket!.send(JSON.stringify({ v: 1, type, requestId, payload }));
+      try {
+        const message = JSON.stringify({ v: 1, type, requestId, payload });
+        if (new TextEncoder().encode(message).length > NETWORK.maxMessageBytes) throw new Error('Message is too large');
+        this.socket!.send(message);
+      } catch {
+        clearTimeout(timer); this.pending.delete(requestId); reject(new ApiError('INVALID_MESSAGE', 'The command could not be sent'));
+      }
     });
   }
   private clearPending(): void {
     for (const pending of this.pending.values()) { clearTimeout(pending.timer); pending.reject(new ApiError('CONNECTION_FAILED', 'The game connection was closed')); }
     this.pending.clear();
   }
-  close(): void {
+  close(code = 1000, reason = ''): void {
     const socket = this.socket; this.socket = null;
-    if (this.heartbeat) clearInterval(this.heartbeat); this.heartbeat = null; this.clearPending(); socket?.close();
+    this.cancelConnect?.(); this.cancelConnect = null; this.selfId = null;
+    if (this.heartbeat) clearInterval(this.heartbeat); this.heartbeat = null; this.clearPending(); socket?.close(code, reason);
+  }
+  private disconnect(socket: WebSocket, message: string, code?: number): void {
+    if (this.socket !== socket) return;
+    this.close(code ?? 1000, message);
+    this.onDisconnect();
   }
 }

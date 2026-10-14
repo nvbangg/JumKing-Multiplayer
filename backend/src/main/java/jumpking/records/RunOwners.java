@@ -26,16 +26,23 @@ public class RunOwners {
         }
     }
     public <T> T write(long source, Function<Long, T> writer) {
-        for (int attempt = 0; attempt < 2; attempt++) {
-            Owner before = read(source); long target = before.mergedInto == null ? source : before.mergedInto;
+        return writeAll(java.util.List.of(source), owners -> writer.apply(owners.get(source)));
+    }
+    public <T> T writeAll(java.util.Collection<Long> sources, Function<java.util.Map<Long, Long>, T> writer) {
+        var unique = new java.util.TreeSet<>(sources);
+        for (int attempt = 0; attempt <= unique.size(); attempt++) {
+            var targets = new java.util.LinkedHashMap<Long, Long>(); var locks = new java.util.TreeSet<>(unique);
+            for (long source : unique) { var owner = read(source); long target = owner.mergedInto == null ? source : owner.mergedInto; targets.put(source, target); locks.add(target); }
             try {
                 return transactions.execute(status -> {
-                    lockPair(source, target); Owner locked = read(source);
-                    long current = locked.mergedInto == null ? source : locked.mergedInto;
-                    // Pointer đổi trước khi lấy lock: rollback rồi khóa lại theo thứ tự ID.
-                    if (current != target) throw new OwnerChanged();
-                    if (current != source && !"ACCOUNT".equals(read(current).type)) throw new IllegalStateException("Invalid merge target");
-                    return writer.apply(current);
+                    locks.forEach(this::lock);
+                    for (long source : unique) {
+                        var owner = read(source); long current = owner.mergedInto == null ? source : owner.mergedInto;
+                        // Pointer đổi trước khi lấy lock: rollback rồi khóa lại toàn bộ theo thứ tự ID.
+                        if (current != targets.get(source)) throw new OwnerChanged();
+                        if (current != source && !"ACCOUNT".equals(read(current).type)) throw new IllegalStateException("Invalid merge target");
+                    }
+                    return writer.apply(java.util.Map.copyOf(targets));
                 });
             } catch (OwnerChanged retry) { /* Pointer chỉ được thiết lập một lần. */ }
         }

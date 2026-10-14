@@ -68,6 +68,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 ## Phase 06 — Room
 
 - [x] Hoàn thiện Create/Join Room và Lobby/settings/Host; kiểm tra permissions và capacity.
+- [x] Triển khai transaction roster/metrics và comparator Room; kiểm tra revision, rollback, Merge và đồng hạng bằng fixtures.
 - [ ] Tích hợp chat Room; kiểm tra history/focus/input và giới hạn.
 - [ ] Hoàn thiện Race Start/countdown/Finish/Results; kiểm tra 1/2/max người và Finish cùng tick.
 - [ ] Hoàn thiện End/Leave/Host transfer/reconnect; kiểm tra deadlines, khóa Join, re-authentication và Host khi mọi người offline.
@@ -150,5 +151,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 05 — Fly online | PASS — type-check/build, 61 frontend unit tests, MySQL/WS regression và Chrome với backend profile local. Options, nhấn đúp, WASD/arrows, tắt bay và Save/Continue giữ state; intent không mất vì ACK cũ, lượt mới reset đúng. Server mặc định từ chối freeFlight=true và tọa độ giả. Backend local lưu/restore JSON và leaderboard tính peak bình thường; browser riêng chạy 1 E2E, suite mặc định 16 E2E vẫn qua |
 | Phase 05 — adventure online | PASS — 62 frontend unit tests, type-check/build, MySQL regression và Chrome. Server nhặt Cap/tự trang bị đúng luật, bật/tắt qua Inventory và Continue giữ state; pickup chỉ phát một lần. Từ chối trang bị chưa sở hữu. Cues adventure/world chỉ gửi owner bằng ID, client lọc lượt và dedupe; replay snapshot không phát lại. E2E cleanup đúng membership sau lỗi để slot reconnect không ảnh hưởng ca kế tiếp |
 | Phase 06 — Lobby | PASS — backend units và RoomLobbyIT với 11 WS/Guest thật: giới hạn 10 người/màu, giải phóng slot, Host-only settings và chuyển Host. Chrome hai Guest tạo/join qua ID, đồng bộ Time Limit/No Walk, không có History khi chưa Start; Start một người bị khóa trên UI. Điều kiện Start phía server/countdown theo mốc Race |
+| Phase 06 — dữ liệu/xếp hạng | PASS — RoomRanking tests cho bốn mode: Finish/time, current/peak, 1,1,3, DNF và không tạo winner khi chưa Finish. RoomRunsIT trên MySQL: match/roster atomic, rollback bằng trigger lỗi, revision/retry không nhân rows; writer cũ resolve Guest đã Merge. Khóa owners tăng dần cho cả roster. Tích hợp gameplay/History/restart theo các mốc tiếp theo |
 | Phase 06 còn lại–07 | NOT RUN — chưa nghiệm thu đầy đủ |
 | Phase 08 | Chưa thực hiện |

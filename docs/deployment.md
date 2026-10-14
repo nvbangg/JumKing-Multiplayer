@@ -208,3 +208,7 @@ Dừng/restart có kiểm soát: ngừng nhận phiên mới, flush checkpoint/k
 Nếu tách frontend lên Cloudflare Pages: dùng `game.example.com` và API VPS `api.example.com` cùng site để phù hợp cookie SameSite=Lax; *.pages.dev và API khác site cần proxy cùng origin hoặc thiết kế lại authentication, CORS không thay cookie policy.
 
 Build Pages từ frontend, command `npm run build`, output `dist`, đặt VITE_BACKEND_ORIGIN trước build. VPS chạy JAR như service, proxy WebSocket upgrade, Secure cookies và origins cụ thể; chỉ tin forwarded headers từ proxy. Nghiệm thu từ mạng ngoài theo testing; Solo vẫn dùng được khi backend không sẵn sàng.
+
+## Persistence JPA
+
+Backend dùng Spring Data JPA/Hibernate với `spring.jpa.hibernate.ddl-auto=validate` và `spring.jpa.open-in-view=false`. Cài mới dùng schema.sql; bản đang có dữ liệu chỉ chạy SQL nâng cấp đúng phiên bản sau khi dừng writer/backend. Không chạy CREATE/DROP hoặc bật update/create tự động trên database cá nhân. Credentials giữ ở file riêng như bảng cấu hình; không đưa database vào Git.

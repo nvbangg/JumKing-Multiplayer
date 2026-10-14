@@ -2,11 +2,11 @@
 
 ## Schema
 
-Database `jumpking`, MySQL/InnoDB, utf8mb4, timestamps UTC. Schema tạo bằng `scripts/schema.sql`; backend JDBC chỉ kiểm tra khi start. Tạo/nâng cấp theo [deployment](deployment.md#mysql).
+Database `jumpking`, MySQL/InnoDB, utf8mb4, timestamps UTC. Schema tạo bằng `scripts/schema.sql`; Hibernate chỉ validate mapping khi start; SQL giữ constraints và indexes. Tạo/nâng cấp theo [deployment](deployment.md#mysql).
 
 | Bảng | Trách nhiệm |
 | --- | --- |
-| users | Định danh Account/Guest, credentials và liên kết Merge |
+| users | Định danh Account/Guest, credentials, vương miện và liên kết Merge |
 | play_runs | Một lượt của một người: metrics, kết quả Room và checkpoint Community |
 | matches | Thông tin chung của một trận Room |
 
@@ -26,6 +26,7 @@ erDiagram
         VARCHAR(255) password_hash "nullable"
         CHAR(64) guest_token_hash UK "nullable"
         BIGINT merged_into_user_id FK "nullable"
+        BOOLEAN crown_unlocked
         DATETIME(3) created_at
     }
     play_runs {
@@ -56,6 +57,7 @@ erDiagram
         CHAR(6) room_code
         VARCHAR(16) mode
         SMALLINT time_limit_minutes "nullable"
+        SMALLINT map_level "1–10; 10=full"
         DATETIME(3) started_at
         DATETIME(3) ended_at "nullable"
         BIGINT duration_ticks
@@ -123,7 +125,7 @@ Reload/lỗi mạng giữ hàng chờ; chỉ xác nhận sync sau commit. New Ga
 
 Continue tìm COMMUNITY/ACTIVE theo Account; chưa có thì tạo spawn snapshot, revision=1. Save thuộc lượt, không gắn room code. Chuyển sảnh/Save & Exit/AFK giữ lượt.
 
-Snapshot do server tạo: physics (freeFlight/phasingFall), inventory/trang bị/quest/hội thoại theo ID, screen events/hidden walls/pha gió và codec version. Không chứa định nghĩa shared hoặc nội dung hiển thị. Backend validate codec/metrics khi restore; xử lý quyền bay theo [gameplay](gameplay.md#fly-mode).
+Snapshot do server tạo: physics (freeFlight/phasingFall), hội thoại theo ID, screen events/hidden walls/pha gió và codec version. Không chứa định nghĩa shared hoặc nội dung hiển thị. Backend validate codec/metrics khi restore; xử lý quyền bay theo [gameplay](gameplay.md#fly-mode).
 
 Autosave ghi metrics/snapshot/revision/updated_at cùng transaction trên đúng id/owner/COMMUNITY/ACTIVE, không upsert lượt đã mất. Worker tuần tự từng lượt, gộp bản chưa ghi. Chu kỳ theo [deployment](deployment.md#cấu-hình); Pause/Leave/Finish yêu cầu flush.
 
@@ -131,7 +133,7 @@ New Run khóa users rồi lượt bằng SELECT ... FOR UPDATE, kiểm tra expec
 
 ## Kết quả Room
 
-Room bắt đầu gameplay tạo match và lượt ROOM của roster trong một transaction bằng IDs chốt khi Start; Lobby/countdown hủy không ghi. started_at là hết countdown. Mode/settings nằm ở matches theo [gameplay](gameplay.md#room-và-xếp-hạng); time_limit_minutes chỉ khác NULL ở TIME_LIMIT. end_reason: FINISH/TIME_LIMIT/HOST_ENDED/PAUSE_TIMEOUT/ALL_DISCONNECTED/ABORTED.
+Room bắt đầu gameplay tạo match và lượt ROOM của roster trong một transaction bằng IDs chốt khi Start; Lobby/countdown hủy không ghi. started_at là hết countdown. Mode/settings/map_level nằm ở matches theo [gameplay](gameplay.md#room-và-xếp-hạng); time_limit_minutes chỉ khác NULL ở TIME_LIMIT. end_reason: FINISH/TIME_LIMIT/HOST_ENDED/PAUSE_TIMEOUT/ALL_DISCONNECTED/ABORTED.
 
 Writer lưu duration_ticks/metrics định kỳ theo deployment và flush khi Host Pause; không lưu snapshot Room. Pause/Resume không kết thúc trận hoặc tạo lượt mới; PAUSE_TIMEOUT chốt người còn tham gia UNFINISHED, không winner. Leave/hết hạn reconnect chốt DNF; finalize chốt người còn lại UNFINISHED/FINISHED. play_ticks≤duration_ticks; xếp hạng dùng clock chung theo gameplay.
 
@@ -147,7 +149,7 @@ Restart chốt match còn mở ABORTED, lượt ROOM ACTIVE thành DNF. Dùng me
 | --- | --- |
 | History Solo/Community | play_runs đã kết thúc; mỗi lượt một mục của owner |
 | History Room | matches và play_runs ROOM; mỗi match đã finalize một mục của owner |
-| Profile Stats | SUM(play_ticks/jumps/falls), số lượt FINISHED và MIN(finish_ticks) từ play_runs của identity |
+| Profile Stats | SUM(play_ticks/jumps/falls), số lượt FINISHED và MIN(finish_ticks) full map từ play_runs của identity |
 | Số trận/thắng Room | COUNT DISTINCT match_id, riêng thắng lọc is_winner=true |
 | Leaderboard | Chỉ play_runs COMMUNITY; một best run mỗi Account theo [gameplay](gameplay.md#community-tower) |
 
@@ -162,3 +164,11 @@ Leaderboard lấy metrics Community đã commit; chọn best bằng ROW_NUMBER r
 Giữ hàng metrics để bảo toàn tổng/History/best. Query có tham số và kiểm tra ownership, chỉ chọn cột cần dùng; Stats/History/leaderboard không đọc snapshot hoặc credentials/token.
 
 Persistence online dùng PENDING/SAVED/FAILED; SAVED chỉ sau commit. Solo tách local save với sync status. Backup/nâng cấp theo [deployment](deployment.md#mysql).
+
+## JPA và nâng cấp
+
+User, PlayRun và Match ánh xạ ba bảng; Service sở hữu transaction, Repository sở hữu truy vấn. Không serialize Entity. Chỉ đọc snapshot khi Continue/save, dùng projection cho Stats/History/leaderboard. `revision` giữ thứ tự payload và chống retry khác nội dung, không thay bằng optimistic version của ORM. Các thao tác merge/New Run/writer khóa owner theo thứ tự rồi khóa lượt trong transaction.
+
+`users.crown_unlocked` chỉ chuyển false → true khi có full Finish, hoặc Merge từ Guest đã mở. `matches.map_level` mặc định 10 cho dữ liệu hiện có, trong [1,10]; Public/Private là metadata phòng RAM, không cần lưu khi match kết thúc. Best Finish Time bỏ Room map_level<10; counters/Finishes/Room Wins vẫn tính.
+
+Cập nhật database có sẵn bằng SQL additive theo deployment, không reset. Hibernate `validate` không thay thế kiểm thử CHECK/unique/FK trong MySQL thật.

@@ -36,6 +36,7 @@ Các path có prefix `/api`. Auth/private responses dùng Cache-Control:no-store
 | GET /game-config | → {physics,rules,appearances,features:{flyEnabled:boolean}} |
 | GET /map | → GameMap |
 | GET /rooms/{roomId} | Public → {roomId,kind,joinable}; chỉ tra loại/khả năng Join, không trả members hoặc tokens |
+| GET /rooms | Public → {rooms:[{roomId,mode,mapLevel,playerCount,capacity}]}; chỉ Public/WAITING còn chỗ, không tokens |
 | GET /community/current | Account → {run:null hoặc RunSummary của lượt ACTIVE,updatedAt,saveStatus}; không trả snapshot nội bộ |
 | GET /leaderboard?limit=100 | Public → {entries:[LeaderboardEntry]} |
 | PUT /solo/runs/{id} | Account → nhận SoloMetrics, trả {revision,syncStatus:SAVED}; bỏ bản cũ theo data |
@@ -51,7 +52,7 @@ game-config trả tuning/rules từ shared; appearances=[{colorSlot,color}] ánh
 
 RunSummary={id,status,currentProgress,maxProgress,elapsedTimeMs,peakReachedTimeMs,finishTimeMs}; LeaderboardEntry thêm {rank,username}.
 
-History summary={id,kind,startedAt,endedAt,status,playTimeMs,jumps,falls,currentProgress,maxProgress,finishTimeMs,room}; room=null cho Solo/Community, Room có {mode,roomCode,durationMs,rank,isWinner}. Detail Room thêm {timeLimitMinutes,endReason,participants}; detail Solo/Community dùng summary. Participant={runId,nickname,status,rank,isWinner,currentProgress,maxProgress,finishTimeMs,playTimeMs,jumps,falls}. Ownership, thứ tự và summary sau Merge theo data.
+History summary={id,kind,startedAt,endedAt,status,playTimeMs,jumps,falls,currentProgress,maxProgress,finishTimeMs,room}; room=null cho Solo/Community, Room có {mode,mapLevel,roomCode,durationMs,rank,isWinner}. Detail Room thêm {timeLimitMinutes,endReason,participants}; detail Solo/Community dùng summary. Participant={runId,nickname,status,rank,isWinner,currentProgress,maxProgress,finishTimeMs,playTimeMs,jumps,falls}. Ownership, thứ tự và summary sau Merge theo data.
 
 Statistics={totalPlayTimeMs,totalJumps,totalFalls,finishes,matchesPlayed,wins,bestFinishTimeMs}; matchesPlayed/wins chỉ đếm Room, bestFinishTimeMs=null nếu chưa Finish. Không nhận bộ lọc kind/mode. Guest Solo local được client tổng hợp theo data, không upload qua API.
 
@@ -65,7 +66,7 @@ SoloMetrics={revision,status,playTicks,jumps,falls,currentProgress,maxProgress,p
 
 Page 0–100000, size/limit 1–100; timestamps ISO-8601 UTC. Chỉ trả Account ID/email của chính phiên, không lộ credentials/token. Detail sai owner trả 404 như không tồn tại.
 
-Tra room ID tối đa 60 requests/phút/IP; ID phải đúng định dạng trong gameplay. Không có API liệt kê Room; kết quả tra không cấp quyền Join/reconnect, server kiểm tra lại khi xử lý command.
+Tra room ID tối đa 60 requests/phút/IP; ID phải đúng định dạng trong gameplay. API liệt kê chỉ trả Public/WAITING còn chỗ; kết quả tra không cấp quyền Join/reconnect, server kiểm tra lại khi xử lý command.
 
 Lỗi chung `{error:{code,message}}`: 400 validation, 401 credentials/identity, 403 quyền/CSRF, 404 not found, 409 conflict, 429 rate limit, 5xx lỗi server đã loại secrets. UI dựa code, không parse message.
 
@@ -102,23 +103,22 @@ Giới hạn mặc định tập trung tại cấu hình network của backend, 
 | --- | --- |
 | HEARTBEAT | {nonce} → PONG |
 | JOIN_COMMUNITY | {newRun?:boolean,expectedRunId?}; mặc định tiếp tục/tạo lượt, newRun=true thay lượt sau xác nhận |
-| CREATE_ROOM | {nickname,settings?} → tạo sảnh chờ và làm Host |
+| CREATE_ROOM | {nickname,visibility?:PUBLIC/PRIVATE,settings?} → tạo sảnh chờ và làm Host |
 | JOIN_ROOM | {roomId,nickname?} → vào đúng Community/Room theo ID |
 | LEAVE_ROOM | {} → Community flush checkpoint; Room Leave/DNF |
 | GET_ROOM_STATE | {} → state hiện hành hoặc null khi đã rời |
-| UPDATE_ROOM_SETTINGS | {mode,timeLimitMinutes}; Host/WAITING |
+| UPDATE_ROOM_SETTINGS | {mode,timeLimitMinutes,mapLevel}; Host/WAITING |
 | START_GAME / END_MATCH | {}; quyền, roster và lifecycle theo gameplay; kiểm tra khi xử lý command |
 | PLAY_AGAIN | {matchId}; mỗi thành viên xác nhận sau match vừa kết thúc, kể cả khi phòng đã về WAITING |
 | SET_ROOM_PAUSED | {playId,paused:boolean}; Host, PLAYING/PAUSED; sai trận bị từ chối |
 | SET_COMMUNITY_PAUSED | {paused:boolean}; Pause/Resume cá nhân, server xác nhận theo gameplay |
 | NEW_COMMUNITY_RUN | {expectedRunId}; ID lượt ACTIVE hoặc null nếu không có, thay lượt đã xác nhận |
-| EQUIP_ITEM | {itemId,equipped:boolean}; server kiểm tra sở hữu/layer |
 | CHAT_SEND | {text}; render plain text, lọc control characters |
 | PLAYER_INPUT | {playId,generation,seq,left,right,jump,up?,down?,freeFlight?}; booleans, field tùy chọn mặc định false |
 | CANCEL_INPUT | {playId,generation,seq}; hủy input/charge, không launch |
 | RECONNECT | {roomId,playerId,reconnectToken} → full state |
 
-Settings Room mặc định RACE/null; mode/biên timeLimitMinutes theo gameplay, mode khác TIME_LIMIT phải null. Patch atomic, sai field/state từ chối toàn bộ.
+Settings Room mặc định RACE/null/mapLevel=10, visibility mặc định PRIVATE; mode/biên timeLimitMinutes theo gameplay, mode khác TIME_LIMIT phải null. Patch atomic, sai field/state từ chối toàn bộ.
 
 JOIN_ROOM tra ID dùng chung cho cả hai kiểu chơi: Community yêu cầu Account và khôi phục lượt cá nhân; Room chỉ nhận người mới khi WAITING. Thành viên cũ dùng RECONNECT với token, không dùng ID để vượt roster.
 
@@ -155,7 +155,7 @@ Room state là WAITING/COUNTDOWN/PLAYING/PAUSED/FINISHED; Community state=PLAYIN
 
 self gồm lastProcessedInputSeq, status, metrics và full simulation để restore/replay: position/velocity, grounded/charge, direction/buffers, splat/knocked, terrain/wind, freeFlight/phasingFall, screen/ticks/jumps/falls/airChargeTicks và adventure. Peers chỉ có public render state, ngoại hình, progress và status; không broadcast checkpoint/secrets.
 
-adventure gồm inventory/trang bị/tiền và ID/counters/flags tiến độ. Client dựng nội dung theo [architecture](architecture.md#công-nghệ-và-trách-nhiệm); thay đổi state phải do server xác nhận.
+adventure gồm ID/counters tiến độ hội thoại. Vương miện là ngoại hình profile tự cấp theo data, không có lệnh trang bị. Client dựng nội dung theo [architecture](architecture.md#công-nghệ-và-trách-nhiệm); thay đổi state phải do server xác nhận.
 
 Results={playerId,nickname,status,rank,currentProgress,maxProgress,isWinner,finishTimeMs}; nickname giữ lúc Join để Results vẫn hiển thị đúng người đã Leave. Status/reason/saveStatus theo data; SAVE_STATUS Room có revision=null. Server chốt metrics và showEnding theo gameplay.
 
@@ -170,3 +170,7 @@ ACK và state lấy cùng tick. Client restore snapshot mới hơn, bỏ frames 
 Control timeout: GET_ROOM_STATE/reconnect, không tự gửi lại Start/New Run/End. Duplicate requestId trả kết quả cũ; New Run kiểm tra thêm expectedRunId. Bỏ message socket/context cũ; đóng connection phải kết thúc pending promises.
 
 Nhóm error codes: INVALID_MESSAGE/INVALID_INPUT/INVALID_SETTINGS/INVALID_NICKNAME, AUTH_REQUIRED/ACCOUNT_REQUIRED, ROOM_NOT_FOUND/ROOM_FULL/ROOM_NOT_JOINABLE/ALREADY_IN_ROOM/HOST_ONLY/NOT_ENOUGH_PLAYERS, STALE_PLAY/STALE_INPUT, INVALID_RECONNECT/RECONNECT_EXPIRED, SAVE_FAILED/CONFLICT/RATE_LIMITED/INTERNAL_ERROR.
+
+## Mở rộng dữ liệu hiển thị
+
+Account/profile có `crownUnlocked`; public render state chỉ mang trạng thái vương miện, không nhận quyền mở từ input online. Solo Finish có thể mở crown qua sync metrics nhưng không lên leaderboard. GAME_SNAPSHOT bổ sung Players ranking từ server RAM, giữ đồng hạng; Room theo mode, Community theo độ cao hiện tại. Không truy vấn DB theo tick để tạo bảng này. Leaderboard HTTP refresh tối đa một lần/10 giây khi đang hiển thị.

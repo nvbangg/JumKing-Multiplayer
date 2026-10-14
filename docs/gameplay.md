@@ -2,13 +2,13 @@
 
 ## Phạm vi và kiểu chơi
 
-Một map Main Babe hoàn chỉnh theo geometry, physics, camera và trải nghiệm Jump King gốc; nghiệm thu theo [testing](testing.md).
+Solo/Community dùng Main Babe hoàn chỉnh theo geometry, physics, camera và trải nghiệm Jump King gốc. Room chọn một trong 10 độ dài cộng dồn theo vùng; nghiệm thu theo [testing](testing.md).
 
 | Kiểu chơi | Bắt đầu | Tiến độ và thành tích |
 | --- | --- | --- |
 | Solo | Lượt mới hoặc tiếp tục save, không cần đăng nhập/backend | Save/Stats/History local; Account đồng bộ metrics khi có mạng, không lên leaderboard |
 | Community Tower | Bắt buộc Account; tạo mới hoặc tiếp tục lượt cá nhân | Lưu tiến độ/History trên server; chỉ kiểu chơi này lên leaderboard |
-| Room | Guest/Account tạo hoặc Join bằng ID; chờ Host Start | Cuộc đua cùng xuất phát; lưu History, không lên leaderboard, không checkpoint dài hạn |
+| Room | Guest/Account tạo Public/Private, Join Public hoặc bằng ID; chờ Host Start | Cuộc đua cùng xuất phát; lưu History, không lên leaderboard, không checkpoint dài hạn |
 
 Solo/Community chỉ có chế độ bình thường. Continue của hai kiểu chơi độc lập, không chuyển save cho nhau. Solo lưu trên thiết bị, Community theo Account; chỉ có thể Continue lượt chưa kết thúc. Room chọn `RACE`, `HARDCORE`, `TIME_LIMIT` hoặc `NO_WALK`. Tất cả players không va chạm và không dùng item tác động người khác.
 
@@ -50,7 +50,7 @@ Tab bị ẩn (visibilitychange/document.hidden), cửa sổ mất focus (window
 
 ## Map và camera
 
-Map Main Babe cố định, gồm screens 0–42. World rộng 480 px; screen cao 360 px; tile 8 px, 60 cột × 45 hàng. Body dùng góc trên trái; x tăng sang phải, y tăng xuống dưới; đỉnh screen i là −360i.
+Main Babe gồm screens 0–42. World rộng 480 px; screen cao 360 px; tile 8 px, 60 cột × 45 hàng. Body dùng góc trên trái; x tăng sang phải, y tăng xuống dưới; đỉnh screen i là −360i.
 
 Spawn chuẩn (231,302), vx=0, vy=1, grounded=true, direction=1; buffers/counters ban đầu rỗng/0. Players cùng spawn, phân biệt bằng ngoại hình. Finish giữ đích gốc: grounded ở screen 42 và tâm body x≥336.
 
@@ -60,7 +60,7 @@ Camera nguyên screen 4:3, letterbox; không smooth-follow. Screen ứng viên =
 
 ## Solo
 
-Autosave trạng thái hiện tại, thời gian, adventure và môi trường mỗi giây, khi Pause/chuyển screen/thoát; Continue khôi phục đúng trạng thái. New Game xác nhận thay lượt đang lưu; trang phục đã mở khóa giữ trong local profile. Không có tải lại các save cũ hoặc gửi save lên server.
+Autosave trạng thái hiện tại, thời gian, adventure và môi trường mỗi giây, khi Pause/chuyển screen/thoát; Continue khôi phục đúng trạng thái. New Game xác nhận thay lượt đang lưu; vương miện đã mở khóa giữ trong profile. Không có tải lại các save cũ hoặc gửi save lên server.
 
 Guest và từng Account có profile local riêng. Offline vẫn chơi/lưu; UI phân biệt local save với sync Account. Ownership và đồng bộ theo [data](data.md#ghi-lượt-và-đồng-bộ-solo).
 
@@ -100,7 +100,7 @@ PLAYING -- Host Pause --> PAUSED -- Host Resume --> PLAYING
 PAUSED -- Host End / hết hạn --> finalize
 ```
 
-Chỉ WAITING nhận Join mới và cho Host đổi settings; COUNTDOWN/PLAYING/PAUSED/FINISHED chỉ nhận reconnect của thành viên cũ. Start chốt roster; FINISHED hiện Results. Ghi trận theo [data](data.md#kết-quả-room).
+Room Private không được liệt kê, ai biết ID vẫn Join được; Public xuất hiện trong Join Public khi WAITING và còn chỗ. Host chọn visibility/mode/map trước Start. Chỉ WAITING nhận Join mới và cho Host đổi settings; COUNTDOWN/PLAYING/PAUSED/FINISHED chỉ nhận reconnect của thành viên cũ. Start chốt roster; FINISHED hiện Results. Ghi trận theo [data](data.md#kết-quả-room).
 
 | Mode | Luật |
 | --- | --- |
@@ -119,6 +119,10 @@ Người Finish đứng đầu theo finish time. Người còn lại so current 
 
 Progress = max(0, originFeetY−feetY); peak là progress cao nhất từng đạt. Không làm tròn trước so sánh. Hardcore reset current về spawn, giữ peak và số lần rơi; không reset clock.
 
+### Độ dài Room
+
+Có 10 mốc Finish tăng dần từ chân tháp; map 10 là Main Babe đầy đủ. Dữ liệu mốc theo vùng nằm trong shared, dùng chung geometry; mỗi đích yêu cầu grounded trên nền hợp lệ. Host chọn trước Start, settings giữ khi Play Again. Map 1–9 chỉ Results, map 10 giữ ending. History lưu map của trận; Best Finish Time chỉ tính full map. Mốc chỉ được nghiệm thu sau replay hợp lệ và kiểm tra tất cả spawn.
+
 ## Leave và reconnect online
 
 Đóng tab hoặc mất kết nối hủy input; server giữ slot 5 phút từ lúc phát hiện disconnect. Reconnect cần đúng identity/token, không tự bật lại điều khiển. Với Community, hạn disconnect thay hạn Pause; reconnect khi còn paused bắt đầu lại hạn Pause. Các mốc AFK/Pause/reconnect tập trung trong shared rules.
@@ -135,7 +139,9 @@ Sau Results, mỗi người chọn Play Again để xác nhận ván mới. Ngư
 
 Chỉ triển khai Main Babe; không mở rộng campaign/DLC khác.
 
-Nội dung Main Babe gồm Old Man, Skeleton, Hermit, merchant, collectibles, inventory/trang phục, birds/quests và các bảng/sách/nhật ký. Giữ vị trí, trigger, animation, hội thoại và ảnh hưởng gameplay theo tiến độ; đọc/hội thoại không trực tiếp yêu cầu Pause. Nhặt/mua đồ, trang bị và phần thưởng online phải được server xác nhận; phân chia dữ liệu theo [architecture](architecture.md#công-nghệ-và-trách-nhiệm). Items không tác động trực tiếp tới player khác.
+Giữ NPC/hội thoại, bảng/sách/nhật ký và môi trường Main Babe; đọc/hội thoại không trực tiếp yêu cầu Pause. Không có Inventory, nhặt/mua vật phẩm hoặc quest nhận đồ. Loại hội thoại/trigger phụ thuộc đồ đã bỏ; dùng một ending cơ bản không credit.
+
+Hoàn thành full map ở Solo/Community/Room map 10 tự mở vương miện cho các lượt sau. Account lưu server, Guest lưu profile trình duyệt; Merge giữ trạng thái đã mở. Room ngắn không mở vương miện. Solo do client khai báo chỉ cấp ngoại hình, không làm bằng chứng leaderboard. Mỗi phòng tối đa 10 màu khác nhau, giữ khi reconnect; self opacity=1 ở trên peers opacity=0.7, có nickname rõ và hội thoại vẽ trên tên.
 
 Ending giữ cảnh/nhạc/ảnh kết thúc và Skip, bỏ credit. Solo Finish phát ending; Community chỉ người Finish xem; Room chỉ winners xem, người khác tới Results. End/timeout chưa có Finish không phát ending. Ending không đổi kết quả/thời gian, xử lý một lần theo runId/matchId và hủy khi chuyển lượt.
 
@@ -150,3 +156,9 @@ History gồm các lượt Solo/Community đã kết thúc và các trận Room 
 Community và Room có chat riêng theo sảnh; chat hủy input nhưng không trực tiếp Pause. AFK áp dụng theo [điều khiển](#điều-khiển-và-physics); định dạng, giới hạn và lưu chat theo [protocol](protocol.md).
 
 Assets có manifest; `frontend/public/assets/ATTRIBUTION.md` ghi nguồn và tình trạng giấy phép của từng nhóm. Không gán giấy phép mã nguồn mở cho tài nguyên khi chưa có căn cứ; sở hữu bản game không mặc nhiên cấp quyền phân phối lại.
+
+## Chat và bảng trong trận
+
+Enter mở/focus chat hoặc gửi khi đang nhập; Esc đóng và trả input. Không bắt phím từ form khác. Tin mới hiện 10 giây, không lấy focus; chat mở thủ công giữ đến khi đóng. Có nút cảm ứng, chat không đi vào database.
+
+Players là thứ hạng hiện tại trong cùng phòng: Room theo comparator mode, Community theo độ cao hiện tại và đồng hạng khi bằng nhau. Server tính từ state RAM. Leaderboard là thành tích Community đã commit, có thể xem khi chơi; refresh theo chu kỳ thay vì mỗi frame. Hai bảng có thể thu gọn.

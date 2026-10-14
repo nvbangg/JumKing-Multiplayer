@@ -6,9 +6,9 @@ Website game Jump King với một map Main Babe đầy đủ, hỗ trợ chơi 
 | --- | --- |
 | Solo | Luyện tập offline, autosave/Continue; Account đồng bộ thống kê khi có mạng, không lên leaderboard |
 | Community Tower | Account chơi cùng sảnh, lưu tiến độ trên server và tính leaderboard |
-| Room | Tạo/join bằng ID, tối thiểu 2 người và Host Start; Race, Hardcore, Time Limit hoặc No Walk; Results và History |
+| Room | Public/Private, join danh sách hoặc ID, tối thiểu 2 người và Host Start; Race, Hardcore, Time Limit hoặc No Walk; Results và History |
 
-Frontend dùng React + TypeScript/Phaser; backend Spring Boot/Java quyết định trạng thái và kết quả online. MySQL lưu identity, lượt chơi và trận Room. Thống kê tổng và History gồm Solo, Community và Room; Guest có thể Merge lịch sử Room vào Account. Luật chơi trong [gameplay](docs/gameplay.md); tiến độ triển khai trong [PLAN](PLAN.md).
+Frontend dùng React + TypeScript/Phaser; backend Spring Boot/Java quyết định trạng thái và kết quả online. Spring Data JPA/Hibernate truy cập MySQL để lưu identity, lượt chơi và trận Room. Thống kê tổng và History gồm Solo, Community và Room; Guest có thể Merge lịch sử Room vào Account. Luật chơi trong [gameplay](docs/gameplay.md); tiến độ triển khai trong [PLAN](PLAN.md).
 
 ## Cài đặt và chạy
 
@@ -93,3 +93,9 @@ Cách đơn giản là chạy cùng JAR trên VPS, MySQL nội bộ và Caddy ph
 | Kế hoạch, kết quả thực nghiệm và giới hạn | [PLAN](PLAN.md) |
 | Quy trình agent | [AGENTS](AGENTS.md) |
 | Yêu cầu bài tập lớn | [Instruction](docs/course-materials/final-project/Instruction.md) |
+
+## Kiểm thử, thực nghiệm và đóng góp
+
+Lệnh và tiêu chí kiểm thử ở [testing](docs/testing.md); kết quả đo và trạng thái nghiệm thu ở [PLAN](PLAN.md). Đánh giá kỹ thuật tập trung vào server-authoritative, đồng bộ input/snapshot, prediction và lưu kết quả nhất quán; mỗi đóng góp cần code và thực nghiệm đối chiếu, không coi thay đổi giao diện/JPA là novelty.
+
+Giới hạn: Solo metrics do client khai báo; Room gameplay ở RAM, restart không phục hồi trận. Nghiệm thu LAN/ZeroTier hai thiết bị, báo cáo, phân công nhóm và Compilatio phải có bằng chứng trước nộp. Framework và nguồn nội dung theo [architecture](docs/architecture.md), [học phần](docs/course-materials/final-project/Instruction.md) và [attribution](frontend/public/assets/ATTRIBUTION.md).

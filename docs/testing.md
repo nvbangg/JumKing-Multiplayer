@@ -77,8 +77,8 @@ Với `-Web` và `E2E_BROWSER_PATH`, `SchemaIT` còn chạy Chrome trực tiếp
 | Map/camera | Toàn tuyến Main Babe từ spawn tới Finish bằng input hợp lệ; tile/biên/chuyển screen đúng, không stuck, không lọt solid |
 | Solo | Offline save/Continue/New Game, profile Guest/Account, UUID/revision; sync hai thiết bị đúng owner, retry/reload hàng chờ; không upload snapshot hoặc ảnh hưởng leaderboard |
 | Fly Mode | Gate mặc định/dev/build/prod cho mọi kiểu chơi; nhấn đúp/repeat/cancel không launch thừa; keyboard/touch, biên world, thoát solid/đáy world/restore; save và thành tích đúng [gameplay](gameplay.md#fly-mode) |
-| Nội dung/ending | Main Babe đủ NPC/readables/items/merchant/quests/môi trường/audio; ending/Skip đúng người, không credit hoặc phát trùng; build đúng scope |
-| Adventure boundary | Hai simulation cùng luật/ID, frontend tra cứu đúng nội dung; Java/snapshot không chứa presentation; pickup/mua/thưởng không nhân đôi qua restore/replay/input giả |
+| Nội dung/ending | Main Babe đủ NPC/readables/môi trường/audio; không Inventory/items/merchant/quest nhận đồ; ending/Skip đúng người, không credit hoặc phát trùng; build đúng scope |
+| Adventure boundary | Hai simulation cùng luật/ID, frontend tra cứu đúng nội dung; Java/snapshot không chứa presentation; hội thoại/crown không nhân đôi qua restore/replay/input giả |
 | Community | Account bắt buộc; tự ghép/tạo sảnh, tra/Join ID/full, transfer; lookup không lộ members/token hoặc vượt kiểm tra Join; một lượt/Account, giữ state/time và không nhân đôi membership |
 | Checkpoint | Restore đủ physics/adventure/world; metrics/snapshot/revision atomic; New Run đồng thời và rollback; transfer/Finish/Abandon không mất save hoặc bị writer cũ phục hồi; một Community ACTIVE không khóa Solo |
 | Pause/AFK | Hidden/blur và biên AFK theo gameplay; neutral frames/giữ phím/heartbeat/chat không reset AFK, input thật reset; Community đang rơi phải settle, hết hạn lưu/release slot; Room mở menu lâu không tự out hoặc dừng trận |
@@ -132,3 +132,12 @@ Nghiệm thu Local, LAN/ZeroTier bằng hai thiết bị và điện thoại th�
 Đối chiếu README với build configuration; ghi checks/commit vào PLAN. Raw traces/screenshots/logs ở `.local/reports/` hoặc reports được ignore. Git giữ tests/fixtures/scripts tái tạo và báo cáo bàn giao, không dữ liệu riêng tư.
 
 Báo cáo giải thích networking/concurrency/protocol, đóng góp có số đo, results/discussion/limitations và trích dẫn nguồn; đáp ứng Compilatio và demo theo yêu cầu học phần.
+
+## Nghiệm thu thay đổi persistence và Room
+
+- JPA mapping chạy trên MySQL, transaction/lock/rollback, generated unique Community, Merge và writer đến muộn; không dùng H2 thay MySQL.
+- Nâng cấp bản schema trước đó giữ users/runs/matches và counters; full map mặc định 10, crown backfill đúng full Finish.
+- Không còn SQL/JdbcTemplate trong Controller/Service; API không trả Entity hoặc truy vấn snapshot cho bảng tổng hợp.
+- Room Public/Private: list chỉ WAITING còn chỗ, Join/Start cạnh tranh không vượt capacity, map không đổi giữa trận.
+- Mười mốc Finish đạt bằng input không Fly và tất cả spawn; map ngắn không cấp crown/ending hoặc ghi đè best full-map.
+- Chat Enter/Esc, focus form, tin mới 10 giây không tự lấy focus; Players/leaderboard tách phạm vi, thu gọn trên mobile.

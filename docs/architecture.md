@@ -8,7 +8,7 @@
 | Hiển thị | Phaser: map, sprite, animation và camera; Web Audio/HTMLAudio: âm thanh |
 | Solo | TypeScript simulation chạy tại trình duyệt |
 | Online | Spring Boot/Java quyết định physics, thời gian, tiến độ và kết quả |
-| Persistence | MySQL + Spring JDBC: identity, lượt chơi, checkpoint và kết quả |
+| Persistence | MySQL + Spring Data JPA/Hibernate: identity, lượt chơi, checkpoint và kết quả |
 
 ```mermaid
 flowchart LR
@@ -33,8 +33,8 @@ Adventure tách dữ liệu luật, trạng thái lượt chơi và nội dung h
 
 | Phần | Nơi sở hữu |
 | --- | --- |
-| Vị trí/trigger có tác động gameplay, điều kiện, giá và phần thưởng | shared/adventure.json; hai simulation cùng dùng |
-| Inventory, tiền, trang bị và tiến độ nhiệm vụ của người chơi | Simulation; server quyết định online, TypeScript quyết định Solo |
+| Trigger hội thoại và tiến độ nội dung | shared/adventure.json; hai simulation cùng dùng |
+| Tiến độ hội thoại trong lượt | Simulation; server quyết định online, TypeScript quyết định Solo |
 | Câu chữ hội thoại, nhãn, metadata sprite/animation và âm thanh | Frontend; tra cứu bằng ID từ rule/state |
 
 Backend chỉ nạp luật và state gameplay; nội dung hiển thị thuộc frontend.
@@ -82,13 +82,13 @@ shared/
   maps/                           # Main Babe geometry và metadata
   physics.json                    # tuning vật lý
   rules.json                      # luật/capacity/timing công khai
-  adventure.json                  # item, trigger, điều kiện và tác động gameplay
+  adventure.json                  # trigger và tiến độ hội thoại
   fixtures/                       # input traces và expected states
 scripts/                          # schema.sql và tác vụ liên module
 docs/
 ```
 
-Java dùng root package `jumpking`, main class đặt tại root để Spring scan. Controller/service/repository nhóm theo chức năng; `network` chỉ xử lý transport/dispatch, `game` giữ luật thuần.
+Java dùng root package `jumpking`, main class đặt tại root để Spring scan. Controller/service/repository/entity nhóm theo chức năng; `network` chỉ xử lý transport/dispatch, `game` giữ luật thuần. Controller nhận/trả DTO, Service sở hữu nghiệp vụ/transaction, Repository truy cập MySQL. Không trả Entity qua API hoặc giữ managed Entity trong simulation/worker. JPA không nằm trong vòng tick; worker trao đổi snapshot bất biến. Không tạo interface/base class chỉ để chuyển tiếp lời gọi.
 
 Frontend nhóm màn hình/hooks theo feature. `game` giữ simulation/input/presentation/netcode, độc lập React UI; `network` chỉ xử lý HTTP/WS. Unit tests đặt cạnh code; E2E ở `e2e/`.
 
@@ -97,6 +97,8 @@ Phaser tải assets giữ nguyên tên từ `public/assets`; tài nguyên UI đ�
 Dữ liệu shared đóng gói vào cả hai build; backend nạp từ classpath, không phụ thuộc source khi chạy JAR. Client online dùng map/config server công bố và luật adventure cùng bản phát hành. Nội dung frontend liên kết bằng ID; shared không chứa lời thoại/font/đường dẫn assets. URL/secrets theo [deployment](deployment.md).
 
 Profile web đóng gói frontend vào JAR. Static files được browser lưu và revalidate bằng Last-Modified; API giữ no-store. SPA fallback index.html chỉ áp dụng route UI, không áp dụng API/WS/asset thiếu.
+
+JPA tắt Open EntityManager in View, chỉ validate schema khi start. Repository dùng Entity cho ghi và projection cho truy vấn; quan hệ chỉ tải khi cần, không dùng collection hai chiều mặc định. Native query dành cho truy vấn tổng hợp cần thiết. Revision checkpoint/protocol không đồng nghĩa `@Version`; giữ semantics theo [data](data.md).
 
 ## Xử lý đồng thời
 

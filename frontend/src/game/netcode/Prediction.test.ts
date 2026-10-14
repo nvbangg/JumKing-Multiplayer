@@ -48,6 +48,15 @@ test('prediction responds before an ACK and replays only unacknowledged input af
   expect(prediction.pending).toBe(13); expect(local.snapshot()).toEqual(before);
   prediction.reconcile(before, 20, true); expect(prediction.pending).toBe(0); expect(local.snapshot()).toEqual(before);
 });
+test('Hardcore prediction and replay respawn on splat while preserving clock and counters', () => {
+  const local = new GameSimulation(map), server = new GameSimulation(map), race = new GameSimulation(map);
+  for (const game of [local, server, race]) game.physics.restore({ ...game.physics.snapshot(), y: 280, vy: 10, grounded: false, ticks: 500, jumps: 12, falls: 2 });
+  const prediction = new Prediction(local, 180, true), neutral = { left: false, right: false, jump: false };
+  for (let seq = 1; seq <= 6; seq++) { prediction.push(seq, neutral); if (seq <= 3) server.tick(neutral, true); race.tick(neutral); }
+  expect(local.physics.snapshot()).toMatchObject({ x: map.spawn.x, y: map.spawn.y, ticks: 506, jumps: 12, falls: 3, splat: 0 });
+  const expected = local.snapshot(); prediction.reconcile(server.snapshot(), 3, true); expect(local.snapshot()).toEqual(expected);
+  expect(race.physics.snapshot().splat).toBeGreaterThan(0);
+});
 test('input overflow is explicit, and cancel drops pending jump edges without launching', () => {
   const game = new GameSimulation(map), prediction = new Prediction(game, 2);
   prediction.push(1, { ...right, jump: true }); prediction.push(2, { ...right, jump: true }); const before = game.snapshot();

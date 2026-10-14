@@ -46,8 +46,11 @@ public final class GameSimulation {
         candidate.physics.restore(saved.physics()); candidate.adventure.restore(saved.adventure());
         physics = candidate.physics; adventure = candidate.adventure; world = w.deepCopy();
     }
-    public Events tick(PlayerInput input) {
-        var movement = physics.tick(input); var player = physics.snapshot(); var content = adventure.tick(player, input); var events = new ArrayList<WorldEvent>();
+    public Events tick(PlayerInput input) { return tick(input, false); }
+    public Events tick(PlayerInput input, boolean respawnOnSplat) {
+        var movement = physics.tick(input);
+        if (respawnOnSplat && movement.contains("SPLAT")) physics.respawn();
+        var player = physics.snapshot(); var content = adventure.tick(player, input); var events = new ArrayList<WorldEvent>();
         if (finished()) adventure.complete();
         double phase = player.ticks / (double) p.tickRate * p.windFrequency;
         double force = Math.max(-1, Math.min(1, 2 * Math.sin(phase) + (Math.cos(phase) > 0 ? 1 : -1))) * p.windAcceleration;

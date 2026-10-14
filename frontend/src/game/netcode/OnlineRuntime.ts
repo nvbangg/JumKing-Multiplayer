@@ -27,7 +27,7 @@ export class OnlineRuntime implements GameRuntime {
   constructor(map: GameMap, private socket: GameSocket, private room: RoomState, private readInput: () => PlayerInput,
     private changed: (state: PlayerState, snapshot: OnlineSnapshot) => void, flyAllowed: boolean, private failed: (message: string) => void = () => {}) {
     this.game = new GameSimulation(map, flyAllowed, room.settings?.mode === 'NO_WALK');
-    this.prediction = new Prediction(this.game, NETWORK.maxInputFrames);
+    this.prediction = new Prediction(this.game, NETWORK.maxInputFrames, room.settings?.mode === 'HARDCORE');
   }
   updateRoom(room: RoomState): void { this.room = room; }
   get flying(): boolean { return this.desiredFlight ?? this.game.physics.snapshot().freeFlight; }

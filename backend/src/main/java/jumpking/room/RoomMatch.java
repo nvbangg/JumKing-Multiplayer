@@ -56,7 +56,7 @@ final class RoomMatch {
         for (var player : players.values()) {
             if (!player.status.equals("ACTIVE")) continue;
             var input = player.input.poll(now); if (input.cancel()) player.game.physics().cancelInput();
-            var effect = player.game.tick(input.input()); events.add(new Events(player, effect));
+            var effect = player.game.tick(input.input(), settings.mode().equals("HARDCORE")); events.add(new Events(player, effect));
             double progress = player.game.physics().progress();
             if (progress > player.maximum) { player.maximum = progress; player.peak = player.game.physics().snapshot().ticks; }
             if (player.game.finished()) { player.status = "FINISHED"; player.finish = ticks; }

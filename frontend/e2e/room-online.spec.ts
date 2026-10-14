@@ -28,6 +28,26 @@ test('two Guest browsers create and join a Room, share settings and transfer Hos
   } finally { for (const context of [first, second]) for (const page of context.pages()) await leaveOnline(page); await first.close(); await second.close(); }
 });
 
+test('two browsers run Hardcore with authoritative jumps and saved results', async ({ browser }) => {
+  const first = await browser.newContext(), second = await browser.newContext();
+  try {
+    for (const context of [first, second]) await context.addInitScript(() => { if (location.protocol.startsWith('http')) localStorage.setItem('jumpking.options', JSON.stringify({ sound: false })); });
+    const a = await first.newPage(), b = await second.newPage();
+    await a.goto('/'); await a.getByRole('button', { name: 'Play with Friends', exact: true }).click(); await a.getByLabel('Nickname', { exact: true }).fill('Hardcore Host'); await a.getByRole('button', { name: 'Create Room', exact: true }).click();
+    await a.getByLabel('Mode', { exact: true }).selectOption('HARDCORE'); const room = await a.locator('.room-code code').innerText();
+    await b.goto('/'); await b.getByRole('button', { name: 'Join by ID', exact: true }).click(); await b.getByLabel('Room ID', { exact: true }).fill(room); await b.getByRole('button', { name: 'Join', exact: true }).click(); await b.getByLabel('Nickname', { exact: true }).fill('Hardcore Peer'); await b.getByRole('button', { name: 'Join', exact: true }).click();
+    await expect(b.getByLabel('Mode', { exact: true })).toHaveValue('HARDCORE');
+    await a.bringToFront(); await a.getByRole('button', { name: 'Start', exact: true }).click();
+    await expect(a.getByRole('button', { name: 'Menu', exact: true })).toBeVisible({ timeout: 15_000 });
+    if (await a.getByRole('button', { name: 'Resume', exact: true }).isVisible()) await a.getByRole('button', { name: 'Resume', exact: true }).click();
+    await a.keyboard.down('Space'); await a.waitForTimeout(220); await a.keyboard.up('Space'); await expect(a.locator('.game-hud')).toContainText('Jumps: 1');
+    await a.getByRole('button', { name: 'Menu', exact: true }).click(); await a.getByRole('button', { name: 'End Match', exact: true }).click();
+    for (const page of [a, b]) { await expect(page.getByRole('heading', { name: 'Results', exact: true })).toBeVisible(); await expect(page.getByText('Results saved', { exact: true })).toBeVisible(); }
+    const history = await (await a.request.get('/api/history')).json(); expect(history.items[0].room.mode).toBe('HARDCORE');
+    for (const page of [a, b]) await page.getByRole('button', { name: 'Leave', exact: true }).click();
+  } finally { for (const context of [first, second]) for (const page of context.pages()) await leaveOnline(page); await first.close(); await second.close(); }
+});
+
 test('two Guest browsers Start together, jump and End Match with saved Results and History', async ({ browser }) => {
   test.setTimeout(45_000);
   const first = await browser.newContext(), second = await browser.newContext();

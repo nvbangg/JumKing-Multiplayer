@@ -26,8 +26,10 @@ export class GameSimulation {
     candidate.physics.restore(saved.physics); candidate.adventure.restore(saved.adventure);
     this.physics.restore(candidate.physics.snapshot()); this.adventure.restore(candidate.adventure.snapshot()); this.world = structuredClone(saved.world);
   }
-  tick(input: PlayerInput) {
-    const movement = this.physics.tick(input), player = this.physics.snapshot(), events: WorldEvent[] = [];
+  tick(input: PlayerInput, respawnOnSplat = false) {
+    const movement = this.physics.tick(input);
+    if (respawnOnSplat && movement.includes('SPLAT')) this.physics.respawn();
+    const player = this.physics.snapshot(), events: WorldEvent[] = [];
     const adventure: AdventureEvent[] = this.adventure.tick(player, input);
     if (this.physics.finished) this.adventure.complete();
     const phase = player.ticks / P.tickRate * P.windFrequency;

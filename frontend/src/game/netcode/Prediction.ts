@@ -4,12 +4,12 @@ import type { PlayerInput } from '../simulation/types';
 interface Frame { seq: number; input: PlayerInput; cancel: boolean }
 export class Prediction {
   private frames: Frame[] = [];
-  constructor(private game: GameSimulation, private maximum: number) {}
+  constructor(private game: GameSimulation, private maximum: number, private respawnOnSplat = false) {}
   get pending(): number { return this.frames.length; }
   reset(): void { this.frames = []; }
   push(seq: number, input: PlayerInput): void {
     if (this.frames.length >= this.maximum) throw new Error('Input acknowledgements are too far behind; reconnect to continue');
-    this.frames.push({ seq, input: { ...input }, cancel: false }); this.game.tick(input);
+    this.frames.push({ seq, input: { ...input }, cancel: false }); this.game.tick(input, this.respawnOnSplat);
   }
   cancel(seq: number): void {
     this.frames = [{ seq, input: { left: false, right: false, jump: false }, cancel: true }];
@@ -23,7 +23,7 @@ export class Prediction {
     for (const frame of this.frames) {
       if (frame.cancel) this.game.physics.cancelInput();
       // Replay chỉ cập nhật simulation; presentation không nhận lại effects/ending.
-      this.game.tick(frame.input);
+      this.game.tick(frame.input, this.respawnOnSplat);
     }
   }
 }

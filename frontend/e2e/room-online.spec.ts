@@ -28,11 +28,15 @@ test('two Guest browsers create and join a Room, share settings and transfer Hos
   } finally { for (const context of [first, second]) for (const page of context.pages()) await leaveOnline(page); await first.close(); await second.close(); }
 });
 
-for (const mode of ['HARDCORE', 'TIME_LIMIT'] as const) test(`two browsers run ${mode} with authoritative jumps and saved results`, async ({ browser }) => {
+for (const mode of ['HARDCORE', 'TIME_LIMIT', 'NO_WALK'] as const) test(`two browsers run ${mode} with authoritative jumps and saved results`, async ({ browser }, info) => {
   const first = await browser.newContext(), second = await browser.newContext();
   try {
     for (const context of [first, second]) await context.addInitScript(() => { if (location.protocol.startsWith('http')) localStorage.setItem('jumpking.options', JSON.stringify({ sound: false })); });
     const a = await first.newPage(), b = await second.newPage();
+    let pose: { x: number; vx: number; grounded: boolean } | undefined, elapsed = 0;
+    a.on('websocket', socket => socket.on('framereceived', frame => {
+      const message = JSON.parse(frame.payload.toString()); if (message.type === 'GAME_SNAPSHOT') { pose = message.payload.self.simulation.physics; elapsed = message.payload.elapsedTimeMs; }
+    }));
     await a.goto('/'); await a.getByRole('button', { name: 'Play with Friends', exact: true }).click(); await a.getByLabel('Nickname', { exact: true }).fill('Hardcore Host'); await a.getByRole('button', { name: 'Create Room', exact: true }).click();
     await a.getByLabel('Mode', { exact: true }).selectOption(mode); if (mode === 'TIME_LIMIT') await a.getByLabel('Minutes', { exact: true }).fill('1'); const room = await a.locator('.room-code code').innerText();
     await b.goto('/'); await b.getByRole('button', { name: 'Join by ID', exact: true }).click(); await b.getByLabel('Room ID', { exact: true }).fill(room); await b.getByRole('button', { name: 'Join', exact: true }).click(); await b.getByLabel('Nickname', { exact: true }).fill('Hardcore Peer'); await b.getByRole('button', { name: 'Join', exact: true }).click();
@@ -41,6 +45,12 @@ for (const mode of ['HARDCORE', 'TIME_LIMIT'] as const) test(`two browsers run $
     await expect(a.getByRole('button', { name: 'Menu', exact: true })).toBeVisible({ timeout: 15_000 });
     if (await a.getByRole('button', { name: 'Resume', exact: true }).isVisible()) await a.getByRole('button', { name: 'Resume', exact: true }).click();
     if (mode === 'TIME_LIMIT') await expect(a.getByLabel('Time left', { exact: true })).toHaveText(/^Time Left: (01:00|00:[0-5]\d)$/);
+    if (mode === 'NO_WALK') {
+      await expect.poll(() => pose?.grounded).toBe(true); const before = elapsed; await a.keyboard.down('ArrowRight');
+      await expect.poll(() => elapsed).toBeGreaterThan(before + 300); await a.keyboard.up('ArrowRight');
+      expect(pose!.x).toBe(231); expect(pose!.vx).toBe(0);
+      await a.screenshot({ path: info.outputPath('no-walk-online.png') });
+    }
     await a.keyboard.down('Space'); await a.waitForTimeout(220); await a.keyboard.up('Space'); await expect(a.locator('.game-hud')).toContainText('Jumps: 1');
     await a.getByRole('button', { name: 'Menu', exact: true }).click(); await a.getByRole('button', { name: 'End Match', exact: true }).click();
     for (const page of [a, b]) { await expect(page.getByRole('heading', { name: 'Results', exact: true })).toBeVisible(); await expect(page.getByText('Results saved', { exact: true })).toBeVisible(); }

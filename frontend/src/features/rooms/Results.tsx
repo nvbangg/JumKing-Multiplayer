@@ -14,7 +14,7 @@ export function Results({ result, room, selfId, pending, onAgain, onLeave }: {
         <td>{row.rank}</td><td>{row.nickname}{row.status === 'DNF' ? ' · DNF' : ''}</td><td>{row.currentProgress.toFixed(1)}</td><td>{duration(row.finishTimeMs)}</td>
       </tr>)}
     </tbody></table></div>
-    <button disabled={pending || confirmed} onClick={onAgain}>{confirmed ? 'Confirmed for Next Game' : 'Play Again'}</button>
+    <button disabled={pending || confirmed || result.saveStatus === 'PENDING'} onClick={onAgain}>{confirmed ? 'Confirmed for Next Game' : result.saveStatus === 'FAILED' ? 'Retry Save' : 'Play Again'}</button>
     <button disabled={pending} onClick={onLeave}>Leave</button>
     <small role="status">{result.saveStatus === 'SAVED' ? 'Results saved' : result.saveStatus === 'PENDING' ? 'Saving results…' : 'Results could not be saved'}</small>
   </>;

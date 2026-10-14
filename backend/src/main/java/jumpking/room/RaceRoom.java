@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
 /** Mỗi Room sở hữu một actor; registry chỉ giữ chỗ và không thực hiện I/O. */
 @Component
 public class RaceRoom implements GameCommandHandler, AutoCloseable {
-    private static final Set<String> COMMANDS = Set.of("CREATE_ROOM", "JOIN_ROOM", "GET_ROOM_STATE", "LEAVE_ROOM", "UPDATE_ROOM_SETTINGS", "RECONNECT", "CHAT_SEND", "START_GAME", "END_MATCH", "SET_ROOM_PAUSED", "PLAYER_INPUT", "CANCEL_INPUT", "EQUIP_ITEM");
+    private static final Set<String> COMMANDS = Set.of("CREATE_ROOM", "JOIN_ROOM", "GET_ROOM_STATE", "LEAVE_ROOM", "UPDATE_ROOM_SETTINGS", "RECONNECT", "CHAT_SEND", "START_GAME", "END_MATCH", "SET_ROOM_PAUSED", "PLAY_AGAIN", "PLAYER_INPUT", "CANCEL_INPUT", "EQUIP_ITEM");
     private final RoomDirectory directory;
     private final Memberships memberships;
     private final GameWorkers workers;
@@ -107,6 +107,14 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
                     room.settings = RoomSettings.parse(command.payload(), rules); connection.reply(command, "ROOM_STATE", state(room)); broadcast(room);
                 }
                 case "START_GAME" -> { GameEnvelope.fields(command.payload(), Set.of()); start(room, player); connection.reply(command, "ROOM_STATE", state(room)); }
+                case "PLAY_AGAIN" -> {
+                    GameEnvelope.fields(command.payload(), Set.of("matchId"));
+                    if (room.match == null || !room.match.id.equals(GameEnvelope.text(command.payload(), "matchId"))) throw new ApiException(409, "STALE_PLAY", "Confirmation belongs to an old match");
+                    if (!Set.of("FINISHED", "WAITING").contains(room.state) || room.match.endedAt == null) throw new ApiException(409, "CONFLICT", "The match has not ended");
+                    if (room.match.saveStatus.equals("FAILED")) save(room, true);
+                    if (room.match.saveStatus.equals("SAVED")) { player.confirmed = true; room.state = "WAITING"; directory.joinable(room.id, true); }
+                    connection.reply(command, "ROOM_STATE", state(room)); broadcast(room);
+                }
                 case "END_MATCH" -> {
                     GameEnvelope.fields(command.payload(), Set.of()); requireHost(room, player);
                     if (!Set.of("PLAYING", "PAUSED").contains(room.state)) throw new ApiException(409, "CONFLICT", "No running match to end");
@@ -153,6 +161,10 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
             var player = new Member(connection, slot, nickname, ++room.joinOrder);
             memberships.claim(player.identity.owner(), new Memberships.Membership(room.id, player.id));
             try { room.actor.execute(() -> {
+                if (rooms.get(room.id) != room || !room.state.equals("WAITING")) {
+                    memberships.release(player.identity.owner(), new Memberships.Membership(room.id, player.id)); directory.release(slot);
+                    connection.error(command, new ApiException(409, "ROOM_NOT_JOINABLE", "This room is not accepting new players")); return;
+                }
                 if (create) room.settings = settings;
                 room.players.put(player.id, player); if (!connection.open()) { player.connection = null; player.disconnectedAt = time.nanos(); }
                 chooseHost(room); connection.reply(command, "ROOM_JOINED", joined(room, player)); broadcast(room); chatHistory(room, player);
@@ -226,9 +238,10 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     private void start(Room room, Member host) {
         requireHost(room, host);
         if (!room.state.equals("WAITING")) throw new ApiException(409, "CONFLICT", "The Room is not waiting for a match");
-        var roster = room.players.values().stream().filter(player -> player.connection != null).toList();
-        if (roster.size() < rules.path("minimumRoomPlayers").asInt()) throw new ApiException(409, "NOT_ENOUGH_PLAYERS", "At least two connected players are required");
-        for (var player : List.copyOf(room.players.values())) if (player.connection == null) remove(room, player, null);
+        var roster = room.players.values().stream().filter(player -> player.connection != null && player.confirmed).toList();
+        if (!host.confirmed || roster.size() < rules.path("minimumRoomPlayers").asInt()) throw new ApiException(409, "NOT_ENOUGH_PLAYERS", "The Host and another connected player must confirm");
+        if (room.match != null && room.match.endedAt != null && !room.match.saveStatus.equals("SAVED")) throw new ApiException(409, "SAVE_PENDING", "Wait for the previous results to be saved");
+        for (var player : List.copyOf(room.players.values())) if (!roster.contains(player)) remove(room, player, null);
         var specs = roster.stream().map(player -> new RoomMatch.Spec(player.id, player.identity.owner(), player.nickname, player.slot.color(), ++player.generation)).toList();
         room.match = new RoomMatch(room.id, room.settings, specs, shared, json, limits, flags.flyEnabled()); room.writer = database.writer(records::save);
         room.state = "COUNTDOWN"; room.countdownAt = time.nanos() + rules.path("countdownMs").asLong() * 1_000_000L; directory.joinable(room.id, false);

@@ -15,6 +15,17 @@ class Socket {
 beforeEach(() => { vi.useFakeTimers(); Socket.instances = []; vi.stubGlobal('WebSocket', Socket); vi.stubGlobal('location', new URL('http://127.0.0.1:5173')); vi.stubEnv('VITE_BACKEND_ORIGIN', ''); });
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 const open = async (game: GameSocket) => { const ready = game.connect(); const socket = Socket.instances.at(-1)!; socket.open(); await ready; return socket; };
+test('packets from a previous room or play cannot replace current chat, state or save status', async () => {
+  const received = vi.fn(), game = new GameSocket(received, vi.fn()), socket = await open(game);
+  const send = (type: string, payload: Record<string, unknown>) => socket.receive({ v: 1, type, payload });
+  send('ROOM_JOINED', { roomId: 'ABCDEF', playerId: 'self', playId: 'first', generation: 1 });
+  const message = { id: 'message', playerId: 'self', nickname: 'Player', text: '<b>hello</b>', sentAt: '2026-01-01T00:00:00.000Z', colorSlot: 0 };
+  send('CHAT_MESSAGE', { roomId: 'ABCDEF', messages: [message] }); expect(game.chatHistory).toHaveLength(1);
+  send('ROOM_JOINED', { roomId: 'GHJKLM', playerId: 'new-self', playId: 'second', generation: 2 }); received.mockClear();
+  send('CHAT_MESSAGE', { roomId: 'ABCDEF', messages: [message] }); send('ROOM_STATE', { roomId: 'ABCDEF' }); send('ROOM_LEFT', { roomId: 'ABCDEF' }); send('SAVE_STATUS', { playId: 'first', saveStatus: 'SAVED' }); send('GAME_FINISHED', { playId: 'first' });
+  expect(received).not.toHaveBeenCalled(); expect(game.chatHistory).toEqual([]);
+  send('CHAT_MESSAGE', { roomId: 'GHJKLM', messages: [message] }); expect(game.chatHistory).toEqual([message]); game.close();
+});
 
 test('parallel connects share one handshake and stale sockets cannot affect the new connection', async () => {
   const message = vi.fn(), disconnect = vi.fn(), game = new GameSocket(message, disconnect);

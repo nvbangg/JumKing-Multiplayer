@@ -29,6 +29,9 @@ class RoomLobbyIT {
             assertThat(host.command("UPDATE_ROOM_SETTINGS", invalid).path("type").asText()).isEqualTo("ERROR");
             assertThat(host.ok("GET_ROOM_STATE", Map.of()).path("settings").path("mode").asText()).isEqualTo("TIME_LIMIT");
             for (int index = 1; index < 10; index++) clients.get(index).ok("JOIN_ROOM", Map.of("roomId", room, "nickname", "Player " + index));
+            var chat = host.ok("CHAT_SEND", Map.of("text", "Room chat")); assertThat(chat.path("roomId").asText()).isEqualTo(room);
+            assertThat(chat.path("messages").get(0).path("nickname").asText()).isEqualTo("Host");
+            clients.get(1).await(message -> message.path("type").asText().equals("CHAT_MESSAGE") && message.path("payload").path("roomId").asText().equals(room));
             assertThat(clients.get(10).command("JOIN_ROOM", Map.of("roomId", room, "nickname", "Overflow")).path("payload").path("code").asText()).isEqualTo("ROOM_FULL");
             var roster = host.ok("GET_ROOM_STATE", Map.of()).path("members"); assertThat(roster.size()).isEqualTo(10);
             var colors = new HashSet<Integer>(); for (var player : roster) { colors.add(player.path("colorSlot").asInt()); assertThat(player.has("reconnectToken")).isFalse(); }

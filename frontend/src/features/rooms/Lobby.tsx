@@ -1,8 +1,9 @@
-import type { RoomState } from '../../network/GameSocket';
+import type { GameSocket, RoomState } from '../../network/GameSocket';
+import { RoomChat } from './RoomChat';
 import rules from '../../../../shared/rules.json';
 
-export function Lobby({ room, selfId, pending, command }: {
-  room: RoomState; selfId: string | null; pending: boolean; command: (type: string, payload?: Record<string, unknown>) => void;
+export function Lobby({ room, selfId, pending, command, socket }: {
+  room: RoomState; selfId: string | null; pending: boolean; command: (type: string, payload?: Record<string, unknown>) => void; socket?: GameSocket | null;
 }) {
   const host = room.hostPlayerId === selfId;
   return <>
@@ -26,5 +27,6 @@ export function Lobby({ room, selfId, pending, command }: {
       <button disabled={pending} onClick={() => command('END_MATCH')}>End Match</button>
     </>}
     <button disabled={pending} onClick={() => command('LEAVE_ROOM')}>Leave</button>
+    {socket && <RoomChat socket={socket} />}
   </>;
 }

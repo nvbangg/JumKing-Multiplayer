@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.util.*;
 import java.util.concurrent.*;
 import jumpking.config.NetworkSettings;
@@ -16,7 +17,7 @@ import org.springframework.stereotype.Component;
 /** Mỗi Room sở hữu một actor; registry chỉ giữ chỗ và không thực hiện I/O. */
 @Component
 public class RaceRoom implements GameCommandHandler, AutoCloseable {
-    private static final Set<String> COMMANDS = Set.of("CREATE_ROOM", "JOIN_ROOM", "GET_ROOM_STATE", "LEAVE_ROOM", "UPDATE_ROOM_SETTINGS", "RECONNECT");
+    private static final Set<String> COMMANDS = Set.of("CREATE_ROOM", "JOIN_ROOM", "GET_ROOM_STATE", "LEAVE_ROOM", "UPDATE_ROOM_SETTINGS", "RECONNECT", "CHAT_SEND");
     private final RoomDirectory directory;
     private final Memberships memberships;
     private final GameWorkers workers;
@@ -25,10 +26,11 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     private final MonotonicTime time;
     private final ObjectMapper json;
     private final JsonNode rules;
+    private final Clock clock;
     private final Map<String, Room> rooms = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(Thread.ofPlatform().daemon().name("room-clock").factory());
-    public RaceRoom(RoomDirectory directory, Memberships memberships, GameWorkers workers, NetworkSettings limits, SessionAuthority sessions, MonotonicTime time, ObjectMapper json, SharedData shared) {
-        this.directory = directory; this.memberships = memberships; this.workers = workers; this.limits = limits; this.sessions = sessions; this.time = time; this.json = json; rules = shared.rules();
+    public RaceRoom(RoomDirectory directory, Memberships memberships, GameWorkers workers, NetworkSettings limits, SessionAuthority sessions, MonotonicTime time, ObjectMapper json, SharedData shared, Clock clock) {
+        this.directory = directory; this.memberships = memberships; this.workers = workers; this.limits = limits; this.sessions = sessions; this.time = time; this.json = json; rules = shared.rules(); this.clock = clock;
     }
     private final class Member {
         final String id = UUID.randomUUID().toString(), token = token();
@@ -43,6 +45,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     private final class Room {
         final String id;
         final LinkedHashMap<String, Member> players = new LinkedHashMap<>();
+        final ChatLog chat = new ChatLog(clock, time, limits.chatCodePoints(), limits.chatHistory(), limits.chatIntervalMs());
         final SerialExecutor actor;
         final ScheduledFuture<?> timer;
         RoomSettings settings = RoomSettings.defaults();
@@ -81,6 +84,12 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
                     if (!player.id.equals(room.host)) throw new ApiException(403, "FORBIDDEN", "Only the Host can change settings");
                     room.settings = RoomSettings.parse(command.payload(), rules); connection.reply(command, "ROOM_STATE", state(room)); broadcast(room);
                 }
+                case "CHAT_SEND" -> {
+                    GameEnvelope.fields(command.payload(), Set.of("text"));
+                    var message = room.chat.send(player.id, player.nickname, player.slot.color(), GameEnvelope.text(command.payload(), "text"));
+                    var payload = Map.of("roomId", room.id, "messages", List.of(message)); connection.reply(command, "CHAT_MESSAGE", payload);
+                    for (var peer : room.players.values()) if (peer != player && peer.connection != null) peer.connection.send("CHAT_MESSAGE", payload);
+                }
                 default -> throw GameEnvelope.invalid();
             }
         }));
@@ -100,7 +109,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
             try { room.actor.execute(() -> {
                 if (create) room.settings = settings;
                 room.players.put(player.id, player); if (!connection.open()) { player.connection = null; player.disconnectedAt = time.nanos(); }
-                chooseHost(room); connection.reply(command, "ROOM_JOINED", joined(room, player)); broadcast(room);
+                chooseHost(room); connection.reply(command, "ROOM_JOINED", joined(room, player)); broadcast(room); chatHistory(room, player);
             }); } catch (RuntimeException error) { memberships.release(player.identity.owner(), new Memberships.Membership(room.id, player.id)); throw error; }
         } catch (RuntimeException error) { if (directory.release(slot)) { var room = rooms.remove(slot.roomId()); if (room != null) room.timer.cancel(false); } throw error; }
     }
@@ -111,7 +120,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         if (player.connection == null && time.nanos() - player.disconnectedAt >= rules.path("reconnectMs").asLong() * 1_000_000L) throw new ApiException(409, "RECONNECT_EXPIRED", "Reconnect is no longer available");
         var old = player.connection; player.connection = connection; player.generation++; chooseHost(room);
         if (old != null && old != connection) old.close(org.springframework.web.socket.CloseStatus.NORMAL);
-        connection.reply(command, "RECONNECT_OK", context(room, player)); broadcast(room);
+        connection.reply(command, "RECONNECT_OK", context(room, player)); broadcast(room); chatHistory(room, player);
     }
     private void chooseHost(Room room) {
         var old = room.host == null ? null : room.players.get(room.host);
@@ -120,6 +129,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     }
     private void remove(Room room, Member player, GameEnvelope command) {
         if (room.players.remove(player.id) == null) return;
+        room.chat.leave(player.id);
         memberships.release(player.identity.owner(), new Memberships.Membership(room.id, player.id));
         if (player.connection != null) { if (command == null) player.connection.send("ROOM_LEFT", Map.of("roomId", room.id)); else player.connection.reply(command, "ROOM_LEFT", Map.of("roomId", room.id)); }
         if (directory.release(player.slot)) { rooms.remove(room.id, room); room.timer.cancel(false); }
@@ -139,6 +149,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         return state;
     }
     private void broadcast(Room room) { var payload = state(room); for (var player : room.players.values()) if (player.connection != null) player.connection.send("ROOM_STATE", payload); }
+    private void chatHistory(Room room, Member player) { if (player.connection != null) player.connection.send("CHAT_HISTORY", Map.of("roomId", room.id, "messages", room.chat.history())); }
     private void safely(GameConnection connection, GameEnvelope command, Runnable action) {
         if (!connection.open()) return;
         try { action.run(); if (connection.identity().sessionId() != null) sessions.valid(sessions.find(connection.identity().sessionId()), true); }

@@ -6,6 +6,8 @@ import { clearReconnect, loadReconnect, saveReconnect } from './reconnect';
 interface Message { v: number; type: string; payload: Record<string, unknown>; requestId?: string }
 const SERVER_TYPES = new Set(['ROOM_JOINED', 'ROOM_STATE', 'ROOM_LEFT', 'GAME_STARTED', 'GAME_SNAPSHOT', 'COMMUNITY_RUN_STATE',
   'PLAYER_EFFECTS', 'ADVENTURE_EVENTS', 'PLAYER_FINISHED', 'GAME_FINISHED', 'SAVE_STATUS', 'CHAT_MESSAGE', 'CHAT_HISTORY', 'RECONNECT_OK', 'PONG', 'ERROR']);
+const ROOM_PACKETS = new Set(['ROOM_STATE', 'ROOM_LEFT', 'GAME_SNAPSHOT', 'PLAYER_EFFECTS', 'ADVENTURE_EVENTS', 'CHAT_MESSAGE', 'CHAT_HISTORY']);
+const PLAY_PACKETS = new Set(['PLAYER_FINISHED', 'GAME_FINISHED', 'SAVE_STATUS']);
 function parseMessage(data: unknown): Message {
   if (typeof data !== 'string' || new TextEncoder().encode(data).length > NETWORK.maxMessageBytes) throw new Error('Invalid message size');
   const value: unknown = JSON.parse(data);
@@ -40,6 +42,7 @@ export class GameSocket {
   lastFinish: Record<string, unknown> | null = null;
   playContext: { playId: string; generation: number } | null = null;
   chatHistory: Record<string, unknown>[] = [];
+  private roomId: string | null = null;
   private listeners = new Set<(type: string, payload: Record<string, unknown>) => void>();
   private profile: string | null = null;
   private restoring: Promise<void> | null = null;
@@ -108,15 +111,18 @@ export class GameSocket {
       if (this.socket !== socket) return;
       let message: Message;
       try { message = parseMessage(event.data); } catch { this.disconnect(socket, 'Invalid protocol', 1002); return; }
+      if (ROOM_PACKETS.has(message.type) && this.roomId && typeof message.payload.roomId === 'string' && message.payload.roomId !== this.roomId) return;
+      if (PLAY_PACKETS.has(message.type) && this.playContext && typeof message.payload.playId === 'string' && message.payload.playId !== this.playContext.playId) return;
       const request = message.requestId ? this.pending.get(message.requestId) : undefined;
       if (request && message.requestId) {
         clearTimeout(request.timer); this.pending.delete(message.requestId);
         if (message.type === 'ERROR') request.reject(new ApiError(message.payload.code as string, message.payload.message as string));
         else request.resolve(message);
       }
-      if (message.type === 'ROOM_JOINED' || message.type === 'RECONNECT_OK') this.selfId = message.payload.playerId as string;
+      if (message.type === 'ROOM_JOINED' || message.type === 'RECONNECT_OK') { this.selfId = message.payload.playerId as string; this.roomId = message.payload.roomId as string; }
       if (message.type === 'ROOM_JOINED') this.chatHistory = [];
       if (message.type === 'CHAT_HISTORY' || message.type === 'CHAT_MESSAGE') {
+        if (message.payload.roomId !== this.roomId) return;
         if (!Array.isArray(message.payload.messages)) { this.disconnect(socket, 'Invalid chat history', 1002); return; }
         const items = message.payload.messages as Record<string, unknown>[];
         if (items.some(item => !item || typeof item.id !== 'string' || typeof item.playerId !== 'string' || typeof item.nickname !== 'string' || typeof item.text !== 'string'

@@ -162,6 +162,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
         var tower = membership == null ? null : towers.get(membership.roomId());
         if (tower == null) throw new ApiException(404, "ROOM_NOT_FOUND", "Community membership not found");
         tower.actor.execute(() -> safely(connection, command, () -> {
+            if (!membership.equals(memberships.find(connection.identity().owner()))) throw new ApiException(409, "CONFLICT", "Membership changed before the command was processed");
             Member player = tower.players.get(membership.playerId());
             if (player == null) throw new ApiException(404, "ROOM_NOT_FOUND", "Community membership has ended");
             if (command.type().equals("RECONNECT")) { reconnect(tower, player, connection, command); return; }
@@ -208,7 +209,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                 case "CHAT_SEND" -> {
                     GameEnvelope.fields(command.payload(), Set.of("text"));
                     var message = tower.chat.send(player.id, player.identity.username(), player.slot.color(), GameEnvelope.text(command.payload(), "text"));
-                    var payload = Map.of("messages", List.of(message)); connection.reply(command, "CHAT_MESSAGE", payload);
+                    var payload = Map.of("roomId", tower.id, "messages", List.of(message)); connection.reply(command, "CHAT_MESSAGE", payload);
                     for (Member peer : tower.players.values()) if (peer != player && peer.connection != null && !peer.loading) peer.connection.send("CHAT_MESSAGE", payload);
                 }
                 default -> throw GameEnvelope.invalid();
@@ -410,7 +411,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
         return value;
     }
     private void broadcast(Tower tower) { var state = state(tower); tower.players.values().forEach(player -> { if (player.connection != null && !player.loading) player.connection.send("ROOM_STATE", state); }); }
-    private void chatHistory(Tower tower, Member player) { if (player.connection != null) player.connection.send("CHAT_HISTORY", Map.of("messages", tower.chat.history())); }
+    private void chatHistory(Tower tower, Member player) { if (player.connection != null) player.connection.send("CHAT_HISTORY", Map.of("roomId", tower.id, "messages", tower.chat.history())); }
     private void finishNotice(Member player) {
         if (!player.finished || player.endingNotified || player.connection == null || player.ending == null || !player.saveStatus.equals("SAVED")) return;
         player.connection.send("PLAYER_FINISHED", Map.of("playerId", player.id, "playId", player.stored.id(), "result", summary(player), "showEnding", true, "ending", player.ending));

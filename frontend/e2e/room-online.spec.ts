@@ -14,6 +14,9 @@ test('two Guest browsers create and join a Room, share settings and transfer Hos
     await b.getByLabel('Nickname', { exact: true }).fill('Second Guest'); await b.getByRole('button', { name: 'Join', exact: true }).click();
     await expect(a.locator('.players')).toContainText('Second Guest'); await expect(b.locator('.players')).toContainText('First Guest');
     await expect(a.getByRole('button', { name: 'Start', exact: true })).toBeEnabled(); await expect(b.getByLabel('Mode', { exact: true })).toBeDisabled();
+    await a.getByRole('button', { name: 'Chat', exact: true }).click(); await a.getByLabel('Message', { exact: true }).fill('<b>Hello Room</b>'); await a.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(a.getByRole('log')).toContainText('<b>Hello Room</b>'); await a.getByRole('button', { name: 'Close chat', exact: true }).click();
+    await b.getByRole('button', { name: 'Chat', exact: true }).click(); await expect(b.getByRole('log')).toContainText('First Guest: <b>Hello Room</b>'); expect(await b.getByRole('log').locator('b').count()).toBe(0); await b.getByRole('button', { name: 'Close chat', exact: true }).click();
     await a.getByLabel('Mode', { exact: true }).selectOption('TIME_LIMIT'); await a.getByLabel('Minutes', { exact: true }).fill('12');
     await expect(b.getByLabel('Minutes', { exact: true })).toHaveValue('12');
     await a.getByLabel('Mode', { exact: true }).selectOption('NO_WALK'); await expect(b.getByLabel('Mode', { exact: true })).toHaveValue('NO_WALK');

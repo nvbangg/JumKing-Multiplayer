@@ -225,7 +225,7 @@ export function App() {
             else { if (!identity.authenticated) throw new Error('Sign in to join Community Tower'); const connection = await connectedSocket(); await connection.command('JOIN_ROOM', { roomId }); }
           });
         }}><label>Room ID<input name="roomId" required minLength={6} maxLength={6} autoCapitalize="characters" autoComplete="off" pattern="[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}" onInput={event => { event.currentTarget.value = event.currentTarget.value.toUpperCase(); }} /></label><button disabled={pending}>{pending ? 'Looking up…' : 'Join'}</button></form>}
-        {screen === 'lobby' && room && <Lobby room={room} selfId={socket.current?.selfId || null} pending={pending} command={command} />}
+        {screen === 'lobby' && room && <Lobby room={room} selfId={socket.current?.selfId || null} pending={pending} command={command} socket={socket.current} />}
         {screen === 'results' && result && <Results result={result} room={room} selfId={socket.current?.selfId || null} pending={pending} onAgain={() => command('PLAY_AGAIN', { matchId: result.playId })} onLeave={() => command('LEAVE_ROOM')} />}
         {error && <p className="error" role="alert">{error}</p>}
         {syncError && (screen === 'home' || screen === 'history') && <p role="status">Solo sync pending: {syncError}</p>}

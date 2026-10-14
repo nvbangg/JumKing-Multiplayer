@@ -145,7 +145,7 @@ Client nhận diện nhấn đúp khi Fly Mode được bật và gửi freeFlig
 | PLAYER_FINISHED | {playerId,playId,result,showEnding,ending:{screen,equipped,ravenDone}}; Community riêng người Finish sau commit |
 | GAME_FINISHED | {playId,reason,durationMs,results,saveStatus}; Room broadcast |
 | SAVE_STATUS | {playId,revision,saveStatus}; chỉ owner checkpoint hoặc members của match |
-| CHAT_MESSAGE / CHAT_HISTORY | {messages:[{id,playerId,nickname,text,sentAt,colorSlot}]} |
+| CHAT_MESSAGE / CHAT_HISTORY | {roomId,messages:[{id,playerId,nickname,text,sentAt,colorSlot}]}; client bỏ chat từ sảnh cũ |
 | RECONNECT_OK | {roomId,playerId,generation,playId}; sau đó full state |
 | PONG / ERROR | {nonce} / {code,message,playId?,generation?,seq?} |
 

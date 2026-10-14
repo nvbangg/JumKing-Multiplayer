@@ -72,7 +72,10 @@ test('two Guest browsers Start together, jump and End Match with saved Results a
     await expect(a.getByRole('button', { name: 'Menu', exact: true })).toBeVisible({ timeout: 15_000 }); await expect(b.getByRole('button', { name: 'Menu', exact: true })).toBeVisible({ timeout: 15_000 });
     if (await a.getByRole('button', { name: 'Resume', exact: true }).isVisible()) await a.getByRole('button', { name: 'Resume', exact: true }).click();
     await a.keyboard.down('Space'); await a.waitForTimeout(220); await a.keyboard.up('Space'); await expect(a.locator('.game-hud')).toContainText('Jumps: 1');
-    await a.getByRole('button', { name: 'Menu', exact: true }).click(); await a.getByRole('button', { name: 'Pause Room', exact: true }).click();
+    await a.getByRole('button', { name: 'Menu', exact: true }).click();
+    await expect(a.getByRole('heading', { name: 'Game Menu', exact: true })).toBeVisible();
+    const menuTime = await a.getByLabel('Play time', { exact: true }).innerText(); await expect(a.getByLabel('Play time', { exact: true })).not.toHaveText(menuTime);
+    await a.getByRole('button', { name: 'Pause Room', exact: true }).click(); await expect(a.getByRole('heading', { name: 'Room Paused', exact: true })).toBeVisible();
     await expect(a.getByRole('button', { name: 'Resume Room', exact: true })).toBeEnabled(); await expect(b.getByRole('button', { name: 'Room Paused', exact: true })).toBeDisabled();
     const pausedTime = await a.getByLabel('Play time', { exact: true }).innerText(); await a.waitForTimeout(1100); await expect(a.getByLabel('Play time', { exact: true })).toHaveText(pausedTime);
     await a.getByRole('button', { name: 'Resume Room', exact: true }).click(); await expect(b.getByRole('button', { name: 'Resume', exact: true })).toBeEnabled();

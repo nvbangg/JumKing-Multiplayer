@@ -84,6 +84,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 
 ## Phase 07 — Nghiệm thu
 
+- [x] Sửa phản hồi identity cũ và phân biệt menu cá nhân/Host Pause; kiểm chứng hồi quy đăng nhập và route Main Babe bằng input hợp lệ.
 - [ ] Nghiệm thu tự động/chơi trực tiếp toàn tuyến Solo/Community/Room; sửa lỗi, không dùng cheat thay route.
 - [ ] Nghiệm thu điện thoại, hai identities cùng máy và LAN/ZeroTier hai thiết bị.
 - [x] Hoàn thiện workload và thực nghiệm snapshot-only/prediction; ghi số đo, cải tiến và giới hạn.
@@ -165,5 +166,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 06 — ending Room | PASS — 66 frontend/49 backend unit tests, kiểm thử MySQL ending/ranking bốn mode và Chrome hai identities. Chỉ winners nhận ending sau commit; lỗi lưu không phát ending, retry/reconnect giữ cùng kết quả. Peers vào Results/xác nhận ván tiếp, winner Skip/View Results/Play Again không bị broadcast cắt cảnh hoặc phát ending cũ. Đã xem screenshot; không ending khi Host End/timeout chưa Finish |
 | Phase 06 — Fly Room | PASS — 49 backend unit tests, 5 MySQL integration tests và 4 Chrome E2E dùng hai identities. Cả bốn mode bật Fly từ Options, nhấn đúp Space bật/tắt, di chuyển lên và lưu History bình thường. WS kiểm tra xuyên solid rồi rơi thẳng/thoát solid, giữ counters; Finish sau Fly vẫn lưu winner, Stats/History và comparator bình thường |
 | Phase 07 — thực nghiệm | PASS — workload HTTP/WS/MySQL thật trên Windows 11/JDK 25, 16 logical CPUs: Community 1 người, Room 2/10 người và 2 Room × 3 người; mỗi mẫu 5 giây. Snapshot ~20 Hz, simulation ~60 Hz, RTT p95 1,75–6,28 ms; 10 người dùng ~155% một CPU core gồm driver, không phải capacity production. Compute tick 10 người p95 0,250 ms/p99 0,391 ms, 0/1.800 vượt 16,67 ms; không gồm I/O/scheduler. Chrome mô hình delay một chiều 0/50/100 ms: prediction thấy nhảy sau 350 ms charge, snapshot-only 400/483/567 ms; sai lệch vị trí p95 0 so với 9/29/43 px. Mô hình không loss/drift; raw JSON được ignore, tests tái chạy theo testing |
-| Phase 07 còn lại | Chưa nghiệm thu đầy đủ; regression online mở rộng còn timeout kết nối loopback cần kiểm tra |
+| Phase 07 — identity và route | PASS — type-check/build, 66 frontend unit tests; Chrome hồi quy giữ phản hồi me ẩn danh đến sau Register, Account không bị ghi đè. Nhóm online riêng 22/22 và regression identity riêng 1/1. Route Chrome/Phaser khớp từng checkpoint: 43 screen, 16.957 ticks, 228 jumps, 0 falls, Finish không Fly/teleport. Room phân biệt Game Menu vẫn chạy clock với Host Pause đóng băng clock |
+| Phase 07 — regression còn lại | Chưa đạt toàn bộ: các lượt chạy dài còn lỗi TCP loopback rải rác. Probe Node gọi health trực tiếp gặp 2/200 timeout khi tạo kết nối mới; Java HTTP echo tối giản cũng tái hiện 3/500. IPv4-only chưa loại bỏ được lỗi; chưa xác định nguyên nhân hệ thống, không thay bằng retry hoặc bỏ assertions |
 | Phase 08 | Chưa thực hiện |

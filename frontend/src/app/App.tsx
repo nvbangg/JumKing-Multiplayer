@@ -37,7 +37,9 @@ export function App() {
     if (routes[next] && location.pathname !== routes[next]) window.history.pushState(null, '', routes[next]);
     setScreenState(next);
   };
-  const [identity, setIdentity] = useState<Identity>(initialIdentity);
+  const [identity, setIdentityState] = useState<Identity>(initialIdentity);
+  const identityRevision = useRef(0);
+  const setIdentity = (value: Identity) => { identityRevision.current++; setIdentityState(value); };
   const [activeSolo, setActiveSolo] = useState<SoloRun | null>(null);
   const [launch, setLaunch] = useState<SoloLaunch>(restoredLaunch);
   const [statistics, setStatistics] = useState<Statistics>({ ...EMPTY_STATS });
@@ -97,11 +99,12 @@ export function App() {
 
   useEffect(() => {
     let disposed = false;
+    const expectedIdentityRevision = identityRevision.current;
     const pop = () => { setLaunch(restoredLaunch()); setScreenState(locationScreen()); };
     window.addEventListener('popstate', pop);
     void api<Identity>('/auth/me').then(value => {
       if (typeof value.authenticated !== 'boolean' || typeof value.guest !== 'boolean') return;
-      if (!disposed) setIdentity(value);
+      if (!disposed && identityRevision.current === expectedIdentityRevision) setIdentity(value);
     }).catch(() => {});
     void api<{ features: { flyEnabled: boolean } }>('/game-config').then(config => { if (!disposed) setFlyAllowed(__SOLO_FLY_ENABLED__ || config.features.flyEnabled); }).catch(() => {});
     return () => { disposed = true; window.removeEventListener('popstate', pop); socket.current?.close(); };
@@ -196,7 +199,9 @@ export function App() {
     viewedEnding.current = resultRef.current?.playId || null; setScreen('results');
   }} onHome={() => {
     socket.current?.close(); socket.current = null; setRoom(null); setScreen('home'); clearCsrf();
-    void api<Identity>('/auth/me').then(setIdentity).catch(cause => {
+    const expectedIdentityRevision = identityRevision.current;
+    void api<Identity>('/auth/me').then(value => { if (identityRevision.current === expectedIdentityRevision) setIdentity(value); }).catch(cause => {
+      if (identityRevision.current !== expectedIdentityRevision) return;
       if (cause instanceof ApiError && ['SESSION_EXPIRED', 'UNAUTHENTICATED'].includes(cause.code)) setIdentity(initialIdentity);
       else setError(cause instanceof Error ? cause.message : 'Identity could not be refreshed');
     });

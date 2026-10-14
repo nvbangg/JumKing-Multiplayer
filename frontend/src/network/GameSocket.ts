@@ -35,6 +35,14 @@ export class GameSocket {
   private cancelConnect: (() => void) | null = null;
   private pending = new Map<string, { resolve: (value: Message) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   selfId: string | null = null;
+  lastSnapshot: Record<string, unknown> | null = null;
+  private listeners = new Set<(type: string, payload: Record<string, unknown>) => void>();
+  subscribe(listener: (type: string, payload: Record<string, unknown>) => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
+  input(type: 'PLAYER_INPUT' | 'CANCEL_INPUT', payload: Record<string, unknown>): void {
+    if (this.socket?.readyState !== WebSocket.OPEN) return;
+    if (this.socket.bufferedAmount > NETWORK.maxMessageBytes * 2) { this.disconnect(this.socket, 'Input connection is too slow'); return; }
+    this.socket.send(JSON.stringify({ v: 1, type, payload }));
+  }
   constructor(private onMessage: (type: string, payload: Record<string, unknown>) => void, private onDisconnect: () => void) {}
   connect(): Promise<void> {
     if (this.socket?.readyState === WebSocket.OPEN) return Promise.resolve();
@@ -83,7 +91,9 @@ export class GameSocket {
         else request.resolve(message);
       }
       if (message.type === 'ROOM_JOINED' || message.type === 'RECONNECT_OK') this.selfId = message.payload.playerId as string;
+      if (message.type === 'GAME_SNAPSHOT') this.lastSnapshot = message.payload;
       this.onMessage(message.type, message.payload);
+      for (const listener of this.listeners) listener(message.type, message.payload);
     };
     return connection;
   }
@@ -109,7 +119,7 @@ export class GameSocket {
   }
   close(code = 1000, reason = ''): void {
     const socket = this.socket; this.socket = null;
-    this.cancelConnect?.(); this.cancelConnect = null; this.selfId = null;
+    this.cancelConnect?.(); this.cancelConnect = null; this.selfId = null; this.lastSnapshot = null;
     if (this.heartbeat) clearInterval(this.heartbeat); this.heartbeat = null; this.clearPending(); socket?.close(code, reason);
   }
   private disconnect(socket: WebSocket, message: string, code?: number): void {

@@ -15,8 +15,9 @@ import { OptionsButtons, ControlsHelp } from '../features/solo/OptionsPanel';
 import { AudioBus } from '../game/presentation/AudioBus';
 import { loadManifest } from '../game/content/assets';
 import { SoloSync } from '../features/solo/sync';
+import { OnlineGame } from '../features/community/OnlineGame';
 
-type Screen = 'home' | 'play' | 'sign-in' | 'register' | 'merge-history' | 'account' | 'community' | 'leaderboard' | 'history' | 'detail' | 'options' | 'controls' | 'nickname' | 'join' | 'lobby' | 'results';
+type Screen = 'home' | 'play' | 'online' | 'sign-in' | 'register' | 'merge-history' | 'account' | 'community' | 'leaderboard' | 'history' | 'detail' | 'options' | 'controls' | 'nickname' | 'join' | 'lobby' | 'results';
 interface SoloLaunch { profile: string; action: 'new' | 'continue' | 'auto'; expectedRunId: string | null }
 const initialIdentity: Identity = { authenticated: false, guest: false, account: null };
 const routes: Partial<Record<Screen, string>> = { home: '/', play: '/play', history: '/history', community: '/community', options: '/options', account: '/account', 'sign-in': '/sign-in', register: '/register' };
@@ -54,7 +55,7 @@ export function App() {
   const sync = useRef<SoloSync | null>(null);
   const socket = useRef<GameSocket | null>(null);
   const profile = identity.account ? backendOrigin() + ':account:' + identity.account.id : 'guest';
-  const playing = screen === 'play';
+  const playing = screen === 'play' || screen === 'online';
   useEffect(() => {
     setSyncError('');
     if (!identity.account) return;
@@ -101,7 +102,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (screen === 'play' || screen === 'lobby') return;
+    if (screen === 'play' || screen === 'online' || screen === 'lobby') return;
     let disposed = false;
     void soloRuns(profile).then(runs => {
       if (disposed) return;
@@ -148,6 +149,7 @@ export function App() {
       if (type === 'ROOM_STATE') {
         const next = payload as unknown as RoomState;
         setRoom(next);
+        if (next.kind === 'COMMUNITY') { setScreen('online'); return; }
         const self = next.members?.find(member => member.playerId === socket.current?.selfId);
         setScreen(resultRef.current && self?.nextMatchConfirmed !== true && (next.state === 'WAITING' || next.state === 'FINISHED') ? 'results' : 'lobby');
       }
@@ -167,6 +169,7 @@ export function App() {
   };
 
   if (screen === 'play') return <SoloGame {...launch} onExit={() => { setOptions(readOptions()); back(); }} />;
+  if (screen === 'online' && room && socket.current) return <OnlineGame room={room} socket={socket.current} />;
   return <main className="home">
     <header className="brand"><h1><img src="/assets/title_logo.png" alt="JumpKing" /></h1></header>
     <div className={screen === 'home' ? 'home-layout' : 'single-panel'}>

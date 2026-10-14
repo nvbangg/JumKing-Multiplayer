@@ -51,7 +51,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 
 ## Phase 05 — Community Tower
 
-- [ ] Triển khai Account-only Community và simulation server; kiểm tra ghép/tạo sảnh, Join/Leave và state của hai clients.
+- [x] Triển khai Account-only Community và simulation server; kiểm tra ghép/tạo sảnh, Join/Leave và state của hai clients.
 - [ ] Hoàn thiện prediction/reconciliation/interpolation; kiểm tra ACK/replay, latency, thiếu frame và resync.
 - [ ] Hoàn thiện checkpoint/worker/autosave/Continue/New Run; kiểm tra transaction/revision, một lượt ACTIVE và rollback.
 - [ ] Hoàn thiện Pause/Resume/AFK/Save & Exit theo gameplay; kiểm tra hidden/blur, clock, đang rơi, save status và hạn giữ slot.
@@ -135,5 +135,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 04 — map/contracts | PASS — type-check/build, 52 frontend/24 backend unit tests, 24 integration tests và 4 Chrome E2E. HTTP trả đúng shared map/tuning/rules, 10 appearance slots và server flag; adapter kiểm tra envelope/size, handshake chung, pending cleanup, socket cũ, heartbeat/nonce và timeout không replay mutation. Chrome xác minh map/config và handshake bị từ chối; WS endpoint/dispatch theo mốc transport |
 | Phase 04 — Solo sync | PASS — type-check/build, 53 frontend/27 backend unit tests, 27 MySQL integration tests; 25 Chrome E2E Solo và 7 E2E online. Kiểm tra offline/pending History/retry, hai browser contexts cùng Account, đổi Account không upload nhầm owner, whitelist không gửi snapshot, UUID/revision/idempotency/terminal invariants, quota 60 kể cả JSON lỗi và tổng ticks lớn không overflow. Profile/History dùng dữ liệu đã commit; queries hỗ trợ cả ba kiểu chơi, writer online nghiệm thu ở Phase 05–06. Output E2E độc lập/online tách riêng để tránh xóa trace chéo |
 | Phase 04 — WS transport | PASS — type-check/build, 53 frontend/33 backend unit tests, 27 MySQL integration tests và 8 Chrome E2E online. Hai browser contexts có cookies độc lập kết nối WS thật; giới hạn hai socket/identity, lỗi payload/request ID, Logout chỉ thu hồi đúng Account. Unit tests kiểm tra FIFO/ACK/timeout, Fly gate, bounded serial executor, snapshot coalescing và slow consumer/overflow. Gameplay online và room registry theo Phase 05–06 |
-| Phase 05–07 | NOT RUN — chưa triển khai và nghiệm thu hệ thống |
+| Phase 05 — Community server | PASS — type-check/build, 53 frontend/33 backend unit tests, 27 MySQL integration tests và 9 Chrome E2E online. Hai Account độc lập Join cùng sảnh qua ID, nhảy và nhận state của nhau, màu khác nhau, Save & Exit giải phóng membership, Continue giữ run ID/counters; xem screenshot thật. Server fixed-step, input FIFO, checkpoint JDBC ngoài actor; prediction và các biên save/pause/reconnect theo những mốc tiếp theo |
+| Phase 05 còn lại–07 | NOT RUN — chưa nghiệm thu đầy đủ |
 | Phase 08 | Chưa thực hiện |

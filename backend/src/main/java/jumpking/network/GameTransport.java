@@ -94,6 +94,7 @@ public class GameTransport extends TextWebSocketHandler implements AutoCloseable
     }
     @Override protected void handleTextMessage(WebSocketSession socket, TextMessage text) {
         var connection = connections.get(socket.getId()); if (connection == null || !connection.open()) return;
+        if (text.getPayload().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > limits.messageBytes()) { connection.close(CloseStatus.TOO_BIG_TO_PROCESS); return; }
         if (!connection.receive(System.nanoTime())) { connection.close(CloseStatus.POLICY_VIOLATION); return; }
         GameEnvelope command;
         try { command = GameEnvelope.parse(json, text.getPayload()); }
@@ -113,8 +114,8 @@ public class GameTransport extends TextWebSocketHandler implements AutoCloseable
                 connection.reply(command, "PONG", Map.of("nonce", GameEnvelope.text(command.payload(), "nonce"))); return;
             }
             if (Set.of("CREATE_ROOM", "JOIN_ROOM", "JOIN_COMMUNITY", "NEW_COMMUNITY_RUN").contains(command.type())) joinAttempt(connection);
-            var handler = handlers.stream().filter(candidate -> candidate.supports(command.type())).findFirst().orElse(null);
-            if (handler != null) handler.handle(connection, command);
+            var handler = handlers.stream().filter(candidate -> candidate.supports(connection, command)).findFirst().orElse(null);
+            if (handler != null) { handler.handle(connection, command); return; }
             else if (command.type().equals("GET_ROOM_STATE") || command.type().equals("LEAVE_ROOM")) {
                 GameEnvelope.fields(command.payload(), Set.of());
                 if (command.type().equals("LEAVE_ROOM")) connection.reply(command, "ROOM_LEFT", java.util.Collections.singletonMap("roomId", null));
@@ -123,7 +124,8 @@ public class GameTransport extends TextWebSocketHandler implements AutoCloseable
                     for (String field : List.of("roomId", "kind", "state", "hostPlayerId", "settings", "currentPlay", "result", "pauseExpiresAt")) empty.putNull(field);
                     empty.putArray("members"); connection.reply(command, "ROOM_STATE", empty);
                 }
-            } else throw new ApiException(400, "INVALID_MESSAGE", "This command is not available in the current context");
+            } else if (command.type().equals("JOIN_ROOM")) throw new ApiException(404, "ROOM_NOT_FOUND", "Room not found");
+            else throw new ApiException(400, "INVALID_MESSAGE", "This command is not available in the current context");
             if (sessionId != null) sessions.valid(sessions.find(sessionId), true);
         } catch (ApiException error) { connection.error(command, error); }
         catch (Exception error) { connection.error(command, new ApiException(500, "INTERNAL_ERROR", "Unable to process game command")); }

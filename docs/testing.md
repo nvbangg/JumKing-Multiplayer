@@ -12,6 +12,8 @@ Kiểm tra theo tài liệu sở hữu; báo PASS/FAIL/BLOCKED/NOT RUN đúng th
 | Luồng online/save/lifecycle | Playwright với backend/MySQL thật và hai identities |
 | Tài liệu | Source of Truth, links/anchors, examples, scope và git diff --check |
 
+Khi đổi dependency: frontend chạy `npm audit`; backend lấy version bằng `./mvnw dependency:list -DincludeScope=runtime` rồi đối chiếu [OSV](https://google.github.io/osv.dev/post-v1-querybatch/) và advisory của nhà cung cấp. Ghi kết quả cùng điều kiện ảnh hưởng/ngoại lệ có nguồn trong PLAN; không coi kết quả quét thô là bằng chứng khai thác được.
+
 ## Lệnh kiểm thử
 
 Mỗi block chạy từ root project trong terminal riêng.

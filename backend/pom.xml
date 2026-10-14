@@ -6,7 +6,12 @@
   </parent>
   <groupId>jumpking</groupId><artifactId>jumpking-server</artifactId><version>0.1.0</version>
   <name>JumpKing Server</name>
-  <properties><java.version>25</java.version></properties>
+  <properties>
+    <java.version>25</java.version>
+    <jackson-bom.version>2.21.7</jackson-bom.version>
+    <log4j2.version>2.25.5</log4j2.version>
+    <tomcat.version>10.1.61</tomcat.version>
+  </properties>
   <dependencies>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-websocket</artifactId></dependency>

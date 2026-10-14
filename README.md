@@ -54,10 +54,6 @@ Build: frontend `npm run build`, backend `.\mvnw.cmd -Pweb clean package`; từ 
 
 Host bind backend vào IP cần dùng hoặc 0.0.0.0, thêm origin IP:8080 vào allowlist và cho phép firewall TCP 8080 từ mạng cần dùng. Người chơi mở `http://<host-ip>:8080`. ZeroTier cần cùng network và được authorize; dùng IP ZeroTier của host. Không mở MySQL cho người chơi. [Các bước và xử lý lỗi](docs/deployment.md#lan-và-zerotier)
 
-## Kiểm chứng và đóng góp
-
-Kiểm thử và thực nghiệm theo [testing](docs/testing.md). Đánh giá prediction/reconciliation so với snapshot-only bằng độ trễ, sai lệch đồng bộ và tải server; kết quả, đóng góp đã chứng minh và giới hạn theo [PLAN](PLAN.md).
-
 ## Tài liệu
 
 | Nội dung | Nguồn chính |
@@ -68,5 +64,6 @@ Kiểm thử và thực nghiệm theo [testing](docs/testing.md). Đánh giá pr
 | Database, checkpoint và thành tích | [data](docs/data.md) |
 | Cấu hình, MySQL, Local/LAN/ZeroTier/Internet | [deployment](docs/deployment.md) |
 | Lệnh kiểm thử và tiêu chí nghiệm thu | [testing](docs/testing.md) |
-| Kế hoạch và quy trình agent | [PLAN](PLAN.md), [AGENTS](AGENTS.md) |
+| Kế hoạch, kết quả thực nghiệm và giới hạn | [PLAN](PLAN.md) |
+| Quy trình agent | [AGENTS](AGENTS.md) |
 | Yêu cầu bài tập lớn | [Instruction](docs/course-materials/final-project/final-project/Instruction.md) |

@@ -56,6 +56,15 @@ class GameTransportTest {
         assertThatThrownBy(() -> serial.execute(() -> {})).isInstanceOf(java.util.concurrent.RejectedExecutionException.class);
         assertThat(scheduled).hasSize(1); scheduled.remove().run(); assertThat(order).containsExactly(1, 2); assertThat(failures.get()).isEqualTo(1);
     }
+    @Test void fullClientQueueCannotDropCommittedResultsAndBothQueuesRemainBounded() {
+        var scheduled = new ArrayDeque<Runnable>(); var order = new ArrayList<Integer>();
+        var serial = new SerialExecutor(scheduled::add, 2, 2, error -> { throw new AssertionError(error); });
+        serial.execute(() -> order.add(3)); serial.execute(() -> order.add(4));
+        assertThatThrownBy(() -> serial.execute(() -> {})).isInstanceOf(java.util.concurrent.RejectedExecutionException.class);
+        serial.complete(() -> order.add(1)); serial.complete(() -> order.add(2));
+        assertThatThrownBy(() -> serial.complete(() -> {})).isInstanceOf(java.util.concurrent.RejectedExecutionException.class);
+        assertThat(scheduled).hasSize(1); scheduled.remove().run(); assertThat(order).containsExactly(1, 2, 3, 4);
+    }
     @Test void snapshotsCoalesceAndRepliesRetainOnlyTheirOwnRequestId() throws Exception {
         var socket = mock(WebSocketSession.class); when(socket.isOpen()).thenReturn(true);
         var scheduled = new ArrayDeque<Runnable>(); var texts = new ArrayList<String>();

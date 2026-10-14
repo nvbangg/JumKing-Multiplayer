@@ -56,6 +56,7 @@ class RoomLifecycleIT {
             assertThat(b.command("RECONNECT", reconnect(game, game.first)).path("payload").path("code").asText()).isEqualTo("INVALID_RECONNECT");
             a.input(Map.of("playId", game.play, "generation", 1, "seq", 1, "left", false, "right", false, "jump", false));
             a.await(message -> message.path("type").asText().equals("ERROR") && message.path("payload").path("code").asText().equals("STALE_PLAY"));
+            b.messages.clear();
             a.disconnect(); b.await(message -> message.path("type").asText().equals("ROOM_STATE") && !message.path("payload").path("members").get(0).path("connected").asBoolean());
             time.advance(299999); Thread.sleep(50); assertThat(memberships.find(a.owner)).isNotNull();
             time.advance(1); GameClient.until(() -> memberships.find(a.owner) == null);

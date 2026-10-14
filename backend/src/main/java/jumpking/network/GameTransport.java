@@ -131,6 +131,7 @@ public class GameTransport extends TextWebSocketHandler implements AutoCloseable
             else throw new ApiException(400, "INVALID_MESSAGE", "This command is not available in the current context");
             if (sessionId != null) sessions.valid(sessions.find(sessionId), true);
         } catch (ApiException error) { connection.error(command, error); }
+        catch (RejectedExecutionException busy) { connection.error(command, rate()); }
         catch (Exception error) { connection.error(command, new ApiException(500, "INTERNAL_ERROR", "Unable to process game command")); }
     }
     @Override protected void handleBinaryMessage(WebSocketSession socket, BinaryMessage message) { closeSocket(socket, CloseStatus.NOT_ACCEPTABLE); }

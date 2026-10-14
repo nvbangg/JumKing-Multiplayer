@@ -125,7 +125,7 @@ Progress = max(0, originFeetY−feetY); peak là progress cao nhất từng đ�
 
 Riêng Room PAUSED giữ roster theo hạn Host Pause; Resume cho thành viên còn offline 5 phút reconnect tính từ Resume. Room đang chạy tiếp tục physics khi còn người connected; Leave hoặc hết hạn reconnect chốt DNF, đóng băng metrics.
 
-Host disconnect/Leave chuyển quyền ngay, kể cả khi PAUSED; giữ nguyên state/deadline. Không ai connected thì Host=null; người reconnect đầu tiên nhận quyền, người về sau không giành lại Host. Leave là bỏ membership; nếu mọi người Leave thì giải tán, không giữ Room rỗng.
+Host disconnect/Leave chuyển quyền ngay, kể cả khi PAUSED; giữ nguyên state/deadline. Không ai connected thì Host=null; người reconnect đầu tiên nhận quyền, người về sau không giành lại Host. Leave là bỏ membership; nếu mọi người Leave thì đóng Room, xử lý kết quả theo [data](data.md#kết-quả-room).
 
 Community giữ lượt theo Account dù slot hết hạn; sảnh mới cũng Continue được. Room chỉ khôi phục từ RAM khi phòng còn tồn tại; restart theo [architecture](architecture.md#lỗi-và-khả-năng-mở-rộng). Room giải tán sau khi đã vào gameplay phải finalize một lần; hủy trước gameplay không ghi kết quả.
 

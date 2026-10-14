@@ -31,6 +31,7 @@ class RoomRestartIT {
                 duration = jdbc.queryForObject("SELECT duration_ticks FROM matches WHERE id=?", Long.class, match);
             }
         }
+        assertThat(jdbc.queryForObject("SELECT end_reason FROM matches WHERE id=?", String.class, match)).isEqualTo("ABORTED");
         try (var restarted = launch()) {
             assertThat(jdbc.queryForObject("SELECT end_reason FROM matches WHERE id=?", String.class, match)).isEqualTo("ABORTED");
             assertThat(jdbc.queryForObject("SELECT duration_ticks FROM matches WHERE id=?", Long.class, match)).isEqualTo(duration);
@@ -40,6 +41,27 @@ class RoomRestartIT {
             var before = jdbc.queryForList("SELECT revision,play_ticks,jumps,falls,`rank`,ended_at FROM play_runs WHERE match_id=? ORDER BY id", match);
             restarted.getBean(jumpking.records.RoomRuns.class).recoverAborted();
             assertThat(jdbc.queryForList("SELECT revision,play_ticks,jumps,falls,`rank`,ended_at FROM play_runs WHERE match_id=? ORDER BY id", match)).isEqualTo(before);
+        }
+    }
+    @Test void startupRecoversCommittedMetricsWithoutAnyRoomStateFromThePreviousProcess() {
+        var jdbc = TestDatabase.get().jdbc; String match = java.util.UUID.randomUUID().toString();
+        try (var first = launch()) {
+            var started = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
+            var runs = new java.util.ArrayList<jumpking.records.RoomRuns.Run>();
+            for (int index = 0; index < 2; index++) {
+                String hash = java.util.UUID.randomUUID().toString().replace("-", "").repeat(2);
+                jdbc.update("INSERT INTO users(type,guest_token_hash,created_at) VALUES ('GUEST',?,UTC_TIMESTAMP(3))", hash);
+                long owner = jdbc.queryForObject("SELECT id FROM users WHERE guest_token_hash=?", Long.class, hash);
+                runs.add(new jumpking.records.RoomRuns.Run(java.util.UUID.randomUUID().toString(), owner, "Peer " + index, "ACTIVE", 120, 3, 1, 180, 360, 100, null, null, false, null));
+            }
+            first.getBean(jumpking.records.RoomRuns.class).save(new jumpking.records.RoomRuns.Write(match, "ABCDEF", "RACE", null, 1, started, null, 120, null, runs));
+        }
+        assertThat(jdbc.queryForObject("SELECT end_reason FROM matches WHERE id=?", String.class, match)).isNull();
+        try (var restarted = launch()) {
+            assertThat(restarted.getBean(RoomDirectory.class).find("ABCDEF")).isNull();
+            assertThat(jdbc.queryForObject("SELECT end_reason FROM matches WHERE id=?", String.class, match)).isEqualTo("ABORTED");
+            assertThat(jdbc.queryForObject("SELECT duration_ticks FROM matches WHERE id=?", Long.class, match)).isEqualTo(120);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM play_runs WHERE match_id=? AND status='DNF' AND play_ticks=120 AND jumps=3 AND falls=1 AND `rank`=1 AND is_winner=FALSE", Integer.class, match)).isEqualTo(2);
         }
     }
 }

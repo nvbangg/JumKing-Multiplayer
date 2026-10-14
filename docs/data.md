@@ -137,6 +137,8 @@ Writer lưu duration_ticks/metrics định kỳ theo deployment và flush khi Ho
 
 Finalize ghi match và metrics/rank/winner trong một transaction, tăng revision/updated_at; giữ metrics/ended_at đã chốt của DNF. Match đang chơi có ended_at/end_reason cùng NULL, kết thúc cùng khác NULL và ended_at≥started_at. Service kiểm tra roster 2–10, đúng match/kind, rank≤số người và comparator. Retry giữ UUID: cùng kết quả no-op, khác kết quả đã chốt báo lỗi.
 
+Room hết thành viên vẫn giữ kết quả chưa ghi trong quota phòng; retry cùng payload, chỉ giải phóng sau commit. Shutdown flush có giới hạn thời gian; không báo SAVED khi ghi lỗi.
+
 Restart chốt match còn mở ABORTED, lượt ROOM ACTIVE thành DNF. Dùng metrics đã commit để xếp hạng, không cộng ticks offline hoặc tạo winner mới. Giới hạn phục hồi theo [architecture](architecture.md#lỗi-và-khả-năng-mở-rộng).
 
 ## History và leaderboard

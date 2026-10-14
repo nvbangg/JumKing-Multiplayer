@@ -52,8 +52,15 @@ public class RoomDirectory {
     }
     public synchronized void joinable(String id, boolean value) { var entry = entries.get(id); if (entry != null) entry.joinable = value; }
     public synchronized boolean release(Slot slot) {
+        return release(slot, false);
+    }
+    public synchronized boolean release(Slot slot, boolean retainEmpty) {
         var entry = entries.get(slot.roomId()); if (entry == null) return true;
         entry.slots.clear(slot.color()); if (!entry.slots.isEmpty()) return false;
-        entries.remove(slot.roomId()); return true;
+        if (!retainEmpty) entries.remove(slot.roomId()); return true;
+    }
+    public synchronized void releaseEmptyRoom(String id) {
+        var entry = entries.get(id);
+        if (entry != null && entry.kind.equals("ROOM") && entry.slots.isEmpty()) entries.remove(id);
     }
 }

@@ -104,7 +104,7 @@ Profile web đóng gói frontend vào JAR cho Local/LAN. SPA fallback index.html
 - Simulation fixed-step **60 Hz**, snapshot **20 Hz**, dùng monotonic clock. Không nhận deltaTime từ client hoặc tăng số bước theo số packet.
 - Community giữ simulation và active clock riêng cho từng lượt; Pause/chuyển sảnh không thay pha vật lý của lượt đó. Room dùng đồng hồ trận chung.
 - Room giữ state, roster, reconnect tokens, xác nhận ván kế tiếp và hạn Host Pause trong RAM; khi paused vẫn xử lý commands/deadlines, không chạy simulation. Resume đặt lại mốc scheduler, không chạy bù ticks thời gian nghỉ.
-- Socket validate rồi enqueue; queues có giới hạn. Tick không chờ database hoặc socket chậm; snapshots gộp bản mới nhất, control messages giữ thứ tự.
+- Socket validate rồi enqueue; hàng đợi lệnh và callback hoàn tất có giới hạn riêng, ưu tiên callback để không mất save/cleanup khi quá tải. Tick không chờ database hoặc socket chậm; snapshots gộp bản mới nhất, control messages giữ thứ tự.
 - Persistence worker xử lý ngoài tick theo [data](data.md). Solo sync không đi qua Java simulation hoặc WS membership.
 
 ## Lỗi và khả năng mở rộng

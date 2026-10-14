@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.stereotype.Component;
 
 @Component
+@org.springframework.context.annotation.DependsOn("dataSource")
 @EnableConfigurationProperties(PersistenceSettings.class)
 public class PersistenceWorkers implements AutoCloseable {
     private final PersistenceSettings settings;
@@ -18,6 +19,10 @@ public class PersistenceWorkers implements AutoCloseable {
         retries.setRemoveOnCancelPolicy(true);
     }
     public void execute(Runnable task) { workers.execute(task); }
+    public int completionCapacity(int players) {
+        // Mỗi slot: hàng chờ ghi, một write đang chạy và một operation load/transfer.
+        return Math.multiplyExact(players, settings.persistenceRunQueue() + 2);
+    }
     public <T> CheckpointWriter<T> writer(java.util.function.Consumer<T> save) {
         return new CheckpointWriter<>(workers, retries, save, settings.persistenceRunQueue(), settings.persistenceRetryCount(), settings.persistenceRetryDelayMs());
     }

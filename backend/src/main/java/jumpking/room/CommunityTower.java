@@ -82,7 +82,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
         long serverTick, eventSeq, nextTick = time.nanos();
         final ScheduledFuture<?> timer;
         Tower(String id) {
-            this.id = id; actor = new SerialExecutor(workers.executor(), limits.commandQueue(), error -> players.values().forEach(player -> { player.paused = true; player.saveStatus = "FAILED"; }));
+            this.id = id; actor = new SerialExecutor(workers.executor(), limits.commandQueue(), database.completionCapacity(rules.path("capacity").asInt()), error -> players.values().forEach(player -> { player.paused = true; player.saveStatus = "FAILED"; }));
             timer = scheduler.scheduleAtFixedRate(() -> {
                 if (!tickQueued.compareAndSet(false, true)) return;
                 try { actor.execute(() -> { try { advance(); } finally { tickQueued.set(false); } }); }
@@ -93,6 +93,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
             long now = time.nanos(); int steps = 0;
             boolean changed = false;
             for (Member player : List.copyOf(players.values())) {
+                if (player.connection != null && !player.connection.open()) { dropConnection(this, player); changed = true; }
                 if (player.loading || player.operation || player.leaving) continue;
                 if ((player.connection == null && now - player.disconnectedAt >= rules.path("reconnectMs").asLong() * 1_000_000L)
                         || (player.connection != null && player.paused && now - player.pausedAt >= rules.path("communityPauseMs").asLong() * 1_000_000L)) {
@@ -233,7 +234,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                 try {
                     var game = new GameSimulation(map, physics, adventure, flags.flyEnabled(), false, List.of());
                     var stored = records.open(player.identity.owner(), true, expected, game.snapshot());
-                    tower.actor.execute(() -> {
+                    tower.actor.complete(() -> {
                         player.game = game; player.stored = stored; player.revision = player.savedRevision = stored.revision(); player.maximum = 0; player.peakTicks = 0;
                         player.finished = player.terminalQueued = player.operation = player.pausePending = player.paused = false; player.finishedAt = null; player.operationCommand = null;
                         player.ending = null; player.endingNotified = false;
@@ -242,7 +243,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                         if (player.connection != null) player.connection.reply(command, "COMMUNITY_RUN_STATE", runPayload(player));
                         broadcast(tower); snapshots(tower);
                     });
-                } catch (Exception error) { tower.actor.execute(() -> { player.operation = false; player.operationCommand = null; pause(player); if (player.connection != null) player.connection.error(command, error instanceof ApiException api ? api : saveError()); }); }
+                } catch (Exception error) { tower.actor.complete(() -> { player.operation = false; player.operationCommand = null; pause(player); if (player.connection != null) player.connection.error(command, error instanceof ApiException api ? api : saveError()); }); }
             }); } catch (RejectedExecutionException busy) { player.operation = false; player.operationCommand = null; pause(player); if (player.connection != null) player.connection.error(command, saveError()); }
         });
     }
@@ -266,23 +267,27 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
         try { memberships.claim(player.identity.owner(), new Memberships.Membership(slot.roomId(), player.id)); }
         catch (RuntimeException error) { directory.release(slot); throw error; }
         var tower = towers.computeIfAbsent(slot.roomId(), Tower::new);
-        tower.actor.execute(() -> {
+        try { tower.actor.execute(() -> {
             tower.players.put(player.id, player);
             try {
                 database.execute(() -> {
                     try {
                         var game = new GameSimulation(map, physics, adventure, flags.flyEnabled(), false, List.of());
                         var stored = records.open(player.identity.owner(), replace, expected, game.snapshot()); game.restore(stored.snapshot()); game.physics().cancelInput();
-                        tower.actor.execute(() -> {
+                        tower.actor.complete(() -> {
                             player.game = game; player.stored = stored; player.revision = player.savedRevision = stored.revision(); player.maximum = stored.maximum(); player.peakTicks = stored.peak(); player.loading = false;
                             player.input.reset(stored.id(), player.generation); player.lastPhysical = time.nanos();
                             if (player.connection == null) pause(player);
                             connection.reply(command, "ROOM_JOINED", joined(player)); broadcast(tower); chatHistory(tower, player); runState(player); snapshots(tower);
                         });
-                    } catch (Exception error) { tower.actor.execute(() -> { remove(tower, player); connection.error(command, error instanceof ApiException api ? api : saveError()); }); }
+                    } catch (Exception error) { tower.actor.complete(() -> { remove(tower, player); connection.error(command, error instanceof ApiException api ? api : saveError()); }); }
                 });
             } catch (RejectedExecutionException busy) { remove(tower, player); connection.error(command, saveError()); }
-        });
+        }); } catch (RejectedExecutionException busy) {
+            memberships.release(player.identity.owner(), new Memberships.Membership(slot.roomId(), player.id));
+            if (directory.release(slot)) { towers.remove(tower.id, tower); tower.timer.cancel(false); }
+            throw busy;
+        }
     }
     private void transfer(Tower source, Member old, GameConnection connection, GameEnvelope command, String requested) {
         if (old == null || old.connection != connection) throw new ApiException(409, "INVALID_RECONNECT", "Reconnect with your saved token first");
@@ -293,7 +298,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
         save(source, old, true, () -> {
             try {
                 var target = towers.computeIfAbsent(slot.roomId(), Tower::new); var next = new Member(connection, slot);
-                target.actor.execute(() -> {
+                target.actor.complete(() -> {
                     try {
                         memberships.move(old.identity.owner(), new Memberships.Membership(source.id, old.id), new Memberships.Membership(target.id, next.id));
                         next.game = old.game; next.stored = old.stored; next.generation = old.generation + 1; next.revision = old.revision; next.savedRevision = old.savedRevision;
@@ -302,12 +307,12 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                         next.terminalQueued = old.terminalQueued; next.paused = true; next.pausedAt = time.nanos(); next.loading = false; next.input.reset(next.stored.id(), next.generation);
                         if (!connection.open()) { next.connection = null; next.disconnectedAt = time.nanos(); }
                         target.players.put(next.id, next);
-                        source.actor.execute(() -> {
+                        source.actor.complete(() -> {
                             old.operationFailure = null; source.players.remove(old.id); source.chat.leave(old.id); old.connection = null;
                             if (directory.release(old.slot)) { towers.remove(source.id, source); source.timer.cancel(false); } else broadcast(source);
                         });
                         connection.reply(command, "ROOM_JOINED", joined(next)); broadcast(target); chatHistory(target, next); runState(next); snapshots(target);
-                    } catch (Exception error) { source.actor.execute(() -> transferFailed(old, command, slot, error)); }
+                    } catch (Exception error) { source.actor.complete(() -> transferFailed(old, command, slot, error)); }
                 });
             } catch (Exception error) { transferFailed(old, command, slot, error); }
         });
@@ -351,15 +356,15 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
         var write = new CommunityRuns.Write(player.stored.id(), player.identity.owner(), revision, player.finished ? "FINISHED" : "ACTIVE", snapshot, player.game.physics().progress(), player.maximum, player.peakTicks, player.finished ? player.finishedAt : null);
         runState(player);
         try { player.writer.submit(write, flush, (outcome, error) -> {
-            if (outcome == CheckpointWriter.Outcome.RETRYING) { tower.actor.execute(() -> { pause(player); runState(player); }); return; }
-            if (outcome == CheckpointWriter.Outcome.SUPERSEDED) { tower.actor.execute(() -> player.saving = --player.pendingWrites > 0); return; }
-            if (outcome == CheckpointWriter.Outcome.SAVED) { tower.actor.execute(() -> {
+            if (outcome == CheckpointWriter.Outcome.RETRYING) { tower.actor.complete(() -> { pause(player); runState(player); }); return; }
+            if (outcome == CheckpointWriter.Outcome.SUPERSEDED) { tower.actor.complete(() -> player.saving = --player.pendingWrites > 0); return; }
+            if (outcome == CheckpointWriter.Outcome.SAVED) { tower.actor.complete(() -> {
                 player.savedRevision = Math.max(player.savedRevision, revision); player.saving = --player.pendingWrites > 0; player.saveStatus = player.savedRevision == player.revision ? "SAVED" : "PENDING";
                 if (player.connection != null) player.connection.send("SAVE_STATUS", Map.of("playId", write.id(), "revision", revision, "saveStatus", "SAVED"));
                 if (flush) committed.run();
                 if (write.status().equals("FINISHED")) { finishNotice(player); var actions = List.copyOf(player.terminalActions); player.terminalActions.clear(); actions.forEach(Runnable::run); }
             }); }
-            else { tower.actor.execute(() -> {
+            else { tower.actor.complete(() -> {
                 player.saving = --player.pendingWrites > 0; player.saveStatus = "FAILED"; if (write.status().equals("FINISHED")) player.terminalQueued = false; pause(player); player.leaving = false;
                 player.operation = false;
                 if (player.operationFailure != null) { player.operationFailure.run(); player.operationFailure = null; }
@@ -392,9 +397,13 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
     }
     @Override public void disconnected(GameConnection connection) {
         var membership = memberships.find(connection.identity().owner()); var tower = membership == null ? null : towers.get(membership.roomId()); if (tower == null) return;
-        try { tower.actor.execute(() -> { var player = tower.players.get(membership.playerId()); if (player == null || player.connection != connection) return;
-            player.connection = null; player.disconnectedAt = time.nanos(); pause(player); if (!player.loading && player.paused) save(tower, player, true, () -> {}); broadcast(tower);
+        try { tower.actor.complete(() -> { var player = tower.players.get(membership.playerId()); if (player == null || player.connection != connection) return;
+            dropConnection(tower, player); broadcast(tower);
         }); } catch (RejectedExecutionException busy) { /* Deadline xử lý khi actor chạy lại. */ }
+    }
+    private void dropConnection(Tower tower, Member player) {
+        player.connection = null; player.disconnectedAt = time.nanos(); pause(player);
+        if (!player.loading && !player.operation && !player.leaving && player.paused) save(tower, player, true, () -> {});
     }
     private void safely(GameConnection connection, GameEnvelope command, Runnable action) {
         if (!connection.open()) return;
@@ -449,7 +458,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
         scheduler.shutdownNow(); var pending = new ArrayList<CompletableFuture<Void>>();
         for (Tower tower : towers.values()) {
             var flushed = new CompletableFuture<Void>(); pending.add(flushed);
-            try { tower.actor.execute(() -> {
+            try { tower.actor.complete(() -> {
                 var saves = tower.players.values().stream().filter(player -> !player.loading).toList();
                 if (saves.isEmpty()) { flushed.complete(null); return; }
                 var count = new java.util.concurrent.atomic.AtomicInteger(saves.size());

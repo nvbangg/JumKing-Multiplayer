@@ -37,6 +37,7 @@ final class RoomMatch {
     long savedRevision;
     int pendingWrites;
     RoomRuns.Write terminalWrite;
+    final java.util.concurrent.CompletableFuture<Void> durable = new java.util.concurrent.CompletableFuture<>();
     String reason, saveStatus = "PENDING";
     RoomMatch(String roomId, RoomSettings settings, List<Spec> roster, SharedData shared, ObjectMapper json, NetworkSettings limits, boolean flyAllowed) {
         if (roster.size() < shared.rules().path("minimumRoomPlayers").asInt() || roster.size() > shared.rules().path("capacity").asInt()

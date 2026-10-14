@@ -69,11 +69,12 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         CheckpointWriter<RoomRuns.Write> writer;
         long countdownAt, nextTick, serverTick, lastSnapshotTick, eventSeq, lastSave, pauseDeadline;
         java.time.Instant pauseExpiresAt;
+        boolean retired;
         final AtomicBoolean tickQueued = new AtomicBoolean();
         String host;
         long joinOrder;
         Room(String id) {
-            this.id = id; actor = new SerialExecutor(workers.executor(), limits.commandQueue(), error -> players.values().forEach(player -> { if (player.connection != null) player.connection.close(org.springframework.web.socket.CloseStatus.SERVER_ERROR); }));
+            this.id = id; actor = new SerialExecutor(workers.executor(), limits.commandQueue(), database.completionCapacity(rules.path("capacity").asInt()), error -> players.values().forEach(player -> { if (player.connection != null) player.connection.close(org.springframework.web.socket.CloseStatus.SERVER_ERROR); }));
             timer = scheduler.scheduleAtFixedRate(() -> {
                 if (!tickQueued.compareAndSet(false, true)) return;
                 try { actor.execute(() -> { try { advance(this); } finally { tickQueued.set(false); } }); }
@@ -193,12 +194,14 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         room.chat.leave(player.id);
         memberships.release(player.identity.owner(), new Memberships.Membership(room.id, player.id));
         if (player.connection != null) { if (command == null) player.connection.send("ROOM_LEFT", Map.of("roomId", room.id)); else player.connection.reply(command, "ROOM_LEFT", Map.of("roomId", room.id)); }
-        boolean empty = directory.release(player.slot);
+        boolean retain = room.players.isEmpty() && room.match != null && room.match.startedAt != null && (room.match.endedAt == null || !room.match.saveStatus.equals("SAVED"));
+        boolean empty = directory.release(player.slot, retain); room.retired = empty && retain;
+        if (room.retired) { room.host = null; directory.joinable(room.id, false); }
         if (room.match != null && room.match.startedAt != null && room.match.endedAt == null) {
             if (empty) { room.match.finish("ALL_DISCONNECTED", clock.instant()); finish(room); }
             else save(room, true);
         }
-        if (empty) { rooms.remove(room.id, room); room.timer.cancel(false); }
+        if (empty && !room.retired) dispose(room);
         else { chooseHost(room); broadcast(room); snapshots(room); }
     }
     private ObjectNode context(Room room, Member player) { var result = json.createObjectNode().put("roomId", room.id).put("playerId", player.id).put("generation", player.generation); if (room.match == null) result.putNull("playId"); else result.put("playId", room.match.id); return result; }
@@ -226,13 +229,16 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     }
     @Override public void disconnected(GameConnection connection) {
         var membership = memberships.find(connection.identity().owner()); var room = membership == null ? null : rooms.get(membership.roomId()); if (room == null) return;
-        try { room.actor.execute(() -> {
+        try { room.actor.complete(() -> {
             var player = room.players.get(membership.playerId()); if (player == null || player.connection != connection) return;
-            if (room.state.equals("COUNTDOWN")) cancelCountdown(room);
-            if (room.match != null && room.match.players.containsKey(player.id)) { var racer = room.match.players.get(player.id); racer.input.clear(); racer.game.physics().cancelInput(); }
-            player.connection = null; player.disconnectedAt = time.nanos(); chooseHost(room); broadcast(room);
-            if (room.state.equals("PLAYING") && room.players.values().stream().noneMatch(member -> member.connection != null)) save(room, true);
+            dropConnection(room, player);
         }); } catch (RejectedExecutionException busy) { connection.close(org.springframework.web.socket.CloseStatus.SERVICE_OVERLOAD); }
+    }
+    private void dropConnection(Room room, Member player) {
+        if (room.state.equals("COUNTDOWN")) cancelCountdown(room);
+        if (room.match != null && room.match.players.containsKey(player.id)) { var racer = room.match.players.get(player.id); racer.input.clear(); racer.game.physics().cancelInput(); }
+        player.connection = null; player.disconnectedAt = time.nanos(); chooseHost(room); broadcast(room);
+        if (room.state.equals("PLAYING") && room.players.values().stream().noneMatch(member -> member.connection != null)) save(room, true);
     }
     private void requireHost(Room room, Member player) { if (!player.id.equals(room.host)) throw new ApiException(403, "FORBIDDEN", "Only the Host can perform this action"); }
     private void start(Room room, Member host) {
@@ -273,6 +279,12 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     }
     private void advance(Room room) {
         long now = time.nanos();
+        if (room.retired) {
+            if (room.match.saveStatus.equals("SAVED")) dispose(room);
+            else if (room.match.saveStatus.equals("FAILED") && now - room.lastSave >= saveIntervalNs) save(room, true);
+            return;
+        }
+        for (var player : List.copyOf(room.players.values())) if (player.connection != null && !player.connection.open()) dropConnection(room, player);
         expirePause(room, now);
         if (!room.state.equals("PAUSED")) for (var player : List.copyOf(room.players.values())) if (player.connection == null && now - player.disconnectedAt >= rules.path("reconnectMs").asLong() * 1_000_000L) remove(room, player, null);
         if (room.state.equals("COUNTDOWN") && now >= room.countdownAt) {
@@ -304,15 +316,17 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         var value = match.terminalWrite == null ? match.write(++match.revision) : match.terminalWrite;
         if (match.endedAt != null) match.terminalWrite = value;
         match.saveStatus = "PENDING"; match.pendingWrites++; room.lastSave = time.nanos();
-        try { room.writer.submit(value, barrier, (outcome, error) -> room.actor.execute(() -> {
+        try { room.writer.submit(value, barrier, (outcome, error) -> {
             if (outcome == CheckpointWriter.Outcome.RETRYING) return;
+            room.actor.complete(() -> {
             match.pendingWrites--;
             if (outcome == CheckpointWriter.Outcome.SAVED) match.savedRevision = Math.max(match.savedRevision, value.revision());
             match.saveStatus = outcome == CheckpointWriter.Outcome.FAILED ? "FAILED" : match.savedRevision >= match.revision ? "SAVED" : "PENDING";
+            if (match.endedAt != null && match.saveStatus.equals("SAVED")) { match.durable.complete(null); if (room.retired) dispose(room); }
             var status = json.createObjectNode().put("playId", match.id).putNull("revision").put("saveStatus", match.saveStatus);
             for (var player : room.players.values()) if (player.connection != null) player.connection.send("SAVE_STATUS", status);
             if (room.match == match) broadcast(room);
-        })); } catch (RejectedExecutionException busy) {
+        }); }); } catch (RejectedExecutionException busy) {
             match.pendingWrites--; match.saveStatus = "FAILED";
             for (var player : room.players.values()) if (player.connection != null) player.connection.send("ERROR", Map.of("code", "SAVE_FAILED", "message", "Room results could not be saved"));
         }
@@ -356,5 +370,21 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         }
     }
     private static String token() { byte[] bytes = new byte[32]; new SecureRandom().nextBytes(bytes); return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes); }
-    @Override public void close() { scheduler.shutdownNow(); }
+    private void dispose(Room room) { if (rooms.remove(room.id, room)) { directory.releaseEmptyRoom(room.id); room.timer.cancel(false); } }
+    @Override public void close() {
+        scheduler.shutdownNow(); var pending = new ArrayList<CompletableFuture<Void>>();
+        for (var room : rooms.values()) {
+            var flushed = new CompletableFuture<Void>(); pending.add(flushed);
+            try { room.actor.complete(() -> {
+                if (room.match == null || room.match.startedAt == null) { flushed.complete(null); return; }
+                if (room.match.endedAt == null) {
+                    for (var player : room.match.players.values()) room.match.abandon(player.spec.playerId(), clock.instant());
+                    room.match.finish("ABORTED", clock.instant()); finish(room);
+                } else if (room.match.saveStatus.equals("FAILED")) save(room, true);
+                room.match.durable.whenComplete((result, error) -> { if (error == null) flushed.complete(null); else flushed.completeExceptionally(error); });
+            }); } catch (RejectedExecutionException busy) { flushed.completeExceptionally(busy); }
+        }
+        try { CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS); }
+        catch (Exception incomplete) { org.slf4j.LoggerFactory.getLogger(RaceRoom.class).warn("Room shutdown flush did not complete within the deadline"); }
+    }
 }

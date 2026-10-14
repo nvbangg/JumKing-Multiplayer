@@ -35,6 +35,12 @@ public final class GameClient implements AutoCloseable {
         owner = request("/auth/register", "POST", Map.of("username", name, "email", name + "@example.test", "password", "A secure server integration password")).path("account").path("id").asLong();
         csrf = request("/auth/csrf", "GET", null).path("token").asText();
     }
+    public void guest() throws Exception {
+        csrf = request("/auth/csrf", "GET", null).path("token").asText(); request("/auth/guest", "POST", null);
+        var cookies = (CookieManager) http.cookieHandler().orElseThrow();
+        String token = cookies.getCookieStore().getCookies().stream().filter(cookie -> cookie.getName().equals("JK_GUEST")).findFirst().orElseThrow().getValue();
+        owner = TestDatabase.get().jdbc.queryForObject("SELECT id FROM users WHERE guest_token_hash=?", Long.class, jumpking.identity.GuestIdentity.hash(token));
+    }
     public void connect() {
         socket = http.newWebSocketBuilder().header("Origin", "http://allowed.test").connectTimeout(Duration.ofSeconds(3))
             .buildAsync(URI.create(origin.replace("http", "ws") + "/ws/game"), new WebSocket.Listener() {

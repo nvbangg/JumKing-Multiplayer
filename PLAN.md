@@ -63,10 +63,11 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 - [x] Hoàn thiện History Solo/Community và contract chung; kiểm tra ownership, pagination, pending/sync và terminal state.
 - [x] Hoàn thiện Community Finish/ending riêng; kiểm tra flush/finalize, Skip/New Run và peers tiếp tục.
 - [x] Tích hợp Fly Mode online; kiểm tra server gate, prediction/checkpoint và thành tích.
+- [ ] Hoàn thiện inventory/trang bị và adventure effects online; kiểm tra quyền sở hữu, lưu/restore và dedupe khi reconciliation.
 
 ## Phase 06 — Room
 
-- [ ] Hoàn thiện Create/Join Room và Lobby/settings/Host; kiểm tra permissions, capacity và điều kiện Start.
+- [x] Hoàn thiện Create/Join Room và Lobby/settings/Host; kiểm tra permissions và capacity.
 - [ ] Tích hợp chat Room; kiểm tra history/focus/input và giới hạn.
 - [ ] Hoàn thiện Race Start/countdown/Finish/Results; kiểm tra 1/2/max người và Finish cùng tick.
 - [ ] Hoàn thiện End/Leave/Host transfer/reconnect; kiểm tra deadlines, khóa Join, re-authentication và Host khi mọi người offline.
@@ -147,5 +148,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 05 — Finish/ending | PASS — 60 frontend unit tests, type-check/build, 37 MySQL integration tests và 16 Chrome E2E online. Checkpoint trước Finish được tạo bằng toàn tuyến input không cheat; server Finish ở tick 16.957, commit một kết quả/xóa snapshot rồi mới gửi ending riêng. Chrome kiểm tra Skip/ảnh kết, New Game xóa camera/animation cũ và peer vẫn nhảy; đã xem screenshot. Notice giữ trang phục trước Crown và dedupe theo lượt |
 | Phase 05 — History | PASS — type-check/build, frontend units, MySQL regression và Chrome online. Phân trang 20+1 lượt, detail qua API đúng owner; local Solo chưa sync thay theo ID khi server commit, ACTIVE không hiện History. Chrome kiểm tra offline/pending/retry, New Run giữ terminal summary và IndexedDB bị chặn vẫn đọc được History server. Room detail contract/queries có fixtures; gameplay writer theo Phase 06 |
 | Phase 05 — Fly online | PASS — type-check/build, 61 frontend unit tests, MySQL/WS regression và Chrome với backend profile local. Options, nhấn đúp, WASD/arrows, tắt bay và Save/Continue giữ state; intent không mất vì ACK cũ, lượt mới reset đúng. Server mặc định từ chối freeFlight=true và tọa độ giả. Backend local lưu/restore JSON và leaderboard tính peak bình thường; browser riêng chạy 1 E2E, suite mặc định 16 E2E vẫn qua |
-| Phase 06–07 | NOT RUN — chưa nghiệm thu đầy đủ |
+| Phase 06 — Lobby | PASS — backend units và RoomLobbyIT với 11 WS/Guest thật: giới hạn 10 người/màu, giải phóng slot, Host-only settings và chuyển Host. Chrome hai Guest tạo/join qua ID, đồng bộ Time Limit/No Walk, không có History khi chưa Start; Start một người bị khóa trên UI. Điều kiện Start phía server/countdown theo mốc Race; suite adventure đang sửa kỳ vọng tự trang bị |
+| Phase 05 adventure, Phase 06 còn lại–07 | NOT RUN — chưa nghiệm thu đầy đủ |
 | Phase 08 | Chưa thực hiện |

@@ -1,0 +1,47 @@
+package jumpking.room;
+
+import static org.assertj.core.api.Assertions.*;
+import java.util.*;
+import jumpking.JumpKingApplication;
+import jumpking.support.GameClient;
+import jumpking.support.TestDatabase;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+
+@SpringBootTest(classes = JumpKingApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "app.allowed-origins=http://allowed.test,http://lobby.test")
+class RoomLobbyIT {
+    @DynamicPropertySource static void database(DynamicPropertyRegistry properties) {
+        var db = TestDatabase.get().dataSource;
+        properties.add("spring.datasource.url", db::getUrl); properties.add("spring.datasource.username", db::getUsername); properties.add("spring.datasource.password", db::getPassword);
+    }
+    @LocalServerPort int port;
+    @Test void guestRoomCapacitySettingsPermissionsAndHostTransferUseRealConnections() throws Exception {
+        var clients = new ArrayList<GameClient>();
+        try {
+            for (int index = 0; index < 11; index++) { var client = new GameClient(port); clients.add(client); client.guest(); client.connect(); }
+            var host = clients.getFirst(); var joined = host.ok("CREATE_ROOM", Map.of("nickname", "Host")); String room = joined.path("roomId").asText();
+            assertThat(host.request("/rooms/" + room, "GET", null).path("joinable").asBoolean()).isTrue();
+            host.ok("UPDATE_ROOM_SETTINGS", Map.of("mode", "TIME_LIMIT", "timeLimitMinutes", 2));
+            var invalid = new HashMap<String, Object>(); invalid.put("mode", "RACE"); invalid.put("timeLimitMinutes", 2);
+            assertThat(host.command("UPDATE_ROOM_SETTINGS", invalid).path("type").asText()).isEqualTo("ERROR");
+            assertThat(host.ok("GET_ROOM_STATE", Map.of()).path("settings").path("mode").asText()).isEqualTo("TIME_LIMIT");
+            for (int index = 1; index < 10; index++) clients.get(index).ok("JOIN_ROOM", Map.of("roomId", room, "nickname", "Player " + index));
+            assertThat(clients.get(10).command("JOIN_ROOM", Map.of("roomId", room, "nickname", "Overflow")).path("payload").path("code").asText()).isEqualTo("ROOM_FULL");
+            var roster = host.ok("GET_ROOM_STATE", Map.of()).path("members"); assertThat(roster.size()).isEqualTo(10);
+            var colors = new HashSet<Integer>(); for (var player : roster) { colors.add(player.path("colorSlot").asInt()); assertThat(player.has("reconnectToken")).isFalse(); }
+            assertThat(colors).hasSize(10);
+            assertThat(clients.get(1).command("UPDATE_ROOM_SETTINGS", Map.of("mode", "TIME_LIMIT", "timeLimitMinutes", 3)).path("payload").path("code").asText()).isEqualTo("FORBIDDEN");
+            assertThat(host.request("/rooms/" + room, "GET", null).path("joinable").asBoolean()).isFalse();
+            host.ok("LEAVE_ROOM", Map.of()); var next = clients.get(1).ok("GET_ROOM_STATE", Map.of());
+            assertThat(next.path("hostPlayerId").asText()).isEqualTo(next.path("members").get(0).path("playerId").asText());
+            assertThat(next.path("settings").path("timeLimitMinutes").asInt()).isEqualTo(2);
+            clients.get(10).ok("JOIN_ROOM", Map.of("roomId", room, "nickname", "Replacement"));
+            assertThat(clients.get(10).ok("GET_ROOM_STATE", Map.of()).path("members").get(9).path("colorSlot").asInt()).isZero();
+        } finally {
+            for (var client : clients) { try { if (client.socket != null) client.ok("LEAVE_ROOM", Map.of()); } catch (Exception ignored) { } client.close(); }
+        }
+    }
+}

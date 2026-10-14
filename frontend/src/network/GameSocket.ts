@@ -36,6 +36,7 @@ export class GameSocket {
   private pending = new Map<string, { resolve: (value: Message) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   selfId: string | null = null;
   lastSnapshot: Record<string, unknown> | null = null;
+  playContext: { playId: string; generation: number } | null = null;
   private listeners = new Set<(type: string, payload: Record<string, unknown>) => void>();
   subscribe(listener: (type: string, payload: Record<string, unknown>) => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   input(type: 'PLAYER_INPUT' | 'CANCEL_INPUT', payload: Record<string, unknown>): void {
@@ -92,6 +93,11 @@ export class GameSocket {
       }
       if (message.type === 'ROOM_JOINED' || message.type === 'RECONNECT_OK') this.selfId = message.payload.playerId as string;
       if (message.type === 'GAME_SNAPSHOT') this.lastSnapshot = message.payload;
+      if (['ROOM_JOINED', 'RECONNECT_OK', 'GAME_STARTED', 'COMMUNITY_RUN_STATE'].includes(message.type)) {
+        const run = message.payload.run as { id?: unknown } | undefined;
+        const playId = message.type === 'COMMUNITY_RUN_STATE' ? run?.id : message.payload.playId, generation = message.payload.generation;
+        if (typeof playId === 'string' && typeof generation === 'number' && Number.isSafeInteger(generation) && generation > 0) this.playContext = { playId, generation };
+      }
       this.onMessage(message.type, message.payload);
       for (const listener of this.listeners) listener(message.type, message.payload);
     };
@@ -119,7 +125,7 @@ export class GameSocket {
   }
   close(code = 1000, reason = ''): void {
     const socket = this.socket; this.socket = null;
-    this.cancelConnect?.(); this.cancelConnect = null; this.selfId = null; this.lastSnapshot = null;
+    this.cancelConnect?.(); this.cancelConnect = null; this.selfId = null; this.lastSnapshot = null; this.playContext = null;
     if (this.heartbeat) clearInterval(this.heartbeat); this.heartbeat = null; this.clearPending(); socket?.close(code, reason);
   }
   private disconnect(socket: WebSocket, message: string, code?: number): void {

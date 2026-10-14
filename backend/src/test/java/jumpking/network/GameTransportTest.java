@@ -42,6 +42,13 @@ class GameTransportTest {
         assertThat(frames.poll(now).seq()).isEqualTo(1);
         assertThatThrownBy(() -> frames.offer(input(2, ",\"up\":1"), now, false)).isInstanceOf(ApiException.class);
     }
+    @Test void explicitCancelDiscardsQueuedMovementAndAckAdvancesOnlyWhenCancelIsConsumed() {
+        var frames = new InputFrames(3, 500); frames.reset("run", 1); long now = 1_000_000L;
+        frames.offer(input(1, ""), now, false); frames.offer(input(2, ""), now, false);
+        var cancel = GameEnvelope.parse(json, "{\"v\":1,\"type\":\"CANCEL_INPUT\",\"payload\":{\"playId\":\"run\",\"generation\":1,\"seq\":3}}");
+        frames.offer(cancel, now, false); assertThat(frames.pending()).isEqualTo(1); assertThat(frames.processed()).isZero();
+        assertThat(frames.poll(now).cancel()).isTrue(); assertThat(frames.processed()).isEqualTo(3);
+    }
     @Test void serialExecutorIsBoundedOrderedAndSurvivesATaskFailure() {
         var scheduled = new ArrayDeque<Runnable>(); var failures = new AtomicInteger(); var order = new ArrayList<Integer>();
         var serial = new SerialExecutor(scheduled::add, 3, error -> failures.incrementAndGet());

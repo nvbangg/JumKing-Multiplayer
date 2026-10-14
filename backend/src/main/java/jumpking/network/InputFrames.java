@@ -27,6 +27,7 @@ public final class InputFrames {
         PlayerInput input = cancel ? PlayerInput.NEUTRAL : new PlayerInput(GameEnvelope.bool(p, "left", false), GameEnvelope.bool(p, "right", false),
             GameEnvelope.bool(p, "jump", false), GameEnvelope.bool(p, "up", true), GameEnvelope.bool(p, "down", true), GameEnvelope.bool(p, "freeFlight", true));
         if (Boolean.TRUE.equals(input.freeFlight()) && !flyAllowed) throw new ApiException(400, "INVALID_INPUT", "Flight is disabled");
+        if (cancel) queue.clear();
         if (queue.size() >= capacity) throw new ApiException(429, "RATE_LIMITED", "Input queue is full; reconnect to resync");
         queue.add(new Frame(seq, input, cancel)); accepted = seq; lastReceived = now;
     }

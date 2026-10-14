@@ -45,7 +45,7 @@ export function OnlineGame({ socket, room }: { socket: GameSocket; room: RoomSta
       const session = new OnlineRuntime(parseMap(mapData), socket, latestRoom.current, () => controls.read(), (state, snapshot) => {
         setElapsed(snapshot.elapsedTimeMs); setJumps(state.jumps); audio.current?.setScreen(state.screen);
         if (snapshot.self.paused && !session.menu) { session.menu = true; controls.cancel(); setMenu('pause'); audio.current?.pause(true); }
-      }, config.features.flyEnabled);
+      }, config.features.flyEnabled, message => { setError(message); setMenu('pause'); controls.cancel(); });
       runtime.current = session;
       if (socket.lastSnapshot) session.receive(socket.lastSnapshot);
       game = renderer.createGame(container.current!, manifest, session, () => setReady(true), setError);

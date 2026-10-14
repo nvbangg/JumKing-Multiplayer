@@ -62,3 +62,25 @@ test('two Accounts share server simulation, see each other jump, leave and Conti
     await leave(a); await leave(b);
   } finally { await first.close(); await second.close(); }
 });
+test('prediction stays usable with delayed and reordered snapshots across Pause and Resume', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('jumpking.options', JSON.stringify({ sound: false })));
+  let count = 0;
+  await page.routeWebSocket('**/ws/game', socket => {
+    const server = socket.connectToServer(), timers = new Set<ReturnType<typeof setTimeout>>();
+    server.onMessage(message => {
+      const value = JSON.parse(message.toString());
+      if (value.type !== 'GAME_SNAPSHOT') { socket.send(message); return; }
+      const timer = setTimeout(() => { timers.delete(timer); socket.send(message); }, ++count % 5 === 0 ? 180 : 100); timers.add(timer);
+    });
+    socket.onClose(() => { timers.forEach(clearTimeout); server.close(); });
+  });
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  await account(page, 'latency'); await page.getByRole('button', { name: 'Community Tower', exact: true }).click(); await page.getByRole('button', { name: 'New Game', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Menu', exact: true })).toBeVisible(); await page.waitForTimeout(500);
+  await jump(page); await expect(page.locator('.game-hud')).toContainText('Jumps: 1');
+  await page.getByRole('button', { name: 'Menu', exact: true }).click(); await expect(page.getByRole('button', { name: 'Resume', exact: true })).toBeVisible(); await page.waitForTimeout(700);
+  await page.getByRole('button', { name: 'Resume', exact: true }).click(); await page.waitForTimeout(500);
+  await expect(page.getByRole('button', { name: 'Resume', exact: true })).toHaveCount(0);
+  await jump(page); await expect(page.locator('.game-hud')).toContainText('Jumps: 2');
+  await expect(page.getByRole('alert')).toHaveCount(0); expect(errors).toEqual([]); await leave(page);
+});

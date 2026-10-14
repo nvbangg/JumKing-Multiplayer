@@ -66,4 +66,4 @@ Host bind backend vào IP cần dùng hoặc 0.0.0.0, thêm origin IP:8080 vào 
 | Lệnh kiểm thử và tiêu chí nghiệm thu | [testing](docs/testing.md) |
 | Kế hoạch, kết quả thực nghiệm và giới hạn | [PLAN](PLAN.md) |
 | Quy trình agent | [AGENTS](AGENTS.md) |
-| Yêu cầu bài tập lớn | [Instruction](docs/course-materials/final-project/final-project/Instruction.md) |
+| Yêu cầu bài tập lớn | [Instruction](docs/course-materials/final-project/Instruction.md) |

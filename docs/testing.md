@@ -107,7 +107,7 @@ Chơi toàn tuyến bằng input hợp lệ để nghiệm thu platform/charge/c
 
 ## Thực nghiệm và bàn giao
 
-Theo [yêu cầu học phần](course-materials/final-project/final-project/Instruction.md), mỗi thực nghiệm có giả thuyết, baseline, workload, môi trường, số mẫu và phân tích giới hạn.
+Theo [yêu cầu học phần](course-materials/final-project/Instruction.md), mỗi thực nghiệm có giả thuyết, baseline, workload, môi trường, số mẫu và phân tích giới hạn.
 
 So sánh snapshot-only với prediction/reconciliation bằng cùng map/tuning và workload. Đo input-to-display latency, correction magnitude/frequency, snapshot jitter, tick time/overrun, messages/bytes, CPU/RAM và độ trễ/lỗi persistence. Dùng 1/2/max clients, thêm nhiều phòng để tìm giới hạn; báo p50/p95/p99 khi phù hợp. Không có clock synchronization thì đo RTT, không suy one-way latency.
 

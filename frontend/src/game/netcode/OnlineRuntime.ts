@@ -56,6 +56,7 @@ export class OnlineRuntime implements GameRuntime {
   }
   cancel(): void {
     if (!this.latest) return;
+    if (this.socket.playContext && (this.latest.playId !== this.socket.playContext.playId || this.latest.generation !== this.socket.playContext.generation)) return;
     const seq = ++this.sequence; this.prediction.cancel(seq);
     this.socket.input('CANCEL_INPUT', { playId: this.latest.playId, generation: this.latest.generation, seq });
   }

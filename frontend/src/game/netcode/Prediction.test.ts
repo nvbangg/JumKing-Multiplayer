@@ -55,7 +55,7 @@ test('runtime ignores stale snapshots and clears sequence/prediction on generati
   expect(socket.input).toHaveBeenLastCalledWith('PLAYER_INPUT', expect.objectContaining({ generation: 2, seq: 1 }));
   runtime.receive(snapshot(server, 100, 2, 1) as unknown as Record<string, unknown>); expect(runtime.latest!.generation).toBe(2);
   socket.playContext = { playId: 'run', generation: 3 }; const count = vi.mocked(socket.input).mock.calls.length;
-  runtime.advance(100); expect(socket.input).toHaveBeenCalledTimes(count);
+  runtime.advance(100); runtime.cancel(); expect(socket.input).toHaveBeenCalledTimes(count);
   runtime.receive({ ...snapshot(server, 101, 1, 2), self: { ...snapshot(server, 101, 1, 2).self, paused: true } } as unknown as Record<string, unknown>);
   expect(runtime.latest!.serverTick).toBe(2);
 });

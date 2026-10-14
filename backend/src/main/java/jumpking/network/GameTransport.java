@@ -56,6 +56,7 @@ public class GameTransport extends TextWebSocketHandler implements AutoCloseable
         buckets.put(key, new Bucket(minute, count)); if (count > maximum) throw rate();
     }
     public synchronized void handshakeAttempt(String ip) { quota("handshake:" + ip, limits.handshakesPerMinute()); }
+    public synchronized void roomLookup(String ip) { quota("lookup:" + ip, limits.roomLookupsPerMinute()); }
     public synchronized void joinAttempt(GameConnection connection) {
         quota("join-ip:" + connection.identity().ip(), limits.joinsPerMinute());
         quota("join-owner:" + connection.identity().owner(), limits.joinsPerMinute());
@@ -126,6 +127,7 @@ public class GameTransport extends TextWebSocketHandler implements AutoCloseable
                     empty.putArray("members"); connection.reply(command, "ROOM_STATE", empty);
                 }
             } else if (command.type().equals("JOIN_ROOM")) throw new ApiException(404, "ROOM_NOT_FOUND", "Room not found");
+            else if (command.type().equals("RECONNECT")) throw new ApiException(409, "RECONNECT_EXPIRED", "Reconnect is no longer available");
             else throw new ApiException(400, "INVALID_MESSAGE", "This command is not available in the current context");
             if (sessionId != null) sessions.valid(sessions.find(sessionId), true);
         } catch (ApiException error) { connection.error(command, error); }

@@ -1,6 +1,7 @@
 import { ApiError, backendOrigin } from './api';
 import { uuid } from './ids';
 import { NETWORK } from './config';
+import { clearReconnect, loadReconnect, saveReconnect } from './reconnect';
 
 interface Message { v: number; type: string; payload: Record<string, unknown>; requestId?: string }
 const SERVER_TYPES = new Set(['ROOM_JOINED', 'ROOM_STATE', 'ROOM_LEFT', 'GAME_STARTED', 'GAME_SNAPSHOT', 'COMMUNITY_RUN_STATE',
@@ -38,6 +39,26 @@ export class GameSocket {
   lastSnapshot: Record<string, unknown> | null = null;
   playContext: { playId: string; generation: number } | null = null;
   private listeners = new Set<(type: string, payload: Record<string, unknown>) => void>();
+  private profile: string | null = null;
+  private restoring: Promise<void> | null = null;
+  async restore(profile: string): Promise<void> {
+    if (this.profile !== null && this.profile !== profile) { this.close(); this.restoring = null; }
+    this.profile = profile;
+    if (this.restoring) return this.restoring;
+    const task = (async () => {
+      await this.connect(); if (this.selfId) return;
+      const context = await loadReconnect(profile);
+      if (!context) return;
+      try { await this.command('RECONNECT', { ...context }); }
+      catch (error) {
+        if (error instanceof ApiError && ['RECONNECT_EXPIRED', 'ROOM_NOT_FOUND'].includes(error.code)) { await clearReconnect(profile); return; }
+        throw error;
+      }
+    })();
+    this.restoring = task;
+    try { await task; } finally { if (this.restoring === task) this.restoring = null; }
+  }
+  reconnect(): Promise<void> { return this.profile ? this.restore(this.profile) : Promise.reject(new Error('Reconnect identity is unavailable')); }
   subscribe(listener: (type: string, payload: Record<string, unknown>) => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   input(type: 'PLAYER_INPUT' | 'CANCEL_INPUT', payload: Record<string, unknown>): void {
     if (this.socket?.readyState !== WebSocket.OPEN) return;
@@ -92,6 +113,8 @@ export class GameSocket {
         else request.resolve(message);
       }
       if (message.type === 'ROOM_JOINED' || message.type === 'RECONNECT_OK') this.selfId = message.payload.playerId as string;
+      if (message.type === 'ROOM_JOINED' && this.profile) void saveReconnect(this.profile, message.payload).catch(() => this.onMessage('ERROR', { code: 'STORAGE_UNAVAILABLE', message: 'Reconnect context could not be saved on this device' }));
+      if (message.type === 'ROOM_LEFT' && this.profile) void clearReconnect(this.profile).catch(() => this.onMessage('ERROR', { code: 'STORAGE_UNAVAILABLE', message: 'Reconnect context could not be cleared on this device' }));
       if (message.type === 'GAME_SNAPSHOT') this.lastSnapshot = message.payload;
       if (['ROOM_JOINED', 'RECONNECT_OK', 'GAME_STARTED', 'COMMUNITY_RUN_STATE'].includes(message.type)) {
         const run = message.payload.run as { id?: unknown } | undefined;
@@ -131,6 +154,7 @@ export class GameSocket {
   private disconnect(socket: WebSocket, message: string, code?: number): void {
     if (this.socket !== socket) return;
     this.close(code ?? 1000, message);
+    for (const listener of this.listeners) listener('CONNECTION_CLOSED', { message });
     this.onDisconnect();
   }
 }

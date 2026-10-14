@@ -109,3 +109,17 @@ test('window blur cancels charging and keeps Community time frozen until explici
   await page.getByRole('button', { name: 'Resume', exact: true }).click(); await expect.poll(() => observed.snapshots.at(-1)?.generation).toBe(2);
   await jump(page); await expect.poll(() => observed.snapshots.at(-1)?.self.simulation.physics.jumps).toBe(1); await leave(page); expect(observed.errors).toEqual([]);
 });
+test('reload reconnects the same identity and run from IndexedDB and confirmed Leave clears its token', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('jumpking.options', JSON.stringify({ sound: false })));
+  const observed = observe(page); await account(page, 'reload_tower'); await page.getByRole('button', { name: 'Community Tower', exact: true }).click(); await page.getByRole('button', { name: 'New Game', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Menu', exact: true })).toBeVisible({ timeout: 15_000 }); await jump(page);
+  await expect.poll(() => observed.snapshots.at(-1)?.self.simulation.physics.jumps).toBe(1);
+  const run = observed.snapshots.at(-1)!.playId, generation = observed.snapshots.at(-1)!.generation;
+  await page.reload(); await expect(page.getByRole('button', { name: 'Resume', exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => observed.snapshots.at(-1)?.generation).toBeGreaterThan(generation); expect(observed.snapshots.at(-1)!.playId).toBe(run);
+  expect(observed.snapshots.at(-1)!.self.simulation.physics.jumps).toBe(1); await leave(page);
+  const saved = await page.evaluate(async () => {
+    const path = '/src/network/reconnect.ts', me = await (await fetch('/api/auth/me')).json();
+    return (await import(path)).loadReconnect(location.origin + ':account:' + me.account.id);
+  }); expect(saved).toBeNull(); expect(observed.errors).toEqual([]);
+});

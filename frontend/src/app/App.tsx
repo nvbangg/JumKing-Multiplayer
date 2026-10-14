@@ -16,6 +16,7 @@ import { AudioBus } from '../game/presentation/AudioBus';
 import { loadManifest } from '../game/content/assets';
 import { SoloSync } from '../features/solo/sync';
 import { OnlineGame } from '../features/community/OnlineGame';
+import { loadReconnect } from '../network/reconnect';
 
 type Screen = 'home' | 'play' | 'online' | 'sign-in' | 'register' | 'merge-history' | 'account' | 'community' | 'leaderboard' | 'history' | 'detail' | 'options' | 'controls' | 'nickname' | 'join' | 'lobby' | 'results';
 interface SoloLaunch { profile: string; action: 'new' | 'continue' | 'auto'; expectedRunId: string | null }
@@ -55,6 +56,7 @@ export function App() {
   const sync = useRef<SoloSync | null>(null);
   const socket = useRef<GameSocket | null>(null);
   const profile = identity.account ? backendOrigin() + ':account:' + identity.account.id : 'guest';
+  const reconnectProfile = identity.account ? profile : (typeof location === 'undefined' ? '' : backendOrigin()) + ':guest';
   const playing = screen === 'play' || screen === 'online';
   useEffect(() => {
     setSyncError('');
@@ -100,6 +102,15 @@ export function App() {
     void api<{ features: { flyEnabled: boolean } }>('/game-config').then(config => { if (!disposed) setFlyAllowed(__SOLO_FLY_ENABLED__ || config.features.flyEnabled); }).catch(() => {});
     return () => { disposed = true; window.removeEventListener('popstate', pop); socket.current?.close(); };
   }, []);
+  useEffect(() => {
+    if (!identity.authenticated && !identity.guest) return;
+    let cancelled = false;
+    void loadReconnect(reconnectProfile).then(async context => {
+      if (!context || cancelled) return;
+      await connectedSocket();
+    }).catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'Reconnect failed'); });
+    return () => { cancelled = true; };
+  }, [reconnectProfile, identity.authenticated, identity.guest]);
 
   useEffect(() => {
     if (screen === 'play' || screen === 'online' || screen === 'lobby') return;
@@ -158,10 +169,15 @@ export function App() {
       else if (type === 'ROOM_LEFT') { setRoom(null); setResult(null); resultRef.current = null; socket.current?.close(); socket.current = null; back(); }
       else if (type === 'ERROR') setError(String(payload.message));
     }, () => setError('Disconnected from the game server'));
-    await socket.current.connect();
+    await socket.current.restore(reconnectProfile);
     return socket.current;
   };
-  const command = (type: string, payload: Record<string, unknown> = {}) => { void execute(async () => { const connection = await connectedSocket(); await connection.command(type, payload); }); };
+  const command = (type: string, payload: Record<string, unknown> = {}) => { void execute(async () => {
+    const connection = await connectedSocket();
+    if (type === 'JOIN_COMMUNITY' && connection.selfId && room?.kind === 'COMMUNITY') {
+      await connection.command(payload.newRun === true ? 'NEW_COMMUNITY_RUN' : 'GET_ROOM_STATE', payload.newRun === true ? { expectedRunId: payload.expectedRunId } : {});
+    } else await connection.command(type, payload);
+  }); };
   const updateOptions = (key: keyof typeof options) => {
     const next = { ...options, [key]: !options[key] };
     setOptions(next);
@@ -169,7 +185,7 @@ export function App() {
   };
 
   if (screen === 'play') return <SoloGame {...launch} onExit={() => { setOptions(readOptions()); back(); }} />;
-  if (screen === 'online' && room && socket.current) return <OnlineGame room={room} socket={socket.current} />;
+  if (screen === 'online' && room && socket.current) return <OnlineGame room={room} socket={socket.current} onHome={() => { socket.current?.close(); socket.current = null; setRoom(null); setScreen('home'); }} />;
   return <main className="home">
     <header className="brand"><h1><img src="/assets/title_logo.png" alt="JumpKing" /></h1></header>
     <div className={screen === 'home' ? 'home-layout' : 'single-panel'}>

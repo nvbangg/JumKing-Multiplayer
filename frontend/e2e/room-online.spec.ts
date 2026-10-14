@@ -5,7 +5,7 @@ test.skip(process.env.E2E_AUTH_ONLINE !== 'true', 'Requires the isolated backend
 test('two Guest browsers create and join a Room, share settings and transfer Host on Leave', async ({ browser }) => {
   const first = await browser.newContext(), second = await browser.newContext();
   try {
-    for (const context of [first, second]) await context.addInitScript(() => { if (location.protocol.startsWith('http')) localStorage.setItem('jumpking.options', JSON.stringify({ sound: false })); });
+    for (const context of [first, second]) await context.addInitScript(() => { if (location.protocol.startsWith('http')) localStorage.setItem('jumpking.options', JSON.stringify({ sound: false, displayTimer: true })); });
     const a = await first.newPage(), b = await second.newPage();
     await a.goto('/'); await a.getByRole('button', { name: 'Play with Friends', exact: true }).click();
     await a.getByLabel('Nickname', { exact: true }).fill('First Guest'); await a.getByRole('button', { name: 'Create Room', exact: true }).click();
@@ -31,7 +31,7 @@ test('two Guest browsers create and join a Room, share settings and transfer Hos
 test('two Guest browsers Start together, jump and End Match with saved Results and History', async ({ browser }) => {
   const first = await browser.newContext(), second = await browser.newContext();
   try {
-    for (const context of [first, second]) await context.addInitScript(() => { if (location.protocol.startsWith('http')) localStorage.setItem('jumpking.options', JSON.stringify({ sound: false })); });
+    for (const context of [first, second]) await context.addInitScript(() => { if (location.protocol.startsWith('http')) localStorage.setItem('jumpking.options', JSON.stringify({ sound: false, displayTimer: true })); });
     const a = await first.newPage(), b = await second.newPage();
     await a.goto('/'); await a.getByRole('button', { name: 'Play with Friends', exact: true }).click(); await a.getByLabel('Nickname', { exact: true }).fill('Race Host'); await a.getByRole('button', { name: 'Create Room', exact: true }).click();
     await expect(a.getByRole('button', { name: 'Start', exact: true })).toBeDisabled(); const room = await a.locator('.room-code code').innerText();
@@ -40,7 +40,11 @@ test('two Guest browsers Start together, jump and End Match with saved Results a
     await expect(a.getByRole('button', { name: 'Menu', exact: true })).toBeVisible({ timeout: 15_000 }); await expect(b.getByRole('button', { name: 'Menu', exact: true })).toBeVisible({ timeout: 15_000 });
     if (await a.getByRole('button', { name: 'Resume', exact: true }).isVisible()) await a.getByRole('button', { name: 'Resume', exact: true }).click();
     await a.keyboard.down('Space'); await a.waitForTimeout(220); await a.keyboard.up('Space'); await expect(a.locator('.game-hud')).toContainText('Jumps: 1');
-    await a.getByRole('button', { name: 'Menu', exact: true }).click(); await a.getByRole('button', { name: 'End Match', exact: true }).click();
+    await a.getByRole('button', { name: 'Menu', exact: true }).click(); await a.getByRole('button', { name: 'Pause Room', exact: true }).click();
+    await expect(a.getByRole('button', { name: 'Resume Room', exact: true })).toBeEnabled(); await expect(b.getByRole('button', { name: 'Room Paused', exact: true })).toBeDisabled();
+    const pausedTime = await a.getByLabel('Play time', { exact: true }).innerText(); await a.waitForTimeout(1100); await expect(a.getByLabel('Play time', { exact: true })).toHaveText(pausedTime);
+    await a.getByRole('button', { name: 'Resume Room', exact: true }).click(); await expect(b.getByRole('button', { name: 'Resume', exact: true })).toBeEnabled();
+    await a.getByRole('button', { name: 'Menu', exact: true }).click(); await a.getByRole('button', { name: 'Pause Room', exact: true }).click(); await a.getByRole('button', { name: 'End Match', exact: true }).click();
     for (const page of [a, b]) { await expect(page.getByRole('heading', { name: 'Results', exact: true })).toBeVisible(); await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(2); await expect(page.getByText('Results saved', { exact: true })).toBeVisible(); }
     await a.getByRole('button', { name: 'Leave', exact: true }).click(); await expect(a.getByRole('button', { name: 'New Solo Game', exact: true })).toBeVisible();
     await b.getByRole('button', { name: 'Leave', exact: true }).click(); await expect(b.getByRole('button', { name: 'New Solo Game', exact: true })).toBeVisible();

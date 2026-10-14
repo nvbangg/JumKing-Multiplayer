@@ -33,11 +33,8 @@ public class RoomRuns {
         validate(write);
         owners.writeAll(write.runs.stream().map(Run::owner).toList(), ownership -> {
             var next = write.runs.stream().map(run -> run.owned(ownership.get(run.owner))).toList();
-            var matches = jdbc.query("SELECT room_code,mode,time_limit_minutes,started_at,ended_at,duration_ticks,end_reason FROM matches WHERE id=? FOR UPDATE",
-                (row, index) -> new Match(row.getString("room_code"), row.getString("mode"), row.getObject("time_limit_minutes", Integer.class), row.getTimestamp("started_at").toInstant(), instant(row.getTimestamp("ended_at")), row.getLong("duration_ticks"), row.getString("end_reason")), write.id);
-            var old = jdbc.query("SELECT id,user_id,nickname,status,play_ticks,jumps,falls,current_progress,max_progress,peak_reached_ticks,finish_ticks,`rank`,is_winner,ended_at,revision FROM play_runs WHERE match_id=? AND kind='ROOM' FOR UPDATE",
-                (row, index) -> new Stored(new Run(row.getString("id"), row.getLong("user_id"), row.getString("nickname"), row.getString("status"), row.getLong("play_ticks"), row.getInt("jumps"), row.getInt("falls"),
-                    row.getDouble("current_progress"), row.getDouble("max_progress"), row.getLong("peak_reached_ticks"), row.getObject("finish_ticks", Long.class), row.getObject("rank", Integer.class), row.getBoolean("is_winner"), instant(row.getTimestamp("ended_at"))), row.getLong("revision")), write.id);
+            var matches = matches(write.id);
+            var old = runs(write.id);
             var desired = new Match(write.roomCode, write.mode, write.minutes, write.startedAt, write.endedAt, write.duration, write.reason);
             if (!matches.isEmpty()) {
                 var previous = matches.getFirst();
@@ -66,6 +63,34 @@ public class RoomRuns {
                 write.revision, run.status, run.ticks, run.jumps, run.falls, run.progress, run.maximum, run.peak, run.finish, run.rank, run.winner, ts(run.endedAt), ts(clock.instant()), run.id, write.id, run.owner);
             return null;
         });
+    }
+    /** Chỉ gọi lúc khởi động, trước khi nhận gameplay mới; không phục hồi Room từ metrics. */
+    public void recoverAborted() {
+        for (String id : jdbc.queryForList("SELECT id FROM matches WHERE ended_at IS NULL ORDER BY id", String.class)) {
+            var match = matches(id).getFirst(); var stored = runs(id);
+            var ended = millis(clock.instant()); if (ended.isBefore(match.startedAt)) ended = match.startedAt;
+            for (var value : stored) if (value.run.endedAt != null && value.run.endedAt.isAfter(ended)) ended = value.run.endedAt;
+            final Instant deadline = ended;
+            var scores = stored.stream().map(value -> {
+                var run = value.run; return new RoomRanking.Score(run.id, run.nickname, "DNF", run.progress, run.maximum, null);
+            }).toList();
+            var ranks = RoomRanking.rank(scores, match.mode, false);
+            var abandoned = stored.stream().map(value -> {
+                var run = value.run; int rank = ranks.stream().filter(row -> row.score().playerId().equals(run.id)).findFirst().orElseThrow().rank();
+                return new Run(run.id, run.owner, run.nickname, "DNF", run.ticks, run.jumps, run.falls, run.progress, run.maximum, run.peak, null, rank, false, run.endedAt == null ? deadline : run.endedAt);
+            }).toList();
+            save(new Write(id, match.roomCode, match.mode, match.minutes, stored.stream().mapToLong(Stored::revision).max().orElseThrow() + 1,
+                match.startedAt, deadline, match.duration, "ABORTED", abandoned));
+        }
+    }
+    private List<Match> matches(String id) {
+        return jdbc.query("SELECT room_code,mode,time_limit_minutes,started_at,ended_at,duration_ticks,end_reason FROM matches WHERE id=? FOR UPDATE",
+            (row, index) -> new Match(row.getString("room_code"), row.getString("mode"), row.getObject("time_limit_minutes", Integer.class), row.getTimestamp("started_at").toInstant(), instant(row.getTimestamp("ended_at")), row.getLong("duration_ticks"), row.getString("end_reason")), id);
+    }
+    private List<Stored> runs(String id) {
+        return jdbc.query("SELECT id,user_id,nickname,status,play_ticks,jumps,falls,current_progress,max_progress,peak_reached_ticks,finish_ticks,`rank`,is_winner,ended_at,revision FROM play_runs WHERE match_id=? AND kind='ROOM' FOR UPDATE",
+            (row, index) -> new Stored(new Run(row.getString("id"), row.getLong("user_id"), row.getString("nickname"), row.getString("status"), row.getLong("play_ticks"), row.getInt("jumps"), row.getInt("falls"),
+                row.getDouble("current_progress"), row.getDouble("max_progress"), row.getLong("peak_reached_ticks"), row.getObject("finish_ticks", Long.class), row.getObject("rank", Integer.class), row.getBoolean("is_winner"), instant(row.getTimestamp("ended_at"))), row.getLong("revision")), id);
     }
     private void validate(Write value) {
         if (value.revision < 1 || value.duration < 0 || value.startedAt == null || value.runs.size() < 2 || value.runs.size() > capacity

@@ -76,8 +76,14 @@ class IdentityIT {
     private void roomHistory(long guest) {
         String match = java.util.UUID.randomUUID().toString(); var jdbc = TestDatabase.get().jdbc;
         jdbc.update("INSERT INTO matches(id,room_code,mode,started_at) VALUES (?,'ABCDEF','RACE',UTC_TIMESTAMP(3))", match);
+        roomFixtures.add(match);
         jdbc.update("INSERT INTO play_runs(id,user_id,kind,match_id,status,nickname,started_at,updated_at) VALUES (?,?,'ROOM',?,'ACTIVE','Guest Player',UTC_TIMESTAMP(3),UTC_TIMESTAMP(3))",
             java.util.UUID.randomUUID().toString(), guest, match);
+    }
+    private final java.util.List<String> roomFixtures = new java.util.ArrayList<>();
+    @org.junit.jupiter.api.AfterEach void cleanupRoomFixtures() {
+        var jdbc = TestDatabase.get().jdbc;
+        for (String id : roomFixtures) { jdbc.update("DELETE FROM play_runs WHERE match_id=?", id); jdbc.update("DELETE FROM matches WHERE id=?", id); }
     }
     private String metrics(long revision, long ticks, String status) throws Exception {
         var body = json.createObjectNode().put("revision", revision).put("status", status).put("playTicks", ticks).put("jumps", ticks > 0 ? 1 : 0).put("falls", 0)

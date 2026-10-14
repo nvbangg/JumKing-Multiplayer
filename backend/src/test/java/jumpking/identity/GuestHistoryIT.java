@@ -12,6 +12,7 @@ import jumpking.records.RunOwners;
 import jumpking.room.Memberships;
 import jumpking.support.TestDatabase;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -29,6 +30,10 @@ class GuestHistoryIT {
     @Autowired JdbcTemplate jdbc;
     @Autowired Memberships memberships;
     @Autowired jumpking.records.RecordsService records;
+    private final java.util.List<String> fixtures = new java.util.ArrayList<>();
+    @AfterEach void cleanupRoomFixtures() {
+        for (String id : fixtures) { jdbc.update("DELETE FROM play_runs WHERE match_id=?", id); jdbc.update("DELETE FROM matches WHERE id=?", id); }
+    }
     private long guest() {
         String hash = UUID.randomUUID().toString().replace("-", "").repeat(2);
         jdbc.update("INSERT INTO users(type,guest_token_hash,created_at) VALUES ('GUEST',?,UTC_TIMESTAMP(3))", hash);
@@ -40,7 +45,7 @@ class GuestHistoryIT {
         return jdbc.queryForObject("SELECT id FROM users WHERE email=?", Long.class, name + "@example.test");
     }
     private String match() {
-        String id = UUID.randomUUID().toString(); jdbc.update("INSERT INTO matches(id,room_code,mode,started_at) VALUES (?,'ABCDEF','RACE',UTC_TIMESTAMP(3))", id); return id;
+        String id = UUID.randomUUID().toString(); jdbc.update("INSERT INTO matches(id,room_code,mode,started_at) VALUES (?,'ABCDEF','RACE',UTC_TIMESTAMP(3))", id); fixtures.add(id); return id;
     }
     private String run(long owner, String match, int jumps) {
         String id = UUID.randomUUID().toString();

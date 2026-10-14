@@ -42,7 +42,7 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
     if (room.kind === 'COMMUNITY') { setSaveStatus('PENDING'); void socket.command('SET_COMMUNITY_PAUSED', { paused: true }).catch(cause => setError(cause.message)); }
   };
   pauseRef.current = pause;
-  useEffect(() => { runtime.current?.updateRoom(room); }, [room]);
+  useEffect(() => { runtime.current?.updateRoom(room); if (room.kind === 'ROOM' && room.state === 'PAUSED') pauseRef.current(); }, [room]);
   useEffect(() => { setMessages(socket.chatHistory as unknown as ChatMessage[]); setChatOpen(false); }, [room.roomId, socket]);
   useEffect(() => {
     let disposed = false, game: { destroy(removeCanvas: boolean): void } | undefined;
@@ -109,6 +109,13 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
     finally { setPending(false); }
   };
   const resume = async () => {
+    if (room.kind === 'ROOM' && room.state === 'PAUSED') {
+      if (room.hostPlayerId !== socket.selfId) return;
+      setPending(true);
+      try { await socket.command('SET_ROOM_PAUSED', { playId: socket.playContext?.playId, paused: false }); }
+      catch (cause) { setError(cause instanceof Error ? cause.message : 'Resume failed'); return; }
+      finally { setPending(false); }
+    }
     if (room.kind === 'COMMUNITY') {
       setPending(true);
       try { await socket.command('SET_COMMUNITY_PAUSED', { paused: false }); }
@@ -141,10 +148,11 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
     {ending && <div className="ending-actions">{ending === 'playing' ? <button onClick={() => skipEnding.current?.()}>Skip</button> : <><button disabled={!pictureReady || pending} onClick={() => { void newGame(); }}>New Game</button><button disabled={!pictureReady || pending || disconnected} onClick={() => { void command('LEAVE_ROOM'); }}>Back to Menu</button></>}</div>}
     {ready && chatOpen && <ChatPanel messages={messages} colors={rules.appearanceColors} onSend={async text => { await socket.command('CHAT_SEND', { text }); }} onClose={() => { setChatOpen(false); if (!runtime.current?.menu) input.current?.resume(); }} />}
     {menu && <section className="game-overlay" aria-label="Game menu"><MenuPanel title={menu === 'pause' ? 'Paused' : menu === 'options' ? 'Options' : menu === 'inventory' ? 'Inventory' : 'Controls'} onBack={menu === 'pause' ? undefined : () => setMenu(menu === 'controls' ? 'options' : 'pause')}>
-      {menu === 'pause' && <>{disconnected ? <><button disabled={pending} onClick={() => { setPending(true); void socket.reconnect().catch(cause => setError(cause.message)).finally(() => setPending(false)); }}>Reconnect</button><button onClick={onHome}>Back to Menu</button></> : <button disabled={pending} onClick={() => { void resume(); }}>Resume</button>}<button onClick={() => setMenu('options')}>Options</button><button onClick={() => { runtime.current?.cancel(); input.current?.cancel(); setChatOpen(true); }}>Open Chat</button>
+      {menu === 'pause' && <>{disconnected ? <><button disabled={pending} onClick={() => { setPending(true); void socket.reconnect().catch(cause => setError(cause.message)).finally(() => setPending(false)); }}>Reconnect</button><button onClick={onHome}>Back to Menu</button></> : <button disabled={pending || (room.state === 'PAUSED' && room.hostPlayerId !== socket.selfId)} onClick={() => { void resume(); }}>{room.kind === 'ROOM' && room.state === 'PAUSED' ? room.hostPlayerId === socket.selfId ? 'Resume Room' : 'Room Paused' : 'Resume'}</button>}<button onClick={() => setMenu('options')}>Options</button><button onClick={() => { runtime.current?.cancel(); input.current?.cancel(); setChatOpen(true); }}>Open Chat</button>
         {room.kind === 'COMMUNITY' && <button disabled={pending || disconnected} onClick={() => { void newGame(); }}>New Game</button>}
         <button onClick={() => setMenu('inventory')}>Inventory</button>
-        {room.kind === 'ROOM' && room.hostPlayerId === socket.selfId && room.state === 'PLAYING' && <button disabled={pending || disconnected} onClick={() => { void command('END_MATCH'); }}>End Match</button>}
+        {room.kind === 'ROOM' && room.hostPlayerId === socket.selfId && room.state === 'PLAYING' && <button disabled={pending || disconnected} onClick={() => { void command('SET_ROOM_PAUSED', { playId: socket.playContext?.playId, paused: true }); }}>Pause Room</button>}
+        {room.kind === 'ROOM' && room.hostPlayerId === socket.selfId && ['PLAYING', 'PAUSED'].includes(room.state) && <button disabled={pending || disconnected} onClick={() => { void command('END_MATCH'); }}>End Match</button>}
         <button disabled={pending || disconnected} onClick={() => { void command('LEAVE_ROOM'); }}>{room.kind === 'COMMUNITY' ? 'Save & Exit' : 'Leave Room'}</button>{room.kind === 'COMMUNITY' && <small role="status">{saveStatus === 'SAVED' ? 'Saved' : saveStatus === 'FAILED' ? 'Save failed' : 'Saving…'}</small>}</>}
       {menu === 'pause' && room.kind === 'COMMUNITY' && <form className="menu-form" onSubmit={event => { event.preventDefault(); void command('JOIN_ROOM', { roomId: transferId }); }}>
         <label>Community ID<input value={transferId} minLength={6} maxLength={6} pattern="[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}" required onChange={event => setTransferId(event.currentTarget.value.toUpperCase())} /></label>

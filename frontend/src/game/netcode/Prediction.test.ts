@@ -62,6 +62,16 @@ test('paused reconciliation restores authority without replay and rejects malfor
   expect(game.snapshot()).toEqual(server.snapshot()); expect(prediction.pending).toBe(2);
   expect(() => prediction.reconcile(server.snapshot(), 1.5, true)).toThrow('acknowledgement'); prediction.reset(); expect(prediction.pending).toBe(0);
 });
+test('server Pause discards inputs canceled by the actor so Resume cannot replay an old charge', () => {
+  const socket = new GameSocket(() => {}, () => {}); socket.selfId = 'self'; socket.input = vi.fn();
+  const server = new GameSimulation(map), runtime = new OnlineRuntime(map, socket, room, () => ({ ...right, jump: true }), () => {}, false);
+  runtime.receive(snapshot(server, 1, 0) as unknown as Record<string, unknown>); runtime.advance(51);
+  expect(runtime.game.physics.snapshot().charge).toBeGreaterThan(0);
+  const paused = snapshot(server, 2, 0); paused.self.paused = true;
+  runtime.receive(paused as unknown as Record<string, unknown>);
+  runtime.receive(snapshot(server, 3, 0) as unknown as Record<string, unknown>);
+  expect(runtime.game.snapshot()).toEqual(server.snapshot());
+});
 test('remote interpolation follows server tick spacing and never extrapolates or resurrects removed peers', () => {
   const game = new GameSimulation(map), previous = snapshot(game, 3, 0), current = snapshot(game, 6, 0);
   const peer = { playerId: 'other', nickname: 'Other', colorSlot: 1, state: game.physics.snapshot(), equipment: [], status: 'ACTIVE' };

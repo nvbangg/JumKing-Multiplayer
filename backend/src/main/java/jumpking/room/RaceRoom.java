@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
 /** Mỗi Room sở hữu một actor; registry chỉ giữ chỗ và không thực hiện I/O. */
 @Component
 public class RaceRoom implements GameCommandHandler, AutoCloseable {
-    private static final Set<String> COMMANDS = Set.of("CREATE_ROOM", "JOIN_ROOM", "GET_ROOM_STATE", "LEAVE_ROOM", "UPDATE_ROOM_SETTINGS", "RECONNECT", "CHAT_SEND", "START_GAME", "END_MATCH", "PLAYER_INPUT", "CANCEL_INPUT", "EQUIP_ITEM");
+    private static final Set<String> COMMANDS = Set.of("CREATE_ROOM", "JOIN_ROOM", "GET_ROOM_STATE", "LEAVE_ROOM", "UPDATE_ROOM_SETTINGS", "RECONNECT", "CHAT_SEND", "START_GAME", "END_MATCH", "SET_ROOM_PAUSED", "PLAYER_INPUT", "CANCEL_INPUT", "EQUIP_ITEM");
     private final RoomDirectory directory;
     private final Memberships memberships;
     private final GameWorkers workers;
@@ -67,7 +67,8 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         String state = "WAITING";
         RoomMatch match;
         CheckpointWriter<RoomRuns.Write> writer;
-        long countdownAt, nextTick, serverTick, eventSeq, lastSave;
+        long countdownAt, nextTick, serverTick, lastSnapshotTick, eventSeq, lastSave, pauseDeadline;
+        java.time.Instant pauseExpiresAt;
         final AtomicBoolean tickQueued = new AtomicBoolean();
         String host;
         long joinOrder;
@@ -92,6 +93,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         var room = membership == null ? null : rooms.get(membership.roomId());
         if (room == null) throw new ApiException(404, "ROOM_NOT_FOUND", "Room not found");
         room.actor.execute(() -> safely(connection, command, () -> {
+            expirePause(room, time.nanos());
             var player = room.players.get(membership.playerId());
             if (player == null) throw new ApiException(404, "ROOM_NOT_FOUND", "Membership has ended");
             if (command.type().equals("RECONNECT")) { reconnect(room, player, connection, command); return; }
@@ -107,8 +109,13 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
                 case "START_GAME" -> { GameEnvelope.fields(command.payload(), Set.of()); start(room, player); connection.reply(command, "ROOM_STATE", state(room)); }
                 case "END_MATCH" -> {
                     GameEnvelope.fields(command.payload(), Set.of()); requireHost(room, player);
-                    if (!room.state.equals("PLAYING")) throw new ApiException(409, "CONFLICT", "No running match to end");
+                    if (!Set.of("PLAYING", "PAUSED").contains(room.state)) throw new ApiException(409, "CONFLICT", "No running match to end");
                     room.match.finish("HOST_ENDED", clock.instant()); finish(room); connection.reply(command, "GAME_FINISHED", room.match.results());
+                }
+                case "SET_ROOM_PAUSED" -> {
+                    GameEnvelope.fields(command.payload(), Set.of("playId", "paused")); requireHost(room, player);
+                    if (room.match == null || !room.match.id.equals(GameEnvelope.text(command.payload(), "playId"))) throw new ApiException(409, "STALE_PLAY", "Pause belongs to an old match");
+                    setPaused(room, GameEnvelope.bool(command.payload(), "paused", false)); connection.reply(command, "ROOM_STATE", state(room));
                 }
                 case "PLAYER_INPUT", "CANCEL_INPUT" -> {
                     var racer = room.match == null ? null : room.match.players.get(player.id);
@@ -156,7 +163,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         GameEnvelope.fields(command.payload(), Set.of("roomId", "playerId", "reconnectToken"));
         if (!room.id.equals(GameEnvelope.text(command.payload(), "roomId")) || !player.id.equals(GameEnvelope.text(command.payload(), "playerId"))
                 || !MessageDigest.isEqual(player.token.getBytes(java.nio.charset.StandardCharsets.UTF_8), GameEnvelope.text(command.payload(), "reconnectToken").getBytes(java.nio.charset.StandardCharsets.UTF_8))) throw new ApiException(403, "INVALID_RECONNECT", "Invalid reconnect context");
-        if (player.connection == null && time.nanos() - player.disconnectedAt >= rules.path("reconnectMs").asLong() * 1_000_000L) throw new ApiException(409, "RECONNECT_EXPIRED", "Reconnect is no longer available");
+        if (!room.state.equals("PAUSED") && player.connection == null && time.nanos() - player.disconnectedAt >= rules.path("reconnectMs").asLong() * 1_000_000L) throw new ApiException(409, "RECONNECT_EXPIRED", "Reconnect is no longer available");
         var old = player.connection; player.connection = connection; player.generation++; chooseHost(room);
         if (old != null && old != connection) old.close(org.springframework.web.socket.CloseStatus.NORMAL);
         if (room.match != null && room.match.players.containsKey(player.id)) room.match.players.get(player.id).input.reset(room.match.id, player.generation);
@@ -188,6 +195,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         var state = json.createObjectNode().put("roomId", room.id).put("kind", "ROOM").put("state", room.state);
         if (room.host == null) state.putNull("hostPlayerId"); else state.put("hostPlayerId", room.host);
         state.set("settings", json.valueToTree(room.settings)); for (String field : List.of("currentPlay", "result", "pauseExpiresAt")) state.putNull(field);
+        if (room.pauseExpiresAt != null) state.put("pauseExpiresAt", room.pauseExpiresAt.toString());
         if (room.match != null) { state.putObject("currentPlay").put("id", room.match.id).put("elapsedTimeMs", room.match.ms(room.match.ticks)).put("countdownRemainingMs", room.state.equals("COUNTDOWN") ? Math.max(0, (room.countdownAt - time.nanos()) / 1_000_000L) : 0); if (room.match.endedAt != null) state.set("result", json.valueToTree(room.match.results())); }
         var members = state.putArray("members");
         for (var player : room.players.values()) {
@@ -231,9 +239,29 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         if (!room.state.equals("COUNTDOWN")) return;
         room.state = "WAITING"; room.match = null; room.writer = null; directory.joinable(room.id, true);
     }
+    private void setPaused(Room room, boolean paused) {
+        if (!Set.of("PLAYING", "PAUSED").contains(room.state)) throw new ApiException(409, "CONFLICT", "No running match to pause");
+        if (paused == room.state.equals("PAUSED")) return;
+        long now = time.nanos();
+        for (var racer : room.match.players.values()) { racer.input.clear(); racer.game.physics().cancelInput(); }
+        if (paused) {
+            room.state = "PAUSED"; room.pauseDeadline = now + rules.path("hostPauseMs").asLong() * 1_000_000L;
+            room.pauseExpiresAt = clock.instant().plusMillis(rules.path("hostPauseMs").asLong()); save(room, true);
+        } else {
+            room.state = "PLAYING"; room.pauseDeadline = 0; room.pauseExpiresAt = null; room.nextTick = now;
+            for (var member : room.players.values()) if (member.connection == null) member.disconnectedAt = now;
+        }
+        broadcast(room); snapshots(room);
+    }
+    private void expirePause(Room room, long now) {
+        if (!room.state.equals("PAUSED") || now < room.pauseDeadline) return;
+        room.match.finish("PAUSE_TIMEOUT", clock.instant()); finish(room);
+        for (var member : List.copyOf(room.players.values())) remove(room, member, null);
+    }
     private void advance(Room room) {
         long now = time.nanos();
-        for (var player : List.copyOf(room.players.values())) if (player.connection == null && now - player.disconnectedAt >= rules.path("reconnectMs").asLong() * 1_000_000L) remove(room, player, null);
+        expirePause(room, now);
+        if (!room.state.equals("PAUSED")) for (var player : List.copyOf(room.players.values())) if (player.connection == null && now - player.disconnectedAt >= rules.path("reconnectMs").asLong() * 1_000_000L) remove(room, player, null);
         if (room.state.equals("COUNTDOWN") && now >= room.countdownAt) {
             room.match.start(clock.instant()); room.state = "PLAYING"; room.nextTick = now; save(room, true); broadcast(room); snapshots(room);
         }
@@ -245,13 +273,14 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
             room.nextTick += step; room.serverTick++;
             emit(room, room.match.tick(now, clock.instant()));
             if (room.match.endedAt != null) { finish(room); break; }
-            if (room.serverTick % (room.match.tickRate / rules.path("snapshotRate").asInt()) == 0) snapshots(room);
+            if (room.match.ticks % (room.match.tickRate / rules.path("snapshotRate").asInt()) == 0) snapshots(room);
         }
         if (now >= room.nextTick) room.nextTick = now + step;
         if (room.state.equals("PLAYING") && now - room.lastSave >= saveIntervalNs) save(room, false);
     }
     private void finish(Room room) {
         room.players.values().forEach(player -> player.confirmed = false);
+        room.pauseDeadline = 0; room.pauseExpiresAt = null;
         room.state = "FINISHED"; directory.joinable(room.id, false); save(room, true);
         for (var player : room.players.values()) if (player.connection != null) player.connection.send("GAME_FINISHED", room.match.results());
         broadcast(room); snapshots(room);
@@ -296,6 +325,8 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     }
     private void snapshots(Room room) {
         var match = room.match; if (match == null || match.startedAt == null) return;
+        // Commands có thể đổi state mà không chạy physics; snapshot mới vẫn phải có thứ tự riêng.
+        room.serverTick = Math.max(room.serverTick, room.lastSnapshotTick + 1); room.lastSnapshotTick = room.serverTick;
         for (var member : room.players.values()) {
             var self = match.players.get(member.id); if (member.connection == null || self == null) continue;
             var snapshot = json.createObjectNode().put("roomId", room.id).put("serverTick", room.serverTick).put("playId", match.id).put("generation", member.generation).put("elapsedTimeMs", match.ms(match.ticks)).putNull("remainingTimeMs");

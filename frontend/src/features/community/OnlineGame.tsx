@@ -15,10 +15,13 @@ import { PlayerEffects } from '../../game/netcode/PlayerEffects';
 import { PRESENTATION } from '../../game/presentation/config';
 import { ChatPanel, type ChatMessage } from '../../components/ChatPanel';
 import rules from '../../../../shared/rules.json';
+import { FlightToggle } from '../../game/input/FlightToggle';
 
 export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room: RoomState; onHome: () => void }) {
   const container = useRef<HTMLDivElement>(null), runtime = useRef<OnlineRuntime | null>(null), input = useRef<InputController | null>(null), audio = useRef<AudioBus | null>(null);
   const [ready, setReady] = useState(false), [menu, setMenu] = useState<'pause' | 'options' | 'controls' | null>(null);
+  const flight = useRef<FlightToggle | null>(null);
+  const [flying, setFlying] = useState(false);
   const [options, setOptions] = useState(readOptions), [flyAllowed, setFlyAllowed] = useState(false);
   const [error, setError] = useState(''), [pending, setPending] = useState(false), [elapsed, setElapsed] = useState(0), [jumps, setJumps] = useState(0), [saveStatus, setSaveStatus] = useState('SAVED');
   const [transferId, setTransferId] = useState('');
@@ -32,7 +35,7 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
   const pause = () => {
     if (endingActive.current) { skipEnding.current?.(); return; }
     if (!runtime.current || runtime.current.menu) return;
-    runtime.current.menu = true; runtime.current.cancel(); input.current?.cancel(); audio.current?.pause(true); setMenu('pause');
+    runtime.current.menu = true; runtime.current.cancel(); flight.current?.cancel(); input.current?.cancel(); audio.current?.pause(true); setMenu('pause');
     if (room.kind === 'COMMUNITY') { setSaveStatus('PENDING'); void socket.command('SET_COMMUNITY_PAUSED', { paused: true }).catch(cause => setError(cause.message)); }
   };
   pauseRef.current = pause;
@@ -42,7 +45,7 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
     let disposed = false, game: { destroy(removeCanvas: boolean): void } | undefined;
     const controller = new AbortController();
     const effects = new PlayerEffects();
-    const controls = new InputController(() => {}, () => pauseRef.current(), () => runtime.current?.cancel()); input.current = controls;
+    const controls = new InputController(() => {}, () => pauseRef.current(), () => { runtime.current?.cancel(); flight.current?.cancel(); }, now => flight.current?.press(now)); input.current = controls;
     const hidden = () => { if (document.hidden) pauseRef.current(); }; const blur = () => pauseRef.current();
     document.addEventListener('visibilitychange', hidden); window.addEventListener('blur', blur);
     const unsubscribe = socket.subscribe((type, payload) => {
@@ -66,10 +69,13 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
       if (disposed) return;
       setFlyAllowed(config.features.flyEnabled); audio.current = new AudioBus(manifest, readOptions().sound, setError);
       const session = new OnlineRuntime(parseMap(mapData), socket, latestRoom.current, () => controls.read(), (state, snapshot) => {
-        setElapsed(snapshot.elapsedTimeMs); setJumps(state.jumps); audio.current?.setScreen(state.screen);
+        setElapsed(snapshot.elapsedTimeMs); setJumps(state.jumps); setFlying(state.freeFlight); audio.current?.setScreen(state.screen);
+        if (!readOptions().fly && state.freeFlight) session.setFlight(false);
         if (snapshot.self.paused && !session.menu) { session.menu = true; controls.cancel(); setMenu('pause'); audio.current?.pause(true); }
       }, config.features.flyEnabled, message => { setError(message); setMenu('pause'); controls.cancel(); });
       runtime.current = session;
+      flight.current = new FlightToggle(config.features.flyEnabled, () => session.flying, enabled => { session.setFlight(enabled); setFlying(enabled); });
+      flight.current.setEnabled(readOptions().fly);
       if (socket.lastFinish) session.finish(socket.lastFinish);
       if (socket.lastSnapshot) session.receive(socket.lastSnapshot);
       game = renderer.createGame(container.current!, manifest, session, () => { setReady(true); if (document.hidden || !document.hasFocus()) pauseRef.current(); }, setError, {
@@ -77,7 +83,7 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
         onEndingComplete: () => setEnding('picture'), onSound: key => audio.current?.play(key),
       });
     })().catch(cause => { if (!disposed) setError(cause instanceof Error ? cause.message : 'Unable to load online game'); });
-    return () => { disposed = true; controller.abort(); unsubscribe(); controls.dispose(); runtime.current?.cancel(); runtime.current = null; input.current = null; game?.destroy(true); audio.current?.dispose(); audio.current = null;
+    return () => { disposed = true; controller.abort(); unsubscribe(); controls.dispose(); runtime.current?.cancel(); runtime.current = null; input.current = null; flight.current = null; game?.destroy(true); audio.current?.dispose(); audio.current = null;
       document.removeEventListener('visibilitychange', hidden); window.removeEventListener('blur', blur);
     };
   }, [socket, room.roomId]);
@@ -98,6 +104,7 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
   };
   const updateOptions = (key: keyof Options) => {
     const next = { ...options, [key]: !options[key] }; setOptions(next); audio.current?.setEnabled(next.sound);
+    if (key === 'fly') flight.current?.setEnabled(next.fly);
     try { saveOptions(next); } catch { setError('Options could not be saved on this device'); }
   };
   const newGame = async () => {
@@ -115,7 +122,7 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
     <div className="game-viewport" ref={container} aria-label="Online Main Babe game" />
     {!ready && <p className="game-message" role="status">Loading…</p>}
     {ready && !ending && <div className="game-hud"><span>Jumps: {jumps}{options.displayTimer && <span className="timer" aria-label="Play time">{duration(elapsed)}</span>}</span><span className="room-code" aria-label="Room ID">{room.roomId}</span><span><button onClick={() => { runtime.current?.cancel(); input.current?.cancel(); setChatOpen(true); }}>Chat</button><button onClick={pause}>Menu</button></span></div>}
-    {ready && !ending && !menu && !chatOpen && <TouchControls input={input} flying={false} />}
+    {ready && !ending && !menu && !chatOpen && <TouchControls input={input} flying={flying} />}
     {ending && <div className="ending-actions">{ending === 'playing' ? <button onClick={() => skipEnding.current?.()}>Skip</button> : <><button disabled={!pictureReady || pending} onClick={() => { void newGame(); }}>New Game</button><button disabled={!pictureReady || pending || disconnected} onClick={() => { void command('LEAVE_ROOM'); }}>Back to Menu</button></>}</div>}
     {ready && chatOpen && <ChatPanel messages={messages} colors={rules.appearanceColors} onSend={async text => { await socket.command('CHAT_SEND', { text }); }} onClose={() => { setChatOpen(false); if (!runtime.current?.menu) input.current?.resume(); }} />}
     {menu && <section className="game-overlay" aria-label="Game menu"><MenuPanel title={menu === 'pause' ? 'Paused' : menu === 'options' ? 'Options' : 'Controls'} onBack={menu === 'pause' ? undefined : () => setMenu(menu === 'controls' ? 'options' : 'pause')}>

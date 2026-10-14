@@ -42,6 +42,21 @@ class CommunityLifecycleIT {
         long before = client.snapshot().path("serverTick").asLong(); time.advance(milliseconds);
         client.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT") && message.path("payload").path("serverTick").asLong() > before);
     }
+    @Test void disabledFlightAndClientPositionsCannotChangeAuthoritativeState() throws Exception {
+        try (var client = new GameClient(port)) {
+            client.register(); client.connect(); var join = client.ok("JOIN_COMMUNITY", Map.of());
+            client.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT"));
+            client.input(Map.of("playId", join.path("playId").asText(), "generation", 1, "seq", 1, "left", false, "right", false, "jump", false, "freeFlight", true));
+            client.await(message -> message.path("type").asText().equals("ERROR") && message.path("payload").path("code").asText().equals("INVALID_INPUT"));
+            client.input(Map.of("playId", join.path("playId").asText(), "generation", 1, "seq", 2, "left", false, "right", false, "jump", false, "y", -15018));
+            client.await(message -> message.path("type").asText().equals("ERROR") && message.path("payload").path("code").asText().equals("INVALID_MESSAGE"));
+            step(client, 100);
+            var physics = client.snapshot().path("self").path("simulation").path("physics");
+            assertThat(physics.path("freeFlight").asBoolean()).isFalse(); assertThat(physics.path("screen").asInt()).isZero();
+            assertThat(physics.path("jumps").asInt()).isZero(); assertThat(client.snapshot().path("self").path("status").asText()).isEqualTo("ACTIVE");
+            client.ok("LEAVE_ROOM", Map.of());
+        }
+    }
     @Test void neutralFramesDoNotResetAfkAndPausedSlotExpiresExactlyAtFifteenMinutes() throws Exception {
         try (var client = new GameClient(port)) {
             client.register(); client.connect(); var join = client.ok("JOIN_COMMUNITY", Map.of());

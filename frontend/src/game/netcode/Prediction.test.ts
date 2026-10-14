@@ -29,6 +29,17 @@ test('online ending waits for the private committed notice and matching finished
   runtime.receive({ ...snapshot(game, 3, 0, 2), playId: 'next' } as unknown as Record<string, unknown>);
   expect(runtime.frame().ending).toBeUndefined(); runtime.finish(notice); expect(runtime.frame().ending).toBeUndefined();
 });
+test('flight intent survives an older ACK and resets for a new run while the gate stays authoritative', () => {
+  const socket = new GameSocket(() => {}, () => {}); socket.selfId = 'self'; socket.input = vi.fn();
+  const game = new GameSimulation(map, true), runtime = new OnlineRuntime(map, socket, room, () => ({ ...right, up: true }), () => {}, true);
+  runtime.receive(snapshot(game, 1, 0) as unknown as Record<string, unknown>); runtime.setFlight(true); runtime.advance(17);
+  expect(socket.input).toHaveBeenLastCalledWith('PLAYER_INPUT', expect.objectContaining({ freeFlight: true, up: true }));
+  runtime.receive(snapshot(game, 2, 0) as unknown as Record<string, unknown>); runtime.advance(17);
+  expect(socket.input).toHaveBeenLastCalledWith('PLAYER_INPUT', expect.objectContaining({ freeFlight: true }));
+  runtime.setFlight(false); runtime.advance(17); expect(socket.input).toHaveBeenLastCalledWith('PLAYER_INPUT', expect.objectContaining({ freeFlight: false }));
+  runtime.setFlight(true); runtime.receive({ ...snapshot(game, 3, 0, 2), playId: 'next' } as unknown as Record<string, unknown>); expect(runtime.flying).toBe(false);
+  const forbidden = new OnlineRuntime(map, socket, room, () => right, () => {}, false); forbidden.setFlight(true); expect(forbidden.flying).toBe(false);
+});
 test('prediction responds before an ACK and replays only unacknowledged input after correction', () => {
   const local = new GameSimulation(map), server = new GameSimulation(map), prediction = new Prediction(local, 180);
   for (let seq = 1; seq <= 20; seq++) { prediction.push(seq, right); if (seq <= 7) server.tick(right); }

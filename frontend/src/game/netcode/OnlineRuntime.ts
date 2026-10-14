@@ -19,6 +19,7 @@ export class OnlineRuntime implements GameRuntime {
   latest: OnlineSnapshot | null = null;
   menu = false;
   private ending?: EndingSignal;
+  private desiredFlight: boolean | undefined;
   private accumulatedMs = 0;
   private sequence = 0;
   private prediction: Prediction;
@@ -29,6 +30,8 @@ export class OnlineRuntime implements GameRuntime {
     this.prediction = new Prediction(this.game, NETWORK.maxInputFrames);
   }
   updateRoom(room: RoomState): void { this.room = room; }
+  get flying(): boolean { return this.desiredFlight ?? this.game.physics.snapshot().freeFlight; }
+  setFlight(enabled: boolean): void { this.desiredFlight = this.game.physics.flyAllowed && enabled; this.game.physics.setFlight(this.desiredFlight); }
   finish(payload: Record<string, unknown>): void {
     if (payload.playerId !== this.socket.selfId || payload.showEnding !== true || typeof payload.playId !== 'string') return;
     if (this.socket.playContext && payload.playId !== this.socket.playContext.playId) return;
@@ -44,6 +47,7 @@ export class OnlineRuntime implements GameRuntime {
     if (this.latest && value.playId === this.latest.playId && value.generation < this.latest.generation) return;
     if (!this.latest || value.playId !== this.latest.playId || value.generation !== this.latest.generation) { this.sequence = value.self.lastProcessedInputSeq; this.accumulatedMs = 0; this.prediction.reset(); this.peers.reset(); }
     if (value.self.lastProcessedInputSeq > this.sequence) throw new Error('Server acknowledged an unsent input');
+    if (!this.latest || value.playId !== this.latest.playId) this.desiredFlight = value.self.simulation.physics.freeFlight;
     this.prediction.reconcile(value.self.simulation, value.self.lastProcessedInputSeq, !this.menu && !value.self.paused && value.self.status === 'ACTIVE');
     this.peers.receive(value, performance.now()); this.latest = value; this.changed(this.game.physics.snapshot(), value);
     if (this.ending && this.ending.id !== value.playId) this.ending = undefined;
@@ -55,7 +59,7 @@ export class OnlineRuntime implements GameRuntime {
     const step = 1000 / PHYSICS.tickRate;
     while (this.accumulatedMs >= step) {
       this.accumulatedMs -= step;
-      const input = this.readInput();
+      const input = { ...this.readInput(), freeFlight: this.flying };
       if (this.menu) break;
       const seq = ++this.sequence;
       try { this.prediction.push(seq, input); }

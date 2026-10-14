@@ -55,7 +55,7 @@ Có thể chạy nhóm bị ảnh hưởng bằng `-IntegrationTest 'RoomRaceIT'
 
 Đặt `E2E_BROWSER_PATH` thành đường dẫn Chrome/Chromium trước khi chạy integration để nghiệm thu Account, contracts và Solo sync qua UI với backend/MySQL cô lập. Harness tự chạy Vite/cổng riêng và đóng sau test; bỏ biến này thì browser integration được ghi là skipped, không coi là đã nghiệm thu UI. `npm run test:e2e` riêng chỉ chạy các scenarios không cần backend, trừ khi cung cấp `E2E_BASE_URL` và cờ online tương ứng.
 
-Kết quả E2E độc lập ở frontend/test-results; harness online dùng .local/browser-online-tests. Khi có E2E_BROWSER_PATH, integration chạy thêm harness riêng cho ending Room và Fly online; output ở .local/browser-room-ending-tests và .local/browser-fly-online-tests. Có thể đổi bằng E2E_OUTPUT_DIR; các lần chạy đồng thời phải dùng thư mục riêng.
+Kết quả E2E độc lập ở frontend/test-results; harness online dùng .local/browser-online-tests. Khi có E2E_BROWSER_PATH, integration chạy thêm harness riêng cho ending Room, Fly Community và Fly Room; output tương ứng .local/browser-room-ending-tests, .local/browser-fly-online-tests và .local/browser-room-fly-tests. Có thể đổi bằng E2E_OUTPUT_DIR; các lần chạy đồng thời phải dùng thư mục riêng.
 
 ## Scenarios và oracles
 

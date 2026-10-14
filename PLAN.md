@@ -77,7 +77,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 - [x] Triển khai Hardcore respawn; kiểm tra body reset, giữ clock/peak/counters.
 - [x] Triển khai Time Limit; kiểm tra biên phút, deadline và Finish đúng tick.
 - [x] Triển khai No Walk; kiểm tra hướng/vận tốc trên nền, nhảy/bounce và luật kết thúc.
-- [ ] Hoàn thiện comparator bốn mode; kiểm tra progress/peak/time, DNF, winner và đồng hạng.
+- [x] Hoàn thiện comparator bốn mode; kiểm tra progress/peak/time, DNF, winner và đồng hạng.
 - [ ] Hoàn thiện Room writer và tích hợp History chung; kiểm tra ghi định kỳ, finalize/retry, Merge, permissions/pagination và restart.
 - [ ] Tích hợp Room ending cho winners; kiểm tra người khác tới Results và không ending khi chưa Finish.
 - [ ] Nghiệm thu Fly Mode trong bốn mode Room; kiểm tra respawn, Finish, History/Stats và xếp hạng.
@@ -160,5 +160,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 06 — Hardcore | PASS — type-check/build, 65 frontend/46 backend unit tests, 7 integration tests và 20 Chrome E2E online. Native splat respawn đúng player, giữ active clock/peak/jumps/falls và lưu MySQL; prediction/replay khớp server. Respawn trước adventure/Finish nên splat tại đích không nhận Crown hoặc thắng. Chrome hai Guest chọn Hardcore, Start/nhảy/End và đọc đúng mode trong History |
 | Phase 06 — Time Limit | PASS — type-check/build, 65 frontend/46 backend unit tests; 8 integration tests cho deadline/Race/Pause và 21 Chrome E2E online. Hết 1 phút chốt đúng tick 3.600, không tiếp tục tick hoặc tạo winner khi chưa Finish; hai Finish tại deadline 5 phút cùng thắng trước timeout. Snapshot công bố thời gian còn lại, HUD vẫn hiện khi tắt Display Timer; History giữ mode và settings |
 | Phase 06 — No Walk | PASS — type-check/build, 65 frontend/48 backend unit tests, MySQL regression các mode và 22 Chrome E2E online. Input ngang trên nền giữ x/vx, charge vẫn nhảy ngang; bật tường hai hướng khớp fixtures độc lập, không đổi hướng giữa không trung. WS kiểm tra jump/bounce/History thực tế; Chrome đọc snapshot khi giữ Right xác minh đứng yên, nhảy và lưu Results. Đã xem screenshot màn chơi |
+| Phase 06 — comparator tích hợp | PASS — 48 backend unit tests và RoomRankingIT qua WS/MySQL. Cả bốn mode Finish ở tick native 16.957, lưu hai hạng nhất/winners cùng tick. Kiểm tra current bằng nhau: Time Limit dùng peak, ba mode còn lại đồng hạng; Leave chốt DNF/metrics trong khi người khác tiếp tục. Host End không tạo winner; thứ tự UUID không phá đồng hạng |
 | Phase 06 còn lại–07 | NOT RUN — chưa nghiệm thu đầy đủ |
 | Phase 08 | Chưa thực hiện |

@@ -8,7 +8,7 @@ import { duration, soloHistory, soloStatistics } from '../features/records/forma
 import { MenuPanel } from '../components/MenuPanel';
 import { api, backendOrigin, clearCsrf } from '../network/api';
 import { GameSocket, type MatchResult, type RoomState } from '../network/GameSocket';
-import { EMPTY_STATS, type HistoryItem, type Identity, type Statistics } from '../network/contracts';
+import { EMPTY_STATS, type HistoryItem, type Identity, type Statistics, type LeaderboardEntry } from '../network/contracts';
 import { Lobby } from '../features/rooms/Lobby';
 import { Results } from '../features/rooms/Results';
 import { OptionsButtons, ControlsHelp } from '../features/solo/OptionsPanel';
@@ -41,7 +41,8 @@ export function App() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [detail, setDetail] = useState<HistoryItem | null>(null);
   const [communityRun, setCommunityRun] = useState<{ id: string } | null>(null);
-  const [leaderboard, setLeaderboard] = useState<{ id: string; rank: number; username: string; maxProgress: number; finishTimeMs: number | null }[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [room, setRoom] = useState<RoomState | null>(null);
   const [result, setResult] = useState<MatchResult | null>(null);
   const resultRef = useRef<MatchResult | null>(null);
@@ -135,7 +136,10 @@ export function App() {
       }).catch(() => {});
     }
     if (screen === 'community' && identity.authenticated) void api<{ run: { id: string } | null }>('/community/current').then(result => { if (!disposed) setCommunityRun(result.run); }).catch(cause => { if (!disposed) setError(cause.message); });
-    if (screen === 'leaderboard') void api<{ entries: typeof leaderboard }>('/leaderboard?limit=100').then(result => { if (!disposed) setLeaderboard(result.entries); }).catch(cause => { if (!disposed) setError(cause.message); });
+    if (screen === 'leaderboard') {
+      setLeaderboardLoading(true);
+      void api<{ entries: LeaderboardEntry[] }>('/leaderboard?limit=100').then(result => { if (!disposed) setLeaderboard(result.entries); }).catch(cause => { if (!disposed) setError(cause.message); }).finally(() => { if (!disposed) setLeaderboardLoading(false); });
+    }
     if (screen === 'history' && (identity.authenticated || identity.guest)) void api<{ items: HistoryItem[] }>('/history?page=0&size=100').then(async result => {
       const local = soloHistory(await soloRuns(profile));
       const combined = new Map(local.map(item => [item.kind + ':' + item.id, item]));
@@ -210,7 +214,7 @@ export function App() {
           </>}
           <button onClick={() => setScreen('leaderboard')}>Leaderboard</button>
         </>}
-        {screen === 'leaderboard' && <ol className="leaderboard">{leaderboard.map(entry => <li key={entry.id}><span>{entry.rank}. {entry.username}</span><strong>{entry.finishTimeMs === null ? Math.floor(entry.maxProgress) + ' px' : duration(entry.finishTimeMs)}</strong></li>)}{!leaderboard.length && !error && <p>No results yet.</p>}</ol>}
+        {screen === 'leaderboard' && <>{leaderboardLoading ? <p role="status">Loading…</p> : <ol className="leaderboard" aria-label="Community leaderboard">{leaderboard.map(entry => <li key={entry.id}><span>{entry.rank}. {entry.username}</span><strong>{entry.finishTimeMs === null ? Math.floor(entry.maxProgress) + ' px' : duration(entry.finishTimeMs)}</strong></li>)}</ol>}{!leaderboardLoading && !leaderboard.length && !error && <p>No results yet.</p>}</>}
         {screen === 'history' && <div className="history-list">{history.map(item => <button key={item.kind + ':' + item.id} onClick={() => { setDetail(item); setScreen('detail'); }}><span className="kind-label">{item.kind}</span><span>{new Date(item.endedAt).toLocaleDateString()} · {item.status}{item.kind === 'SOLO' && pendingHistory.has(item.id) ? ' · Pending sync' : ''}</span><span>{duration(item.finishTimeMs ?? item.playTimeMs)}</span></button>)}{!history.length && <p>No completed games.</p>}</div>}
         {screen === 'detail' && detail && <dl className="record-detail"><dt>Type</dt><dd>{detail.kind}</dd><dt>Result</dt><dd>{detail.status}</dd><dt>Play Time</dt><dd>{duration(detail.playTimeMs)}</dd><dt>Finish Time</dt><dd>{duration(detail.finishTimeMs)}</dd><dt>Jumps</dt><dd>{detail.jumps}</dd><dt>Falls</dt><dd>{detail.falls}</dd><dt>Peak</dt><dd>{Math.floor(detail.maxProgress)} px</dd>{detail.room && <><dt>Room</dt><dd>{detail.room.roomCode}</dd><dt>Mode</dt><dd>{detail.room.mode}</dd><dt>Rank</dt><dd>{detail.room.rank}</dd></>}</dl>}
         {screen === 'options' && <OptionsButtons options={options} flyAllowed={flyAllowed} onChange={updateOptions} onControls={() => setScreen('controls')} onError={setError} />}

@@ -86,6 +86,17 @@ test('two Accounts share server simulation, see each other jump, leave and Conti
     await expect.poll(() => observedA.snapshots.at(-1)?.playId).toBe(runId); expect(observedA.snapshots.at(-1)!.self.simulation.physics.jumps).toBeGreaterThan(0);
     await a.getByRole('button', { name: 'Chat', exact: true }).click(); await expect(a.getByRole('log')).toContainText(text); await a.getByRole('button', { name: 'Close chat', exact: true }).click();
     await leave(a); await leave(b);
+    await a.getByRole('button', { name: 'Community Tower', exact: true }).click();
+    await a.getByRole('button', { name: 'Leaderboard', exact: true }).click();
+    const entries = (await (await a.request.get('/api/leaderboard?limit=100')).json()).entries;
+    const best = entries.find((entry: { username: string }) => entry.username === nameA);
+    expect(best.id).toBe(runId);
+    const row = a.getByLabel('Community leaderboard').getByRole('listitem').filter({ hasText: nameA });
+    await expect(row).toHaveCount(1); await expect(row).toContainText(best.rank + '. ' + nameA);
+    await expect(row).toContainText(Math.floor(best.maxProgress) + ' px');
+    await a.getByRole('button', { name: 'Back', exact: true }).click();
+    await a.getByRole('button', { name: 'Back', exact: true }).click();
+    await expect(a.getByRole('button', { name: 'Leaderboard', exact: true })).toBeHidden();
   } finally { await first.close(); await second.close(); }
 });
 test('prediction stays usable with delayed and reordered snapshots across Pause and Resume', async ({ page }) => {

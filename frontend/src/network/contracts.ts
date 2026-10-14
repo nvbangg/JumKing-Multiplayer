@@ -10,4 +10,9 @@ export interface HistoryItem {
   currentProgress: number; maxProgress: number; finishTimeMs: number | null;
   room: null | { mode: string; roomCode: string; durationMs: number; rank: number; isWinner: boolean };
 }
+export interface LeaderboardEntry {
+  id: string; rank: number; username: string; status: string;
+  currentProgress: number; maxProgress: number; elapsedTimeMs: number;
+  peakReachedTimeMs: number; finishTimeMs: number | null;
+}
 export const EMPTY_STATS: Readonly<Statistics> = Object.freeze({ totalPlayTimeMs: 0, totalJumps: 0, totalFalls: 0, finishes: 0, matchesPlayed: 0, wins: 0, bestFinishTimeMs: null });

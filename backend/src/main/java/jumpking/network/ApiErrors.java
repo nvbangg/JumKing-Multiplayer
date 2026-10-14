@@ -21,7 +21,8 @@ public class ApiErrors {
     @ExceptionHandler(ApiException.class) ResponseEntity<?> application(ApiException error) {
         return ResponseEntity.status(error.status()).body(body(error.code(), error.getMessage()));
     }
-    @ExceptionHandler({HttpMessageNotReadableException.class, org.springframework.web.bind.MissingServletRequestParameterException.class})
+    @ExceptionHandler({HttpMessageNotReadableException.class, org.springframework.web.bind.MissingServletRequestParameterException.class,
+        org.springframework.web.bind.MethodArgumentNotValidException.class})
     ResponseEntity<?> invalid() { return ResponseEntity.badRequest().body(body("VALIDATION", "Invalid request")); }
     @ExceptionHandler(NoResourceFoundException.class) ResponseEntity<?> missing() {
         return ResponseEntity.status(404).body(body("NOT_FOUND", "Not found"));

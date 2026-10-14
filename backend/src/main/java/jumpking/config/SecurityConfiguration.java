@@ -36,6 +36,13 @@ import org.springframework.security.config.Customizer;
 public class SecurityConfiguration {
     @Bean Clock applicationClock() { return Clock.systemUTC(); }
     @Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
+    @Bean org.springframework.security.authentication.AuthenticationManager authenticationManager(
+            org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration configuration) throws Exception {
+        return configuration.getAuthenticationManager();
+    }
+    @Bean org.springframework.security.web.context.HttpSessionSecurityContextRepository securityContexts() {
+        return new org.springframework.security.web.context.HttpSessionSecurityContextRepository();
+    }
     @Bean UserDetailsService userDetailsService(JdbcTemplate jdbc) {
         return email -> jdbc.query("SELECT email,password_hash FROM users WHERE type='ACCOUNT' AND email=?",
             (row, index) -> User.withUsername(row.getString("email")).password(row.getString("password_hash")).roles("ACCOUNT").build(), email)
@@ -66,8 +73,10 @@ public class SecurityConfiguration {
         var registration = new FilterRegistrationBean<>(filter); registration.setEnabled(false); return registration;
     }
     @Bean SecurityFilterChain security(HttpSecurity http, SecuritySettings settings, SessionAuthority sessions,
-            AuthRateLimiter limits, ObjectMapper json, HttpSessionCsrfTokenRepository csrf) throws Exception {
+            AuthRateLimiter limits, ObjectMapper json, HttpSessionCsrfTokenRepository csrf,
+            org.springframework.security.web.context.HttpSessionSecurityContextRepository contexts) throws Exception {
         http.cors(Customizer.withDefaults())
+            .securityContext(configuration -> configuration.securityContextRepository(contexts))
             .csrf(configuration -> configuration.csrfTokenRepository(csrf))
             .formLogin(AbstractHttpConfigurer::disable).httpBasic(AbstractHttpConfigurer::disable)
             .logout(AbstractHttpConfigurer::disable).requestCache(AbstractHttpConfigurer::disable)

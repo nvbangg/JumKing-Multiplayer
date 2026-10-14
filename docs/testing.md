@@ -51,6 +51,8 @@ Integration dùng [Testcontainers MySQL](https://java.testcontainers.org/modules
 
 Windows không có Docker: chạy `./scripts/test-mysql.ps1 -MySqlHome '<thư mục MySQL 8.4>' -JavaHome '<thư mục JDK 25>'` từ root. Runner tạo instance loopback/cổng ngẫu nhiên, credentials riêng, chạy integration rồi dừng và xóa dữ liệu test; không sửa service/database đang dùng. Thêm `-Web` sau khi build frontend để kiểm tra JAR chứa web và Vite proxy. Integration cũng nhận `JK_TEST_DATABASE_URL/USERNAME/PASSWORD` cho database test rỗng có tên bắt đầu `jumpking_it`; runner bên ngoài chịu trách nhiệm cleanup.
 
+Đặt `E2E_BROWSER_PATH` thành đường dẫn Chrome/Chromium trước khi chạy integration để nghiệm thu Account qua UI với backend/MySQL cô lập. Harness tự chạy Vite/cổng riêng và đóng sau test; bỏ biến này thì browser integration được ghi là skipped, không coi là đã nghiệm thu UI. `npm run test:e2e` riêng chỉ chạy các scenarios không cần backend, trừ khi cung cấp `E2E_BASE_URL` và cờ online tương ứng.
+
 ## Scenarios và oracles
 
 | Nhóm | Kiểm tra và kết quả mong đợi |

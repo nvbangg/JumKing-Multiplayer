@@ -27,7 +27,10 @@ export async function api<T>(path: string, method = 'GET', body?: unknown): Prom
     });
     const contentType = response.headers.get('Content-Type') || '';
     const result = contentType.includes('application/json') ? await response.json() : null;
-    if (!response.ok) throw new ApiError(result?.error?.code || 'HTTP_ERROR', result?.error?.message || 'The server could not complete this request');
+    if (!response.ok) {
+      if (result?.error?.code === 'CSRF' || result?.error?.code === 'SESSION_EXPIRED') clearCsrf();
+      throw new ApiError(result?.error?.code || 'HTTP_ERROR', result?.error?.message || 'The server could not complete this request');
+    }
     if (!result || typeof result !== 'object') throw new ApiError('PROTOCOL_ERROR', 'The server returned an invalid response');
     return result;
   } catch (error) {

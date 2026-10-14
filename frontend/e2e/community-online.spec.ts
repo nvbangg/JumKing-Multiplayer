@@ -1,7 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { OnlineSnapshot } from '../src/game/netcode/OnlineRuntime';
+import { leaveOnline } from './support/online';
 
 test.skip(process.env.E2E_AUTH_ONLINE !== 'true', 'Requires the isolated backend/MySQL integration harness');
+test.afterEach(async ({ page }) => { await leaveOnline(page); });
 async function account(page: Page, prefix: string) {
   const name = prefix + '_' + crypto.randomUUID().replaceAll('-', '').slice(0, 12);
   await page.goto('/'); await page.getByRole('button', { name: 'Create Account', exact: true }).click();
@@ -97,7 +99,7 @@ test('two Accounts share server simulation, see each other jump, leave and Conti
     await a.getByRole('button', { name: 'Back', exact: true }).click();
     await a.getByRole('button', { name: 'Back', exact: true }).click();
     await expect(a.getByRole('button', { name: 'Leaderboard', exact: true })).toBeHidden();
-  } finally { await first.close(); await second.close(); }
+  } finally { for (const context of [first, second]) for (const page of context.pages()) await leaveOnline(page); await first.close(); await second.close(); }
 });
 test('prediction stays usable with delayed and reordered snapshots across Pause and Resume', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('jumpking.options', JSON.stringify({ sound: false })));

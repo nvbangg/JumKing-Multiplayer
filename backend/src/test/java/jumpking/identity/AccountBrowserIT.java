@@ -31,6 +31,17 @@ class AccountBrowserIT {
     @Autowired jumpking.game.SharedData shared;
     @Autowired com.fasterxml.jackson.databind.ObjectMapper json;
     private record FinishFixture(long owner, String email, String password, String run) {}
+    private record AdventureFixture(String email, String password) {}
+    private AdventureFixture adventureFixture() throws Exception {
+        var jdbc = TestDatabase.get().jdbc;
+        String name = "adventure_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12), email = name + "@example.test", password = java.util.UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO users(type,username,email,password_hash,created_at) VALUES ('ACCOUNT',?,?,?,UTC_TIMESTAMP(3))", name, email, passwords.encode(password));
+        long owner = jdbc.queryForObject("SELECT id FROM users WHERE email=?", Long.class, email);
+        var game = new jumpking.game.GameSimulation(json.treeToValue(shared.map(), jumpking.game.GameMap.class), new jumpking.game.Physics(json.convertValue(shared.physics(), new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Number>>() {})), shared.adventure(), false, false, java.util.List.of());
+        var physics = game.physics().snapshot(); physics.x = 296; physics.y = -1682; physics.screen = 5;
+        game.physics().restore(physics); communityRuns.open(owner, false, null, game.snapshot());
+        return new AdventureFixture(email, password);
+    }
     private FinishFixture finishFixture() throws Exception {
         var jdbc = TestDatabase.get().jdbc;
         String name = "finish_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12), email = name + "@example.test", password = java.util.UUID.randomUUID().toString();
@@ -90,6 +101,8 @@ class AccountBrowserIT {
             builder.environment().put("E2E_MERGE_PASSWORD", merge.password); builder.environment().put("E2E_MERGE_GUEST", merge.token);
             var finish = finishFixture();
             builder.environment().put("E2E_FINISH_EMAIL", finish.email); builder.environment().put("E2E_FINISH_PASSWORD", finish.password); builder.environment().put("E2E_FINISH_RUN", finish.run);
+            var adventure = adventureFixture();
+            builder.environment().put("E2E_ADVENTURE_EMAIL", adventure.email); builder.environment().put("E2E_ADVENTURE_PASSWORD", adventure.password);
             browser = builder.redirectErrorStream(true).redirectOutput(Path.of("target/auth-browser-test.log").toFile()).start();
             assertThat(browser.waitFor(300, TimeUnit.SECONDS)).as("Browser test timeout; inspect target/auth-browser-test.log").isTrue();
             assertThat(browser.exitValue()).as("Inspect target/auth-browser-test.log and frontend/test-results").isZero();

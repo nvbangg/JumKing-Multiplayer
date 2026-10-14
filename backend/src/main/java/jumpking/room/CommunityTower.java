@@ -118,6 +118,12 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                     var input = player.pausePending ? PlayerInput.NEUTRAL : frame.input();
                     var beforeEnding = player.game.adventure().snapshot();
                     var events = player.game.tick(input); double progress = player.game.physics().progress();
+                    if (player.connection != null && (!events.adventure().isEmpty() || !events.world().isEmpty())) {
+                        var cues = json.createArrayNode();
+                        for (var event : events.adventure()) cues.addObject().put("eventSeq", ++eventSeq).put("kind", "ADVENTURE").put("type", event.type()).put("id", event.id());
+                        for (var event : events.world()) cues.addObject().put("eventSeq", ++eventSeq).put("kind", "WORLD").put("type", event.type()).put("id", event.id());
+                        player.connection.send("ADVENTURE_EVENTS", Map.of("roomId", id, "playId", player.stored.id(), "events", cues));
+                    }
                     var pose = player.game.physics().snapshot();
                     for (String effect : events.movement()) effects.add(json.createObjectNode().put("eventSeq", ++eventSeq).put("playerId", player.id).put("playId", player.stored.id())
                         .put("screen", pose.screen).put("effect", effect).put("terrain", pose.snow ? "SNOW" : pose.ice ? "ICE" : "NORMAL"));

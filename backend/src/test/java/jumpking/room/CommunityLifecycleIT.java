@@ -52,6 +52,8 @@ class CommunityLifecycleIT {
             client.await(message -> message.path("type").asText().equals("ERROR") && message.path("payload").path("code").asText().equals("INVALID_MESSAGE"));
             step(client, 100);
             var physics = client.snapshot().path("self").path("simulation").path("physics");
+            assertThat(client.command("EQUIP_ITEM", Map.of("itemId", "Cap", "equipped", true)).path("payload").path("code").asText()).isEqualTo("CONFLICT");
+            assertThat(client.snapshot().path("self").path("simulation").path("adventure").path("equipped").size()).isZero();
             assertThat(physics.path("freeFlight").asBoolean()).isFalse(); assertThat(physics.path("screen").asInt()).isZero();
             assertThat(physics.path("jumps").asInt()).isZero(); assertThat(client.snapshot().path("self").path("status").asText()).isEqualTo("ACTIVE");
             client.ok("LEAVE_ROOM", Map.of());

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { leaveOnline } from './support/online';
 
 test.skip(process.env.E2E_AUTH_ONLINE !== 'true', 'Requires the isolated backend/MySQL integration harness');
 test('committed Community Finish plays only for its owner and New Game clears the ending', async ({ browser }, info) => {
@@ -32,5 +33,5 @@ test('committed Community Finish plays only for its owner and New Game clears th
     await peer.keyboard.down('Space'); await peer.waitForTimeout(220); await peer.keyboard.up('Space'); await expect(peer.locator('.game-hud')).toContainText('Jumps: 1');
     await peer.getByRole('button', { name: 'Menu', exact: true }).click(); await peer.getByRole('button', { name: 'Save & Exit', exact: true }).click(); await expect(peer.getByRole('button', { name: 'New Solo Game', exact: true })).toBeVisible();
     expect(peerFinishes).toEqual([]); expect(errors).toEqual([]);
-  } finally { await first.close(); await second.close(); }
+  } finally { for (const context of [first, second]) for (const page of context.pages()) await leaveOnline(page); await first.close(); await second.close(); }
 });

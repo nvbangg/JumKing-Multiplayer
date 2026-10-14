@@ -5,7 +5,7 @@ import { clearReconnect, loadReconnect, saveReconnect } from './reconnect';
 
 interface Message { v: number; type: string; payload: Record<string, unknown>; requestId?: string }
 const SERVER_TYPES = new Set(['ROOM_JOINED', 'ROOM_STATE', 'ROOM_LEFT', 'GAME_STARTED', 'GAME_SNAPSHOT', 'COMMUNITY_RUN_STATE',
-  'PLAYER_EFFECTS', 'PLAYER_FINISHED', 'GAME_FINISHED', 'SAVE_STATUS', 'CHAT_MESSAGE', 'CHAT_HISTORY', 'RECONNECT_OK', 'PONG', 'ERROR']);
+  'PLAYER_EFFECTS', 'ADVENTURE_EVENTS', 'PLAYER_FINISHED', 'GAME_FINISHED', 'SAVE_STATUS', 'CHAT_MESSAGE', 'CHAT_HISTORY', 'RECONNECT_OK', 'PONG', 'ERROR']);
 function parseMessage(data: unknown): Message {
   if (typeof data !== 'string' || new TextEncoder().encode(data).length > NETWORK.maxMessageBytes) throw new Error('Invalid message size');
   const value: unknown = JSON.parse(data);

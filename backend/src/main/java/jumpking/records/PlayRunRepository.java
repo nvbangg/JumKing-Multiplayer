@@ -4,6 +4,8 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
+import java.util.List;
+import java.util.List;
 
 public interface PlayRunRepository extends JpaRepository<PlayRun, String> {
     boolean existsByUserIdAndKind(long userId, String kind);
@@ -13,4 +15,8 @@ public interface PlayRunRepository extends JpaRepository<PlayRun, String> {
     @Modifying(flushAutomatically = true)
     @Query("update PlayRun r set r.userId = :target where r.userId = :source and r.kind = 'ROOM'")
     int transferRoomRuns(@Param("source") long source, @Param("target") long target);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from PlayRun r where r.userId = :owner and r.kind = 'COMMUNITY' and r.status = 'ACTIVE'")
+    Optional<PlayRun> lockActiveCommunity(@Param("owner") long owner);
 }

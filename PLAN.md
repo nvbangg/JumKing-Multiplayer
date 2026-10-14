@@ -16,7 +16,7 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 
 - [x] Chuyển Account/Guest/session và authentication sang UserRepository; hồi quy đăng nhập.
 - [x] Chuyển merge/ownership và Solo metrics; kiểm thử locking/idempotency/rollback.
-- [ ] Chuyển Community checkpoint/New Run/Finish và worker; hồi quy Continue/retry.
+- [x] Chuyển Community checkpoint/New Run/Finish và worker; hồi quy Continue/retry.
 - [ ] Chuyển Room writer/recovery; kiểm thử ghi/finalize đúng một lần.
 - [ ] Chuyển Stats/History/leaderboard/current sang projections/Repository; bỏ đường JDBC và SQL ngoài repository.
 
@@ -66,6 +66,8 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 | Phase 02 — Identity | PASS — 51 unit tests, 18 MySQL integration tests; 22 Chrome online và 1 identity-race PASS. Account/Guest/authentication dùng UserRepository, không đổi contract/session hoặc database cá nhân. |
 
 | Phase 02 — Merge/Solo | PASS — 51 unit và 19 MySQL integration tests (Identity, Community, Room writer). Giữ kiểm tra retry/conflict/rollback và late writer sau Merge. Fixture Room chuyển sang Spring bean để cùng datasource/transaction JPA; lượt lỗi fixture ban đầu không tính PASS. |
+
+| Phase 02 — Community | PASS — 51 unit và 9 MySQL integration tests, gồm New Run/Continue, rollback và save failure. Flush lượt cũ trước insert để giữ generated unique ACTIVE; không sửa database cá nhân. |
 
 ## Lịch sử triển khai trước thay đổi kiến trúc
 

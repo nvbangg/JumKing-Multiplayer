@@ -1,13 +1,11 @@
 package jumpking.records;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 import jumpking.game.GameSimulation;
 import jumpking.network.ApiException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -23,24 +21,30 @@ public class CommunityRuns {
                 && progress == next.progress() && maximum == next.maximum() && peak == next.peak() && java.util.Objects.equals(endedAt, next.endedAt());
         }
     }
-    private final JdbcTemplate jdbc;
+    private final PlayRunRepository runs;
     private final ObjectMapper json;
     private final RunOwners owners;
     private final Clock clock;
-    public CommunityRuns(JdbcTemplate jdbc, ObjectMapper json, RunOwners owners, Clock clock) { this.jdbc = jdbc; this.json = json; this.owners = owners; this.clock = clock; }
+    public CommunityRuns(PlayRunRepository runs, ObjectMapper json, RunOwners owners, Clock clock) { this.runs = runs; this.json = json; this.owners = owners; this.clock = clock; }
     public Stored open(long account, boolean replace, String expected, GameSimulation.Snapshot spawn) {
         return owners.write(account, owner -> {
             if (!owners.read(owner).type().equals("ACCOUNT")) throw new ApiException(403, "ACCOUNT_REQUIRED", "Sign in to play Community Tower");
-            var active = jdbc.query("SELECT id,revision,snapshot,max_progress,peak_reached_ticks,started_at FROM play_runs WHERE user_id=? AND kind='COMMUNITY' AND status='ACTIVE' FOR UPDATE",
-                (row, index) -> new Stored(row.getString("id"), owner, row.getLong("revision"), decode(row.getString("snapshot")), row.getDouble("max_progress"), row.getLong("peak_reached_ticks"), row.getTimestamp("started_at").toInstant()), owner);
-            var old = active.isEmpty() ? null : active.getFirst();
+            var active = runs.lockActiveCommunity(owner).orElse(null);
+            var old = active == null ? null : new Stored(active.getId(), owner, active.getRevision(), decode(active.getSnapshot()), active.getMaxProgress(), active.getPeakReachedTicks(), active.getStartedAt());
             if (!replace && old != null) return old;
             if (replace && !java.util.Objects.equals(expected, old == null ? null : old.id())) throw new ApiException(409, "CONFLICT", "Community save changed; refresh before starting a new game");
-            var now = Timestamp.from(clock.instant());
-            if (old != null) jdbc.update("UPDATE play_runs SET status='ABANDONED',snapshot=NULL,revision=revision+1,ended_at=?,updated_at=? WHERE id=?", now, now, old.id());
+            var now = clock.instant();
+            if (active != null) {
+                active.setStatus("ABANDONED"); active.setSnapshot(null); active.setRevision(active.getRevision() + 1);
+                active.setEndedAt(now); active.setUpdatedAt(now);
+                // Hibernate insert trước update: flush lượt cũ để giải phóng generated unique ACTIVE.
+                runs.flush();
+            }
             String id = UUID.randomUUID().toString();
-            jdbc.update("INSERT INTO play_runs(id,user_id,kind,status,snapshot,started_at,updated_at) VALUES (?,?,'COMMUNITY','ACTIVE',?,?,?)", id, owner, encode(spawn), now, now);
-            return new Stored(id, owner, 1, spawn, 0, 0, now.toInstant());
+            var run = new PlayRun(); run.setId(id); run.setUserId(owner); run.setKind("COMMUNITY"); run.setStatus("ACTIVE");
+            run.setRevision(1); run.setSnapshot(encode(spawn)); run.setStartedAt(now); run.setUpdatedAt(now);
+            runs.saveAndFlush(run);
+            return new Stored(id, owner, 1, spawn, 0, 0, run.getStartedAt());
         });
     }
     public void save(Write next) {
@@ -51,11 +55,11 @@ public class CommunityRuns {
                 || next.snapshot().world().path("lastTick").asLong() != state.ticks
                 || (next.status().equals("ACTIVE") != (next.endedAt() == null))) throw new ApiException(409, "CONFLICT", "Invalid Community metrics");
         owners.write(next.owner(), owner -> {
-            var old = jdbc.query("SELECT status,revision,play_ticks,jumps,falls,current_progress,max_progress,peak_reached_ticks,snapshot,ended_at FROM play_runs WHERE id=? AND user_id=? AND kind='COMMUNITY' FOR UPDATE",
-                (row, index) -> new Existing(row.getString("status"), row.getLong("revision"), row.getLong("play_ticks"), row.getInt("jumps"), row.getInt("falls"), row.getDouble("current_progress"),
-                    row.getDouble("max_progress"), row.getLong("peak_reached_ticks"), row.getString("snapshot"), row.getTimestamp("ended_at") == null ? null : row.getTimestamp("ended_at").toInstant()), next.id(), owner);
-            if (old.isEmpty()) throw new ApiException(409, "CONFLICT", "Community run no longer exists");
-            var value = old.getFirst(); long revision = value.revision();
+            var run = runs.lockById(next.id()).orElse(null);
+            if (run == null || run.getUserId() != owner || !run.getKind().equals("COMMUNITY")) throw new ApiException(409, "CONFLICT", "Community run no longer exists");
+            var value = new Existing(run.getStatus(), run.getRevision(), run.getPlayTicks(), run.getJumps(), run.getFalls(), run.getCurrentProgress(),
+                run.getMaxProgress(), run.getPeakReachedTicks(), run.getSnapshot(), run.getEndedAt());
+            long revision = value.revision();
             if (next.revision() < revision) return null;
             if (next.revision() == revision) {
                 if (!value.same(next) || (next.status().equals("ACTIVE") && !tree(value.snapshot()).equals(tree(encode(next.snapshot()))))) throw new ApiException(409, "CONFLICT", "Community revision conflicts");
@@ -65,9 +69,10 @@ public class CommunityRuns {
             if (state.ticks < value.ticks() || state.jumps < value.jumps() || state.falls < value.falls() || next.maximum() < value.maximum()
                     || next.peak() < value.peak() || (next.maximum() == value.maximum() && next.peak() != value.peak())) throw new ApiException(409, "CONFLICT", "Community metrics cannot decrease or change an existing peak time");
             boolean active = next.status().equals("ACTIVE");
-            jdbc.update("UPDATE play_runs SET revision=?,status=?,play_ticks=?,jumps=?,falls=?,current_progress=?,max_progress=?,peak_reached_ticks=?,finish_ticks=?,snapshot=?,ended_at=?,updated_at=? WHERE id=? AND user_id=?",
-                next.revision(), next.status(), state.ticks, state.jumps, state.falls, next.progress(), next.maximum(), next.peak(), next.status().equals("FINISHED") ? state.ticks : null,
-                active ? encode(next.snapshot()) : null, next.endedAt() == null ? null : Timestamp.from(next.endedAt()), Timestamp.from(clock.instant()), next.id(), owner);
+            run.setRevision(next.revision()); run.setStatus(next.status()); run.setPlayTicks(state.ticks); run.setJumps(state.jumps); run.setFalls(state.falls);
+            run.setCurrentProgress(next.progress()); run.setMaxProgress(next.maximum()); run.setPeakReachedTicks(next.peak());
+            run.setFinishTicks(next.status().equals("FINISHED") ? state.ticks : null); run.setSnapshot(active ? encode(next.snapshot()) : null);
+            run.setEndedAt(next.endedAt()); run.setUpdatedAt(clock.instant()); runs.flush();
             return null;
         });
     }

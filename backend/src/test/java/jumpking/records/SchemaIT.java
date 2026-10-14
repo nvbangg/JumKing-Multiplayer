@@ -87,9 +87,11 @@ class SchemaIT {
                     verifyViteProxy(http, origin);
                 }
             }
-            for (String path : new String[]{"/api/missing", "/assets/missing.png", "/ws/game"}) {
+            for (String path : new String[]{"/api/missing", "/assets/missing.png"}) {
                 assertThat(http.send(HttpRequest.newBuilder(URI.create(origin + path)).header("Origin", "http://127.0.0.1:5173").build(), HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(404);
             }
+            var unauthorizedSocket = http.send(HttpRequest.newBuilder(URI.create(origin + "/ws/game")).header("Origin", "http://127.0.0.1:5173").build(), HttpResponse.BodyHandlers.ofString());
+            assertThat(unauthorizedSocket.statusCode()).isEqualTo(401); assertThat(unauthorizedSocket.body()).doesNotContain("<html");
         } finally {
             process.destroy();
             if (!process.waitFor(15, TimeUnit.SECONDS)) { process.destroyForcibly(); process.waitFor(5, TimeUnit.SECONDS); }

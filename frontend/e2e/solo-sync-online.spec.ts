@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import type { SoloRun } from '../src/features/solo/storage';
 
 test.skip(process.env.E2E_AUTH_ONLINE !== 'true', 'Requires the isolated backend/MySQL integration harness');
 test.beforeEach(async ({ page }) => { await page.addInitScript(() => localStorage.setItem('jumpking.options', JSON.stringify({ sound: false }))); });
@@ -16,7 +17,7 @@ async function playAndSave(page: Page) {
   await page.getByRole('button', { name: 'Menu', exact: true }).click(); await page.getByRole('button', { name: 'Save & Exit', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Continue Solo', exact: true })).toBeVisible();
 }
-async function runs(page: Page, accountId: string) {
+async function runs(page: Page, accountId: string): Promise<SoloRun[]> {
   return page.evaluate(async id => { const path = '/src/features/solo/storage.ts', { soloRuns } = await import(path); return soloRuns(location.origin + ':account:' + id); }, accountId);
 }
 async function synced(page: Page, accountId: string) {
@@ -52,10 +53,10 @@ test('one Account on two devices creates separate Solo UUIDs and totals both exa
     await page.bringToFront(); await playAndSave(page); await synced(page, account.id);
     await other.bringToFront(); await playAndSave(other); await synced(other, account.id);
     const firstRuns = await runs(page, account.id), secondRuns = await runs(other, account.id);
-    expect(firstRuns).toHaveLength(1); expect(secondRuns).toHaveLength(1); expect(firstRuns[0].id).not.toBe(secondRuns[0].id);
+    expect(firstRuns).toHaveLength(1); expect(secondRuns).toHaveLength(1); expect(firstRuns[0]!.id).not.toBe(secondRuns[0]!.id);
     const stats = await (await page.request.get('/api/profile/me')).json();
-    expect(stats.total.totalJumps).toBe(firstRuns[0].jumps + secondRuns[0].jumps);
-    expect(stats.total.totalPlayTimeMs).toBe(Math.floor((firstRuns[0].playTicks + secondRuns[0].playTicks) * 1000 / 60));
+    expect(stats.total.totalJumps).toBe(firstRuns[0]!.jumps + secondRuns[0]!.jumps);
+    expect(stats.total.totalPlayTimeMs).toBe(Math.floor((firstRuns[0]!.playTicks + secondRuns[0]!.playTicks) * 1000 / 60));
     expect(stats.total.bestFinishTimeMs).toBeNull();
     await page.reload(); await expect(page.getByRole('button', { name: account.username, exact: true })).toBeVisible();
   } finally { await second.close(); }

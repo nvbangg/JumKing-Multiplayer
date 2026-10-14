@@ -53,7 +53,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 
 - [x] Triển khai Account-only Community và simulation server; kiểm tra ghép/tạo sảnh, Join/Leave và state của hai clients.
 - [x] Hoàn thiện prediction/reconciliation/interpolation; kiểm tra ACK/replay, latency, thiếu frame và resync.
-- [ ] Hoàn thiện checkpoint/worker/autosave/Continue/New Run; kiểm tra transaction/revision, một lượt ACTIVE và rollback.
+- [x] Hoàn thiện checkpoint/worker/autosave/Continue/New Run; kiểm tra transaction/revision, một lượt ACTIVE và rollback.
 - [ ] Hoàn thiện Pause/Resume/AFK/Save & Exit theo gameplay; kiểm tra hidden/blur, clock, đang rơi, save status và hạn giữ slot.
 - [ ] Hoàn thiện Join ID/transfer/reconnect; kiểm tra capacity, membership, biên deadline và Continue sau hết hạn.
 - [ ] Đồng bộ ngoại hình/nhãn tên/animation/audio peers; kiểm tra self/peers, camera/screen, slot reuse và dedupe effects.
@@ -137,5 +137,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 04 — WS transport | PASS — type-check/build, 53 frontend/33 backend unit tests, 27 MySQL integration tests và 8 Chrome E2E online. Hai browser contexts có cookies độc lập kết nối WS thật; giới hạn hai socket/identity, lỗi payload/request ID, Logout chỉ thu hồi đúng Account. Unit tests kiểm tra FIFO/ACK/timeout, Fly gate, bounded serial executor, snapshot coalescing và slow consumer/overflow. Gameplay online và room registry theo Phase 05–06 |
 | Phase 05 — Community server | PASS — type-check/build, 53 frontend/33 backend unit tests, 27 MySQL integration tests và 9 Chrome E2E online. Hai Account độc lập Join cùng sảnh qua ID, nhảy và nhận state của nhau, màu khác nhau, Save & Exit giải phóng membership, Continue giữ run ID/counters; xem screenshot thật. Server fixed-step, input FIFO, checkpoint JDBC ngoài actor; prediction và các biên save/pause/reconnect theo những mốc tiếp theo |
 | Phase 05 — prediction | PASS — type-check/build, 58 frontend/34 backend unit tests, 27 MySQL integration tests và 10 Chrome E2E online. Client dự đoán trước ACK, restore/replay phần chưa xác nhận, nội suy peers theo serverTick; bỏ snapshot/context cũ và dừng khi buffer đầy. CANCEL loại input đang chờ, không release-jump. Chrome qua WS/MySQL thật chịu snapshot trễ 100–180 ms/đến sai thứ tự; Pause/Resume và hai lần nhảy vẫn đúng, không nhận pause từ generation cũ. Đo hiệu năng định lượng theo Phase 07 |
+| Phase 05 — checkpoint | PASS — type-check/build, 58 frontend/38 backend unit tests, 33 MySQL/HTTP/WS integration tests và 11 Chrome E2E online. Worker gộp autosave chưa ghi, giữ flush barriers, retry cùng payload tối đa 3 lần; không báo SAVED trước commit. Kiểm tra concurrent Continue chỉ một ACTIVE, owner/revision/counters, rollback New Run bằng trigger lỗi và writer cũ không phục hồi ABANDONED. UI New Game giữ History/totals, đổi đúng run ID. Có clock test cho deadlines, không sửa shared rules để rút ngắn thời gian thật |
 | Phase 05 còn lại–07 | NOT RUN — chưa nghiệm thu đầy đủ |
 | Phase 08 | Chưa thực hiện |

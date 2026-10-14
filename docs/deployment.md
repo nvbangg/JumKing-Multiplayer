@@ -53,7 +53,9 @@ BACKEND_URL chỉ dùng cho proxy Vite. VITE_BACKEND_ORIGIN trống nếu cùng 
 | APP_AUTH_RATE_PER_MINUTE / APP_HTTP_BODY_LIMIT | app.auth-rate-per-minute=20; app.http-body-limit=16384 bytes |
 | APP_SOLO_SYNC_RATE_PER_MINUTE | app.solo-sync-rate-per-minute=60; giới hạn theo Account |
 | APP_CHECKPOINT_INTERVAL_MS | app.checkpoint-interval-ms=1000; chu kỳ checkpoint Community và metrics Room |
-| APP_PERSISTENCE_RETRY_COUNT | app.persistence-retry-count=3 |
+| APP_PERSISTENCE_RETRY_COUNT | app.persistence-retry-count=3; tối đa 3 lần thử lại sau lần ghi đầu |
+| APP_PERSISTENCE_RETRY_DELAY_MS | app.persistence-retry-delay-ms=1000; khoảng chờ giữa các lần thử |
+| APP_PERSISTENCE_THREADS / QUEUE / RUN_QUEUE | app.persistence-threads=2, app.persistence-queue=256, app.persistence-run-queue=16; workers chung và hàng chờ từng lượt |
 | FLY_ENABLED | app.fly-enabled=${FLY_ENABLED:false}; mặc định false |
 
 Ưu tiên config: command-line → process ENV → external properties → JAR. Backend validate datasource/allowlist. Gameplay/rules ở shared, network bounds theo protocol, presentation ở frontend config. [Spring external config](https://docs.spring.io/spring-boot/reference/features/external-config.html)

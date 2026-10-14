@@ -79,7 +79,14 @@ export function OnlineGame({ socket, room }: { socket: GameSocket; room: RoomSta
     {ready && <div className="game-hud"><span>Jumps: {jumps}{options.displayTimer && <span className="timer" aria-label="Play time">{duration(elapsed)}</span>}</span><span className="room-code" aria-label="Room ID">{room.roomId}</span><button onClick={pause}>Menu</button></div>}
     {ready && !menu && <TouchControls input={input} flying={false} />}
     {menu && <section className="game-overlay" aria-label="Game menu"><MenuPanel title={menu === 'pause' ? 'Paused' : menu === 'options' ? 'Options' : 'Controls'} onBack={menu === 'pause' ? undefined : () => setMenu(menu === 'controls' ? 'options' : 'pause')}>
-      {menu === 'pause' && <><button disabled={pending} onClick={() => { void resume(); }}>Resume</button><button onClick={() => setMenu('options')}>Options</button><button disabled={pending} onClick={() => { void command('LEAVE_ROOM'); }}>{room.kind === 'COMMUNITY' ? 'Save & Exit' : 'Leave Room'}</button>{room.kind === 'COMMUNITY' && <small role="status">{saveStatus === 'SAVED' ? 'Saved' : saveStatus === 'FAILED' ? 'Save failed' : 'Saving…'}</small>}</>}
+      {menu === 'pause' && <><button disabled={pending} onClick={() => { void resume(); }}>Resume</button><button onClick={() => setMenu('options')}>Options</button>
+        {room.kind === 'COMMUNITY' && <button disabled={pending} onClick={() => { if (!window.confirm('Replace your unfinished Community game?')) return; void (async () => {
+          setPending(true); setError('');
+          try { await socket.command('NEW_COMMUNITY_RUN', { expectedRunId: runtime.current?.latest?.self.status === 'FINISHED' ? null : runtime.current?.latest?.playId });
+            if (runtime.current) runtime.current.menu = false; input.current?.resume(); audio.current?.pause(false); setMenu(null);
+          } catch (cause) { setError(cause instanceof Error ? cause.message : 'New Game failed'); } finally { setPending(false); }
+        })(); }}>New Game</button>}
+        <button disabled={pending} onClick={() => { void command('LEAVE_ROOM'); }}>{room.kind === 'COMMUNITY' ? 'Save & Exit' : 'Leave Room'}</button>{room.kind === 'COMMUNITY' && <small role="status">{saveStatus === 'SAVED' ? 'Saved' : saveStatus === 'FAILED' ? 'Save failed' : 'Saving…'}</small>}</>}
       {menu === 'options' && <OptionsButtons options={options} flyAllowed={flyAllowed} onChange={updateOptions} onControls={() => setMenu('controls')} onError={setError} />}
       {menu === 'controls' && <ControlsHelp flyAllowed={flyAllowed} />}
       {error && <p role="alert">{error}</p>}

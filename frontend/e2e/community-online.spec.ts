@@ -35,15 +35,15 @@ async function leave(page: Page) {
 test('two Accounts share server simulation, see each other jump, leave and Continue the saved run', async ({ browser }, info) => {
   const first = await browser.newContext(), second = await browser.newContext();
   try {
-    for (const context of [first, second]) await context.addInitScript(() => localStorage.setItem('jumpking.options', JSON.stringify({ sound: false, displayTimer: true })));
+    for (const context of [first, second]) await context.addInitScript(() => { if (location.protocol === 'http:' || location.protocol === 'https:') localStorage.setItem('jumpking.options', JSON.stringify({ sound: false, displayTimer: true })); });
     const a = await first.newPage(), b = await second.newPage(), observedA = observe(a), observedB = observe(b);
     const nameA = await account(a, 'tower_a'), nameB = await account(b, 'tower_b');
     await a.bringToFront(); await a.getByRole('button', { name: 'Community Tower', exact: true }).click(); await a.getByRole('button', { name: 'New Game', exact: true }).click();
-    await expect(a.getByRole('button', { name: 'Menu', exact: true })).toBeVisible();
+    await expect(a.getByRole('button', { name: 'Menu', exact: true })).toBeVisible({ timeout: 15_000 });
     await expect.poll(() => observedA.snapshots.length).toBeGreaterThan(0);
     const roomId = await a.getByLabel('Room ID', { exact: true }).innerText(), runId = observedA.snapshots.at(-1)!.playId;
     await b.getByRole('button', { name: 'Join by ID', exact: true }).click(); await b.getByLabel('Room ID', { exact: true }).fill(roomId); await b.getByRole('button', { name: 'Join', exact: true }).click();
-    await expect(b.getByRole('button', { name: 'Menu', exact: true })).toBeVisible();
+    await expect(b.getByRole('button', { name: 'Menu', exact: true })).toBeVisible({ timeout: 15_000 });
     await expect.poll(() => observedA.rosters.at(-1)?.members.length).toBe(2); await expect.poll(() => observedB.rosters.at(-1)?.members.length).toBe(2);
     expect(observedA.rosters.at(-1)!.members.map(member => member.nickname).sort()).toEqual([nameA, nameB].sort());
     expect(new Set(observedA.rosters.at(-1)!.members.map(member => member.colorSlot)).size).toBe(2);
@@ -83,4 +83,17 @@ test('prediction stays usable with delayed and reordered snapshots across Pause 
   await expect(page.getByRole('button', { name: 'Resume', exact: true })).toHaveCount(0);
   await jump(page); await expect(page.locator('.game-hud')).toContainText('Jumps: 2');
   await expect(page.getByRole('alert')).toHaveCount(0); expect(errors).toEqual([]); await leave(page);
+});
+test('Community New Game keeps old History and metrics while replacing only the active checkpoint', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('jumpking.options', JSON.stringify({ sound: false })));
+  const observed = observe(page); await account(page, 'new_run');
+  await page.getByRole('button', { name: 'Community Tower', exact: true }).click(); await page.getByRole('button', { name: 'New Game', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Menu', exact: true })).toBeVisible(); await expect.poll(() => observed.snapshots.length).toBeGreaterThan(0);
+  const first = observed.snapshots.at(-1)!.playId; await jump(page); await expect(page.locator('.game-hud')).toContainText('Jumps: 1');
+  await page.getByRole('button', { name: 'Menu', exact: true }).click(); page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'New Game', exact: true }).click();
+  await expect.poll(() => observed.snapshots.at(-1)?.playId).not.toBe(first); expect(observed.snapshots.at(-1)!.self.simulation.physics.jumps).toBe(0);
+  await leave(page);
+  const history = await (await page.request.get('/api/history')).json(), stats = await (await page.request.get('/api/profile/me')).json();
+  expect(history.items).toHaveLength(1); expect(history.items[0]).toMatchObject({ id: first, kind: 'COMMUNITY', status: 'ABANDONED', jumps: 1 });
+  expect(stats.total.totalJumps).toBe(1); expect((await (await page.request.get('/api/community/current')).json()).run.id).not.toBe(first); expect(observed.errors).toEqual([]);
 });

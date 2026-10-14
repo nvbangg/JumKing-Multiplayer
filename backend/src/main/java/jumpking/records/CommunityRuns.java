@@ -13,7 +13,16 @@ import org.springframework.stereotype.Service;
 @Service
 public class CommunityRuns {
     public record Stored(String id, long owner, long revision, GameSimulation.Snapshot snapshot, double maximum, long peak, Instant startedAt) {}
-    public record Write(String id, long owner, long revision, String status, GameSimulation.Snapshot snapshot, double progress, double maximum, long peak, Instant endedAt) {}
+    public record Write(String id, long owner, long revision, String status, GameSimulation.Snapshot snapshot, double progress, double maximum, long peak, Instant endedAt) {
+        public Write { if (endedAt != null) endedAt = endedAt.truncatedTo(java.time.temporal.ChronoUnit.MILLIS); }
+    }
+    private record Existing(String status, long revision, long ticks, int jumps, int falls, double progress, double maximum, long peak, String snapshot, Instant endedAt) {
+        boolean same(Write next) {
+            var physics = next.snapshot().physics();
+            return status.equals(next.status()) && ticks == physics.ticks && jumps == physics.jumps && falls == physics.falls
+                && progress == next.progress() && maximum == next.maximum() && peak == next.peak() && java.util.Objects.equals(endedAt, next.endedAt());
+        }
+    }
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final RunOwners owners;
@@ -35,19 +44,27 @@ public class CommunityRuns {
         });
     }
     public void save(Write next) {
+        var state = next.snapshot().physics();
+        if (!java.util.Set.of("ACTIVE", "FINISHED", "ABANDONED").contains(next.status()) || next.revision() < 1
+                || !Double.isFinite(next.progress()) || !Double.isFinite(next.maximum()) || next.maximum() < next.progress() || next.progress() < 0
+                || state.ticks < 0 || state.jumps < 0 || state.falls < 0 || next.peak() < 0 || next.peak() > state.ticks
+                || next.snapshot().world().path("lastTick").asLong() != state.ticks
+                || (next.status().equals("ACTIVE") != (next.endedAt() == null))) throw new ApiException(409, "CONFLICT", "Invalid Community metrics");
         owners.write(next.owner(), owner -> {
-            var old = jdbc.query("SELECT status,revision,play_ticks,snapshot FROM play_runs WHERE id=? AND user_id=? AND kind='COMMUNITY' FOR UPDATE",
-                (row, index) -> new Object[]{row.getString("status"), row.getLong("revision"), row.getLong("play_ticks"), row.getString("snapshot")}, next.id(), owner);
+            var old = jdbc.query("SELECT status,revision,play_ticks,jumps,falls,current_progress,max_progress,peak_reached_ticks,snapshot,ended_at FROM play_runs WHERE id=? AND user_id=? AND kind='COMMUNITY' FOR UPDATE",
+                (row, index) -> new Existing(row.getString("status"), row.getLong("revision"), row.getLong("play_ticks"), row.getInt("jumps"), row.getInt("falls"), row.getDouble("current_progress"),
+                    row.getDouble("max_progress"), row.getLong("peak_reached_ticks"), row.getString("snapshot"), row.getTimestamp("ended_at") == null ? null : row.getTimestamp("ended_at").toInstant()), next.id(), owner);
             if (old.isEmpty()) throw new ApiException(409, "CONFLICT", "Community run no longer exists");
-            Object[] value = old.getFirst(); long revision = (Long) value[1];
+            var value = old.getFirst(); long revision = value.revision();
             if (next.revision() < revision) return null;
             if (next.revision() == revision) {
-                if (!value[0].equals(next.status()) || (Long) value[2] != next.snapshot().physics().ticks
-                        || (next.status().equals("ACTIVE") && !tree((String) value[3]).equals(json.valueToTree(next.snapshot())))) throw new ApiException(409, "CONFLICT", "Community revision conflicts");
+                if (!value.same(next) || (next.status().equals("ACTIVE") && !tree(value.snapshot()).equals(tree(encode(next.snapshot()))))) throw new ApiException(409, "CONFLICT", "Community revision conflicts");
                 return null;
             }
-            if (!value[0].equals("ACTIVE")) throw new ApiException(409, "CONFLICT", "Community run has already ended");
-            var state = next.snapshot().physics(); boolean active = next.status().equals("ACTIVE");
+            if (!value.status().equals("ACTIVE")) throw new ApiException(409, "CONFLICT", "Community run has already ended");
+            if (state.ticks < value.ticks() || state.jumps < value.jumps() || state.falls < value.falls() || next.maximum() < value.maximum()
+                    || next.peak() < value.peak() || (next.maximum() == value.maximum() && next.peak() != value.peak())) throw new ApiException(409, "CONFLICT", "Community metrics cannot decrease or change an existing peak time");
+            boolean active = next.status().equals("ACTIVE");
             jdbc.update("UPDATE play_runs SET revision=?,status=?,play_ticks=?,jumps=?,falls=?,current_progress=?,max_progress=?,peak_reached_ticks=?,finish_ticks=?,snapshot=?,ended_at=?,updated_at=? WHERE id=? AND user_id=?",
                 next.revision(), next.status(), state.ticks, state.jumps, state.falls, next.progress(), next.maximum(), next.peak(), next.status().equals("FINISHED") ? state.ticks : null,
                 active ? encode(next.snapshot()) : null, next.endedAt() == null ? null : Timestamp.from(next.endedAt()), Timestamp.from(clock.instant()), next.id(), owner);

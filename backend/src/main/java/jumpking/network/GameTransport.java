@@ -33,10 +33,11 @@ public class GameTransport extends TextWebSocketHandler implements AutoCloseable
     private final ConcurrentHashMap<String, GameConnection> connections = new ConcurrentHashMap<>();
     private final Map<String, Reservation> reservations = new HashMap<>();
     private final Map<String, Bucket> buckets = new HashMap<>();
-    private final ThreadPoolExecutor workers, sends, closes;
-    public GameTransport(NetworkSettings limits, ObjectMapper json, SessionAuthority sessions, Clock clock, List<GameCommandHandler> handlers) {
+    private final java.util.concurrent.Executor workers;
+    private final ThreadPoolExecutor sends, closes;
+    public GameTransport(NetworkSettings limits, ObjectMapper json, SessionAuthority sessions, Clock clock, List<GameCommandHandler> handlers, GameWorkers gameWorkers) {
         this.limits = limits; this.json = json; this.sessions = sessions; this.clock = clock; this.handlers = handlers;
-        workers = pool(limits.workerThreads(), limits.connections() + limits.rooms(), "game-command-");
+        workers = gameWorkers.executor();
         sends = pool(limits.sendThreads(), limits.connections(), "game-send-");
         closes = pool(2, limits.connections(), "game-close-");
     }
@@ -152,5 +153,5 @@ public class GameTransport extends TextWebSocketHandler implements AutoCloseable
                 && !entry.getValue().connected);
         }
     }
-    @Override public void close() { connections.values().forEach(connection -> connection.close(CloseStatus.GOING_AWAY)); workers.shutdownNow(); sends.shutdownNow(); closes.shutdown(); }
+    @Override public void close() { connections.values().forEach(connection -> connection.close(CloseStatus.GOING_AWAY)); sends.shutdownNow(); closes.shutdown(); }
 }

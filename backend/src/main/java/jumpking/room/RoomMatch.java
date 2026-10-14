@@ -31,6 +31,7 @@ final class RoomMatch {
     final RoomSettings settings;
     final LinkedHashMap<String, Player> players = new LinkedHashMap<>();
     final int tickRate;
+    final long limitTicks;
     Instant startedAt, endedAt;
     long ticks, revision;
     long savedRevision;
@@ -43,6 +44,7 @@ final class RoomMatch {
         this.roomId = roomId; this.settings = settings;
         var map = json.convertValue(shared.map(), GameMap.class);
         var physics = new Physics(json.convertValue(shared.physics(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Number>>() {})); tickRate = physics.tickRate;
+        limitTicks = settings.mode().equals("TIME_LIMIT") ? settings.timeLimitMinutes() * 60L * tickRate : 0;
         JsonNode adventure = shared.adventure();
         for (var spec : roster) {
             var input = new InputFrames(limits.inputFrames(), limits.inputTimeoutMs()); input.reset(id, spec.generation);
@@ -62,6 +64,7 @@ final class RoomMatch {
             if (player.game.finished()) { player.status = "FINISHED"; player.finish = ticks; }
         }
         if (players.values().stream().anyMatch(player -> player.finish != null)) finish("FINISH", instant);
+        else if (limitTicks > 0 && ticks >= limitTicks) finish("TIME_LIMIT", instant);
         return events;
     }
     void abandon(String id, Instant now) {
@@ -94,5 +97,6 @@ final class RoomMatch {
         return Map.of("playId", id, "reason", reason, "durationMs", ms(ticks), "results", rows, "saveStatus", saveStatus);
     }
     long ms(long ticks) { return ticks / tickRate * 1000 + ticks % tickRate * 1000 / tickRate; }
+    Long remainingMs() { return limitTicks == 0 ? null : ms(Math.max(0, limitTicks - ticks)); }
     private static Instant millis(Instant value) { return value.truncatedTo(java.time.temporal.ChronoUnit.MILLIS); }
 }

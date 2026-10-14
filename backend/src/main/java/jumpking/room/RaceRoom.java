@@ -342,7 +342,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         room.serverTick = Math.max(room.serverTick, room.lastSnapshotTick + 1); room.lastSnapshotTick = room.serverTick;
         for (var member : room.players.values()) {
             var self = match.players.get(member.id); if (member.connection == null || self == null) continue;
-            var snapshot = json.createObjectNode().put("roomId", room.id).put("serverTick", room.serverTick).put("playId", match.id).put("generation", member.generation).put("elapsedTimeMs", match.ms(match.ticks)).putNull("remainingTimeMs");
+            var snapshot = json.createObjectNode().put("roomId", room.id).put("serverTick", room.serverTick).put("playId", match.id).put("generation", member.generation).put("elapsedTimeMs", match.ms(match.ticks)).put("remainingTimeMs", match.remainingMs());
             var own = snapshot.putObject("self").put("lastProcessedInputSeq", self.input.processed()).put("status", self.status).put("paused", !room.state.equals("PLAYING"));
             own.set("simulation", json.valueToTree(self.game.snapshot())); own.putObject("metrics").put("currentProgress", self.game.physics().progress()).put("maxProgress", self.maximum);
             var peers = snapshot.putArray("peers");

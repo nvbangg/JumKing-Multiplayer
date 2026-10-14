@@ -28,6 +28,7 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
   const [options, setOptions] = useState(readOptions), [flyAllowed, setFlyAllowed] = useState(false);
   const [error, setError] = useState(''), [pending, setPending] = useState(false), [elapsed, setElapsed] = useState(0), [jumps, setJumps] = useState(0), [saveStatus, setSaveStatus] = useState('SAVED');
   const [transferId, setTransferId] = useState('');
+  const [remaining, setRemaining] = useState<number | null>(null);
   const [disconnected, setDisconnected] = useState(false);
   const [chatOpen, setChatOpen] = useState(false), [messages, setMessages] = useState<ChatMessage[]>(() => socket.chatHistory as unknown as ChatMessage[]);
   const [ending, setEnding] = useState<'playing' | 'picture' | null>(null), [pictureReady, setPictureReady] = useState(false);
@@ -82,7 +83,7 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
       if (disposed) return;
       cueManifest = manifest; setFlyAllowed(config.features.flyEnabled); audio.current = new AudioBus(manifest, readOptions().sound, setError);
       const session = new OnlineRuntime(parseMap(mapData), socket, latestRoom.current, () => controls.read(), (state, snapshot) => {
-        setElapsed(snapshot.elapsedTimeMs); setJumps(state.jumps); setFlying(state.freeFlight); audio.current?.setScreen(state.screen);
+        setElapsed(snapshot.elapsedTimeMs); setRemaining(snapshot.remainingTimeMs); setJumps(state.jumps); setFlying(state.freeFlight); audio.current?.setScreen(state.screen);
         setInventory(snapshot.self.simulation.adventure);
         if (!readOptions().fly && state.freeFlight) session.setFlight(false);
         if (snapshot.self.paused && !session.menu) { session.menu = true; controls.cancel(); setMenu('pause'); audio.current?.pause(true); }
@@ -143,7 +144,7 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
   return <main className="play-page">
     <div className="game-viewport" ref={container} aria-label="Online Main Babe game" />
     {!ready && <p className="game-message" role="status">Loading…</p>}
-    {ready && !ending && <div className="game-hud"><span>Jumps: {jumps}{options.displayTimer && <span className="timer" aria-label="Play time">{duration(elapsed)}</span>}</span><span className="room-code" aria-label="Room ID">{room.roomId}</span><span><button onClick={() => { runtime.current?.cancel(); input.current?.cancel(); setChatOpen(true); }}>Chat</button><button onClick={pause}>Menu</button></span></div>}
+    {ready && !ending && <div className="game-hud"><span>Jumps: {jumps}{options.displayTimer && <span className="timer" aria-label="Play time">{duration(elapsed)}</span>}{remaining !== null && <span className="timer" aria-label="Time left">Time Left: {duration(Math.ceil(remaining / 1000) * 1000)}</span>}</span><span className="room-code" aria-label="Room ID">{room.roomId}</span><span><button onClick={() => { runtime.current?.cancel(); input.current?.cancel(); setChatOpen(true); }}>Chat</button><button onClick={pause}>Menu</button></span></div>}
     {ready && !ending && !menu && !chatOpen && <TouchControls input={input} flying={flying} />}
     {ending && <div className="ending-actions">{ending === 'playing' ? <button onClick={() => skipEnding.current?.()}>Skip</button> : <><button disabled={!pictureReady || pending} onClick={() => { void newGame(); }}>New Game</button><button disabled={!pictureReady || pending || disconnected} onClick={() => { void command('LEAVE_ROOM'); }}>Back to Menu</button></>}</div>}
     {ready && chatOpen && <ChatPanel messages={messages} colors={rules.appearanceColors} onSend={async text => { await socket.command('CHAT_SEND', { text }); }} onClose={() => { setChatOpen(false); if (!runtime.current?.menu) input.current?.resume(); }} />}

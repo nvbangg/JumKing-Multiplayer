@@ -75,7 +75,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 - [x] Hoàn thiện Host Pause/Resume Room; kiểm tra clock/state/input, giữ RAM, hết hạn, chuyển Host/reconnect và restart.
 - [x] Hoàn thiện Play Again từng người; kiểm tra room code/settings, xác nhận/AFK/Join mới, roster và match/History mới.
 - [x] Triển khai Hardcore respawn; kiểm tra body reset, giữ clock/peak/counters.
-- [ ] Triển khai Time Limit; kiểm tra biên phút, deadline và Finish đúng tick.
+- [x] Triển khai Time Limit; kiểm tra biên phút, deadline và Finish đúng tick.
 - [ ] Triển khai No Walk; kiểm tra hướng/vận tốc trên nền, nhảy/bounce và luật kết thúc.
 - [ ] Hoàn thiện comparator bốn mode; kiểm tra progress/peak/time, DNF, winner và đồng hạng.
 - [ ] Hoàn thiện Room writer và tích hợp History chung; kiểm tra ghi định kỳ, finalize/retry, Merge, permissions/pagination và restart.
@@ -158,5 +158,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 06 — Host Pause | PASS — type-check/build, 64 frontend/44 backend unit tests, 52 integration tests và 19 Chrome E2E online. Pause đóng băng clock/physics, hủy charge và input chưa ACK; Resume không replay hoặc cộng giờ nghỉ. Kiểm tra quyền, stale play, deadline 24 giờ không gia hạn, mọi người offline, chuyển Host, Login/reconnect khi session bị thu hồi và grace 5 phút sau Resume. Restart backend thật chốt ABORTED từ metrics đã commit; timeout chốt UNFINISHED không winner và giải phóng Room. Fixtures identity cleanup đúng rows của test |
 | Phase 06 — Play Again | PASS — type-check/build, 64 frontend/44 backend unit tests; RoomAgain/Race/Lobby/Pause integration và 19 Chrome E2E online. Hai ván giữ code/settings nhưng tạo UUID/History mới; Host và ít nhất một người phải xác nhận, người mới được xác nhận và người AFK không vào roster. Kiểm tra stale match, khóa Join trước xác nhận đầu, revalidate Join trong actor; lỗi finalize có Retry Save giữ nguyên payload/UUID và không cho Start trước commit |
 | Phase 06 — Hardcore | PASS — type-check/build, 65 frontend/46 backend unit tests, 7 integration tests và 20 Chrome E2E online. Native splat respawn đúng player, giữ active clock/peak/jumps/falls và lưu MySQL; prediction/replay khớp server. Respawn trước adventure/Finish nên splat tại đích không nhận Crown hoặc thắng. Chrome hai Guest chọn Hardcore, Start/nhảy/End và đọc đúng mode trong History |
+| Phase 06 — Time Limit | PASS — type-check/build, 65 frontend/46 backend unit tests; 8 integration tests cho deadline/Race/Pause và 21 Chrome E2E online. Hết 1 phút chốt đúng tick 3.600, không tiếp tục tick hoặc tạo winner khi chưa Finish; hai Finish tại deadline 5 phút cùng thắng trước timeout. Snapshot công bố thời gian còn lại, HUD vẫn hiện khi tắt Display Timer; History giữ mode và settings |
 | Phase 06 còn lại–07 | NOT RUN — chưa nghiệm thu đầy đủ |
 | Phase 08 | Chưa thực hiện |

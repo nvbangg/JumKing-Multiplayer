@@ -1,5 +1,5 @@
 /target/
-/config/application-*.properties
+/config/*
 !/config/*.properties.example
 /logs/
 .classpath

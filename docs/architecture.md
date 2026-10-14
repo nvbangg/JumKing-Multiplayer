@@ -96,7 +96,7 @@ Phaser tải assets giữ nguyên tên từ `public/assets`; tài nguyên UI đ�
 
 Dữ liệu shared đóng gói vào cả hai build; backend nạp từ classpath, không phụ thuộc source khi chạy JAR. Client online dùng map/config server công bố và luật adventure cùng bản phát hành. Nội dung frontend liên kết bằng ID; shared không chứa lời thoại/font/đường dẫn assets. URL/secrets theo [deployment](deployment.md).
 
-Profile web đóng gói frontend vào JAR cho Local/LAN. SPA fallback index.html chỉ áp dụng route UI, không áp dụng API/WS/asset thiếu.
+Profile web đóng gói frontend vào JAR. Static files được browser lưu và revalidate bằng Last-Modified; API giữ no-store. SPA fallback index.html chỉ áp dụng route UI, không áp dụng API/WS/asset thiếu.
 
 ## Xử lý đồng thời
 

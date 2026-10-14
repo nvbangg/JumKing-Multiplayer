@@ -70,6 +70,7 @@ class SchemaIT {
             assertThat(response).isNotNull();
             assertThat(response.statusCode()).isEqualTo(200);
             assertThat(response.body()).contains("\"status\":\"UP\"");
+            assertThat(response.headers().firstValue("cache-control").orElseThrow()).contains("no-store");
             try (var archive = new ZipFile("target/jumpking-server.jar")) {
                 for (String shared : new String[]{"maps/main-babe.json", "physics.json", "rules.json", "adventure.json"}) {
                     var entry = archive.getEntry("BOOT-INF/classes/shared/" + shared);
@@ -84,6 +85,10 @@ class SchemaIT {
                         var page = http.send(HttpRequest.newBuilder(URI.create(origin + path)).build(), HttpResponse.BodyHandlers.ofString());
                         assertThat(page.statusCode()).as(path).isEqualTo(200);
                         assertThat(page.body()).contains("<div id=\"root\"></div>").doesNotContain("SPA routing fixture");
+                        assertThat(page.headers().firstValue("cache-control").orElseThrow()).isEqualTo("no-cache");
+                        var cached = http.send(HttpRequest.newBuilder(URI.create(origin + path))
+                            .header("If-Modified-Since", page.headers().firstValue("last-modified").orElseThrow()).build(), HttpResponse.BodyHandlers.discarding());
+                        assertThat(cached.statusCode()).as("Revalidate " + path).isEqualTo(304);
                     }
                     verifyViteProxy(http, origin);
                     if (System.getenv("E2E_BROWSER_PATH") != null) verifyPackagedBrowser(origin);

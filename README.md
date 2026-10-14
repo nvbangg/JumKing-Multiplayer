@@ -12,20 +12,35 @@ Frontend dùng React + TypeScript/Phaser; backend Spring Boot/Java quyết đị
 
 ## Cài đặt và chạy
 
-Cần **JDK 25, Node.js 24, MySQL Server 8.4**; Workbench để quản trị database. Tiến độ triển khai và các bước đã kiểm chứng theo [PLAN](PLAN.md).
+Cần **JDK 25, Node.js 24 và MySQL Server 8.4**. Workbench là công cụ quản trị tùy chọn; không thay MySQL Server. Maven Wrapper được cung cấp sẵn.
 
-1. Clone project; chạy `scripts/schema.sql` bằng Workbench hoặc mysql CLI để tạo database `jumpking`.
-2. Tạo user MySQL dành cho ứng dụng theo [hướng dẫn MySQL](docs/deployment.md#mysql).
-3. Copy cấu hình mẫu từ root project:
+**1. Database.** Clone project, mở `scripts/schema.sql` bằng Workbench và Execute trên MySQL mới/rỗng để tạo `jumpking`. Trong SQL editor, tạo user ứng dụng; thay password mẫu:
+
+```sql
+CREATE USER 'jumpking_app'@'127.0.0.1' IDENTIFIED BY 'CHANGE_ME';
+GRANT SELECT, INSERT, UPDATE, DELETE ON jumpking.* TO 'jumpking_app'@'127.0.0.1';
+```
+
+Database đã có dữ liệu cần [SQL nâng cấp riêng](docs/deployment.md#mysql); không chạy lại schema tạo mới.
+
+**2. Cấu hình riêng.** Từ root project:
 
 ```powershell
 Copy-Item backend/config/application-local.properties.example backend/config/application-local.properties
 Copy-Item frontend/.env.example frontend/.env.local
 ```
 
-Điền datasource URL/user/password trong file backend riêng. Frontend dùng proxy mặc định; để VITE_BACKEND_ORIGIN trống khi cùng origin. Bảng giá trị và cách đổi IP/port trong [deployment](docs/deployment.md#cấu-hình); không đưa secrets vào file mẫu hoặc frontend.
+Trong `backend/config/application-local.properties`, điền:
 
-Mở hai terminal. Backend:
+```properties
+spring.datasource.url=jdbc:mysql://127.0.0.1:3306/jumpking?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
+spring.datasource.username=jumpking_app
+spring.datasource.password=CHANGE_ME
+```
+
+Password phải trùng user vừa tạo; đổi host/port nếu MySQL chạy nơi khác. Giữ các giá trị còn lại trong file mẫu. `frontend/.env.local` dùng mặc định khi chạy local, không cần thêm secrets. Hai file riêng được Git ignore; chỉ commit các file `.example`. Backend không tự đọc file `.env`.
+
+**3. Chạy hai terminal** từ root project. Backend:
 
 ```powershell
 cd backend
@@ -40,9 +55,9 @@ npm ci
 npm run dev
 ```
 
-Mở **http://127.0.0.1:5173**. Backend dùng **8080**, MySQL **3306**. Linux/macOS thay mvnw.cmd bằng ./mvnw. Hai người trên cùng máy dùng hai browser profiles hoặc normal/incognito, chỉ chạy một backend.
+Mở **http://127.0.0.1:5173**. Backend dùng **8080**, MySQL **3306**. Linux/macOS thay mvnw.cmd bằng ./mvnw và Copy-Item bằng cp. Hai người trên cùng máy dùng hai browser profiles hoặc normal/incognito, chỉ chạy một backend; không cần hai máy hoặc hai backend.
 
-Build: frontend `npm run build`, backend `.\mvnw.cmd -Pweb clean package`; từ backend chạy `java -jar target/jumpking-server.jar --spring.profiles.active=local`, mở **http://127.0.0.1:8080**. Chi tiết [build/local](docs/deployment.md#chạy-development-và-build).
+**Build một ứng dụng:** tại frontend chạy `npm run build`; tại backend chạy `.\mvnw.cmd -Pweb clean package`, rồi `java -jar target/jumpking-server.jar --spring.profiles.active=local`. Mở **http://127.0.0.1:8080**; JAR phục vụ cả frontend/backend, không cần Vite. Dừng backend development trước để giải phóng cổng 8080. Các lệnh cài dependencies/build lần đầu cần Internet.
 
 ## Demo nhanh
 
@@ -52,7 +67,18 @@ Build: frontend `npm run build`, backend `.\mvnw.cmd -Pweb clean package`; từ 
 
 ## Chơi qua LAN/ZeroTier
 
-Host bind backend vào IP cần dùng hoặc 0.0.0.0, thêm origin IP:8080 vào allowlist và cho phép firewall TCP 8080 từ mạng cần dùng. Người chơi mở `http://<host-ip>:8080`. ZeroTier cần cùng network và được authorize; dùng IP ZeroTier của host. Không mở MySQL cho người chơi. [Các bước và xử lý lỗi](docs/deployment.md#lan-và-zerotier)
+Dùng JAR đã build. Trong cấu hình local của host, thay `10.147.17.5` bằng IP LAN/ZeroTier thực tế:
+
+```properties
+server.address=0.0.0.0
+app.allowed-origins=http://127.0.0.1:8080,http://10.147.17.5:8080
+```
+
+Restart JAR, cho phép inbound TCP 8080 từ mạng cần dùng; players mở `http://10.147.17.5:8080`. ZeroTier cần cùng network và được authorize. Players chỉ cần trình duyệt; không mở MySQL ra mạng. [Chi tiết và xử lý lỗi](docs/deployment.md#lan-và-zerotier)
+
+## VPS
+
+Cách đơn giản là chạy cùng JAR trên VPS, MySQL nội bộ và Caddy phục vụ HTTPS/WSS qua một domain. Copy mẫu cấu hình prod, điền database/domain rồi chạy service theo [hướng dẫn VPS](docs/deployment.md#vps-một-domain). Frontend tách lên Cloudflare Pages là phương án mở rộng riêng.
 
 ## Tài liệu
 

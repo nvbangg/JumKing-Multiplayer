@@ -2,6 +2,7 @@ package jumpking.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.*;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -32,5 +33,18 @@ class SecurityBoundsTest {
         var bounded = new AuthRateLimiter(clock, new SecuritySettings(List.of("https://example.com"), Duration.ofHours(24), 20, 16384, 1, 60));
         bounded.check("one", null);
         assertThatThrownBy(() -> bounded.check("two", null)).isInstanceOf(ApiException.class);
+    }
+    @Test void minuteBoundaryResetsAuthSoloAndCapacityTogether() {
+        var now = new java.util.concurrent.atomic.AtomicLong(59_999);
+        var clock = mock(Clock.class); when(clock.millis()).thenAnswer(call -> now.get());
+        var limits = new AuthRateLimiter(clock, new SecuritySettings(List.of("https://example.com"), Duration.ofHours(24), 2, 16384, 2, 2));
+        for (int index = 0; index < 2; index++) { limits.check("one", null); limits.solo("42"); }
+        assertThatThrownBy(() -> limits.check("one", null)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> limits.solo("42")).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> limits.check("two", null)).isInstanceOf(ApiException.class);
+        now.set(60_000);
+        limits.check("two", null); limits.solo("43");
+        limits.check("two", null); limits.solo("43");
+        assertThatThrownBy(() -> limits.check("two", null)).isInstanceOf(ApiException.class);
     }
 }

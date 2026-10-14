@@ -24,7 +24,6 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 public class GameTransport extends TextWebSocketHandler implements AutoCloseable {
     public static final String IDENTITY = GameTransport.class.getName() + ".identity";
     private record Reservation(GameConnection.Identity identity, long created, boolean connected) {}
-    private record Bucket(long minute, int count) {}
     private final NetworkSettings limits;
     private final ObjectMapper json;
     private final SessionAuthority sessions;
@@ -32,7 +31,8 @@ public class GameTransport extends TextWebSocketHandler implements AutoCloseable
     private final List<GameCommandHandler> handlers;
     private final ConcurrentHashMap<String, GameConnection> connections = new ConcurrentHashMap<>();
     private final Map<String, Reservation> reservations = new HashMap<>();
-    private final Map<String, Bucket> buckets = new HashMap<>();
+    private final Map<String, Integer> buckets = new HashMap<>();
+    private long bucketMinute = Long.MIN_VALUE;
     private final java.util.concurrent.Executor workers;
     private final ThreadPoolExecutor sends, closes;
     public GameTransport(NetworkSettings limits, ObjectMapper json, SessionAuthority sessions, Clock clock, List<GameCommandHandler> handlers, GameWorkers gameWorkers) {
@@ -49,11 +49,12 @@ public class GameTransport extends TextWebSocketHandler implements AutoCloseable
     }
     public java.util.concurrent.Executor workers() { return workers; }
     private void quota(String key, int maximum) {
-        long minute = clock.millis() / 60_000L;
-        buckets.entrySet().removeIf(entry -> entry.getValue().minute != minute);
+        long minute = Math.floorDiv(clock.millis(), 60_000L);
+        if (minute != bucketMinute) { buckets.clear(); bucketMinute = minute; }
         if (buckets.size() >= limits.connections() * 64 && !buckets.containsKey(key)) throw rate();
-        var previous = buckets.get(key); int count = previous == null ? 1 : previous.count + 1;
-        buckets.put(key, new Bucket(minute, count)); if (count > maximum) throw rate();
+        var previous = buckets.get(key);
+        if (previous != null && previous >= maximum) throw rate();
+        buckets.put(key, previous == null ? 1 : previous + 1);
     }
     public synchronized void handshakeAttempt(String ip) { quota("handshake:" + ip, limits.handshakesPerMinute()); }
     public synchronized void roomLookup(String ip) { quota("lookup:" + ip, limits.roomLookupsPerMinute()); }

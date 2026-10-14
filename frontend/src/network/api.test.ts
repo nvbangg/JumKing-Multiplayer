@@ -2,6 +2,13 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { api, ApiError, clearCsrf } from './api';
 
 afterEach(() => { clearCsrf(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+test('API follows the browser origin on LAN and ZeroTier without a configured backend URL', async () => {
+  vi.stubGlobal('location', new URL('http://10.147.17.5:8080')); vi.stubEnv('VITE_BACKEND_ORIGIN', '');
+  const fetcher = vi.fn().mockResolvedValue(Response.json({ authenticated: false, guest: false, account: null }));
+  vi.stubGlobal('fetch', fetcher);
+  await api('/auth/me');
+  expect(fetcher).toHaveBeenCalledWith('http://10.147.17.5:8080/api/auth/me', expect.objectContaining({ credentials: 'include' }));
+});
 test('CSRF denial clears the cached token so retry fetches a new session token', async () => {
   vi.stubGlobal('location', new URL('http://127.0.0.1:5173')); vi.stubEnv('VITE_BACKEND_ORIGIN', '');
   const fetcher = vi.fn()

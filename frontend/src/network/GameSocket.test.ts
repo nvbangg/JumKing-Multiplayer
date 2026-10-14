@@ -15,6 +15,13 @@ class Socket {
 beforeEach(() => { vi.useFakeTimers(); Socket.instances = []; vi.stubGlobal('WebSocket', Socket); vi.stubGlobal('location', new URL('http://127.0.0.1:5173')); vi.stubEnv('VITE_BACKEND_ORIGIN', ''); });
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 const open = async (game: GameSocket) => { const ready = game.connect(); const socket = Socket.instances.at(-1)!; socket.open(); await ready; return socket; };
+test('WebSocket follows the browser origin and uses WSS for an explicitly configured HTTPS backend', async () => {
+  vi.stubGlobal('location', new URL('http://10.147.17.5:8080'));
+  const game = new GameSocket(vi.fn(), vi.fn());
+  expect((await open(game)).url).toBe('ws://10.147.17.5:8080/ws/game'); game.close();
+  vi.stubEnv('VITE_BACKEND_ORIGIN', 'https://api.example.test');
+  expect((await open(game)).url).toBe('wss://api.example.test/ws/game'); game.close();
+});
 test('packets from a previous room or play cannot replace current chat, state or save status', async () => {
   const received = vi.fn(), game = new GameSocket(received, vi.fn()), socket = await open(game);
   const send = (type: string, payload: Record<string, unknown>) => socket.receive({ v: 1, type, payload });

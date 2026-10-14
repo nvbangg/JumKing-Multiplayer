@@ -67,6 +67,8 @@ Integration cũng chạy `IdentityRaceBrowserIT`: giữ phản hồi `/auth/me` 
 
 Với `-Web` và `E2E_BROWSER_PATH`, `SchemaIT` còn chạy Chrome trực tiếp từ JAR: Account, Community save/Continue và Room hai người Start/Pause/End/Leave/History; không đi qua Vite. Output ở `.local/browser-packaged-tests`.
 
+`ProductionProxyIT` kiểm tra profile prod: Secure cookies, HTTPS headers và rate-limit theo IP qua proxy tin cậy; forwarded headers từ peer khác không được đổi identity IP. `SchemaIT` kiểm tra static revalidation trả 304, API vẫn no-store.
+
 ## Scenarios và oracles
 
 | Nhóm | Kiểm tra và kết quả mong đợi |

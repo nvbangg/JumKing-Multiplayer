@@ -53,6 +53,7 @@ class SchemaIT {
         environment.put("SPRING_DATASOURCE_USERNAME", dataSource.getUsername());
         environment.put("SPRING_DATASOURCE_PASSWORD", dataSource.getPassword());
         environment.put("SERVER_PORT", Integer.toString(port));
+        environment.put("APP_ALLOWED_ORIGINS", "http://127.0.0.1:" + port + ",http://127.0.0.1:5173");
         environment.put("SPRING_PROFILES_ACTIVE", "local");
         Process process = builder.redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try (var http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(1)).build()) {
@@ -85,6 +86,7 @@ class SchemaIT {
                         assertThat(page.body()).contains("<div id=\"root\"></div>").doesNotContain("SPA routing fixture");
                     }
                     verifyViteProxy(http, origin);
+                    if (System.getenv("E2E_BROWSER_PATH") != null) verifyPackagedBrowser(origin);
                 }
             }
             for (String path : new String[]{"/api/missing", "/assets/missing.png"}) {
@@ -96,6 +98,17 @@ class SchemaIT {
             process.destroy();
             if (!process.waitFor(15, TimeUnit.SECONDS)) { process.destroyForcibly(); process.waitFor(5, TimeUnit.SECONDS); }
         }
+    }
+
+    private void verifyPackagedBrowser(String origin) throws Exception {
+        var builder = new ProcessBuilder("node", "node_modules/@playwright/test/cli.js", "test", "e2e/packaged-online.spec.ts", "--workers=1").directory(Path.of("../frontend").toFile());
+        builder.environment().put("E2E_BASE_URL", origin); builder.environment().put("E2E_PACKAGED", "true");
+        builder.environment().put("E2E_OUTPUT_DIR", "../.local/browser-packaged-tests");
+        var browser = builder.redirectErrorStream(true).redirectOutput(Path.of("target/packaged-browser.log").toFile()).start();
+        try {
+            assertThat(browser.waitFor(90, TimeUnit.SECONDS)).as("Packaged browser timeout").isTrue();
+            assertThat(browser.exitValue()).as("Inspect target/packaged-browser.log").isZero();
+        } finally { if (browser.isAlive()) { browser.destroyForcibly(); browser.waitFor(5, TimeUnit.SECONDS); } }
     }
 
     private void verifyViteProxy(HttpClient http, String backend) throws Exception {

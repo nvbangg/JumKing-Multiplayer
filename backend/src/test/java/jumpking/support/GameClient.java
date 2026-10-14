@@ -100,6 +100,11 @@ public final class GameClient implements AutoCloseable {
         while (!condition.getAsBoolean() && System.nanoTime() < deadline) Thread.sleep(10);
         assertThat(condition.getAsBoolean()).as("Condition before deadline").isTrue();
     }
-    public void disconnect() { if (socket != null) { if (!socket.isOutputClosed()) socket.sendClose(WebSocket.NORMAL_CLOSURE, "").join(); socket = null; } }
+    public void disconnect() {
+        var closing = socket; socket = null;
+        if (closing == null || closing.isOutputClosed()) return;
+        try { closing.sendClose(WebSocket.NORMAL_CLOSURE, "").join(); }
+        catch (java.util.concurrent.CompletionException error) { if (!closing.isOutputClosed()) throw error; }
+    }
     @Override public void close() { disconnect(); http.close(); }
 }

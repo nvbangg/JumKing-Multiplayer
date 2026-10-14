@@ -2,6 +2,7 @@ param(
     [Parameter(Mandatory = $true)][string]$MySqlHome,
     [string]$JavaHome = $env:JAVA_HOME,
     [switch]$Web,
+    [switch]$DatabaseRecovery,
     [string]$IntegrationTest
 )
 $ErrorActionPreference = 'Stop'
@@ -57,6 +58,45 @@ try {
     if ($IntegrationTest) { $verificationArguments += "-Dit.test=$IntegrationTest" }
     & .\mvnw.cmd @verificationArguments
     if ($LASTEXITCODE -ne 0) { throw 'Integration verification failed.' }
+    if ($DatabaseRecovery) {
+        $env:MYSQL_PWD = $password
+        $connectionArguments = @('--no-defaults', '--host=127.0.0.1', "--port=$port", '--user=root', '--batch', '--skip-column-names')
+        $countsSql = "SELECT 'users',COUNT(*) FROM users UNION ALL SELECT 'play_runs',COUNT(*) FROM play_runs UNION ALL SELECT 'matches',COUNT(*) FROM matches;"
+        $countsBefore = & $client @connectionArguments "--database=$database" "--execute=$countsSql"
+        if ($LASTEXITCODE -ne 0) { throw 'Could not read recovery fixture counts.' }
+        $dump = Join-Path $runRoot 'backup.sql'
+        & (Join-Path $mysqlBase 'bin/mysqldump.exe') --no-defaults --host=127.0.0.1 "--port=$port" --user=root --single-transaction --no-tablespaces --set-gtid-purged=OFF --hex-blob "--result-file=$dump" $database
+        if ($LASTEXITCODE -ne 0) { throw 'Isolated database backup failed.' }
+        & (Join-Path $mysqlBase 'bin/mysqladmin.exe') --no-defaults --host=127.0.0.1 "--port=$port" --user=root shutdown
+        if ($LASTEXITCODE -ne 0 -or -not $process.WaitForExit(20000)) { throw 'Isolated database did not stop cleanly.' }
+        [IO.File]::WriteAllText($config, ($configText -replace '(?m)^init-file=.*\n', ''))
+        $process = Start-Process -FilePath $server -ArgumentList "--defaults-file=`"$config`"" -PassThru -WindowStyle Hidden
+        $restarted = $false
+        for ($attempt = 0; $attempt -lt 60; $attempt++) {
+            if ($process.HasExited) { throw 'Isolated MySQL restart failed.' }
+            & $client @connectionArguments --execute='SELECT 1' 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) { $restarted = $true; break }
+            Start-Sleep -Milliseconds 500
+        }
+        if (-not $restarted) { throw 'Isolated MySQL restart timed out.' }
+        $countsAfter = & $client @connectionArguments "--database=$database" "--execute=$countsSql"
+        if ($LASTEXITCODE -ne 0 -or ($countsBefore -join "`n") -ne ($countsAfter -join "`n")) { throw 'Counts changed after MySQL restart.' }
+        $restoreDatabase = $database + '_restore'
+        & $client @connectionArguments "--execute=CREATE DATABASE $restoreDatabase CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+        if ($LASTEXITCODE -ne 0) { throw 'Could not create isolated restore database.' }
+        & $client @connectionArguments "--database=$restoreDatabase" "--execute=SOURCE $($dump.Replace('\','/'));"
+        if ($LASTEXITCODE -ne 0) { throw 'Isolated database restore failed.' }
+        $restoredCounts = & $client @connectionArguments "--database=$restoreDatabase" "--execute=$countsSql"
+        if ($LASTEXITCODE -ne 0 -or ($countsBefore -join "`n") -ne ($restoredCounts -join "`n")) { throw 'Counts changed after restore.' }
+        foreach ($table in @('users', 'play_runs', 'matches')) {
+            $original = & $client @connectionArguments "--execute=CHECKSUM TABLE $database.$table EXTENDED;"
+            if ($LASTEXITCODE -ne 0) { throw 'Original checksum failed.' }
+            $restored = & $client @connectionArguments "--execute=CHECKSUM TABLE $restoreDatabase.$table EXTENDED;"
+            if ($LASTEXITCODE -ne 0 -or $original.Split("`t")[-1] -ne $restored.Split("`t")[-1]) { throw "Restore checksum differs for $table." }
+        }
+        Write-Output 'PASS: isolated MySQL restart, backup and restore; all three table counts and checksums match.'
+        Remove-Item Env:MYSQL_PWD
+    }
 }
 finally {
     if ($locationPushed) { Pop-Location }

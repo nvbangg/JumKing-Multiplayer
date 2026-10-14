@@ -51,11 +51,19 @@ Integration dùng [Testcontainers MySQL](https://java.testcontainers.org/modules
 
 Windows không có Docker: chạy `./scripts/test-mysql.ps1 -MySqlHome '<thư mục MySQL 8.4>' -JavaHome '<thư mục JDK 25>'` từ root. Runner tạo instance loopback/cổng ngẫu nhiên, credentials riêng, chạy integration rồi dừng và xóa dữ liệu test; không sửa service/database đang dùng. Thêm `-Web` sau khi build frontend để kiểm tra JAR chứa web và Vite proxy. Integration cũng nhận `JK_TEST_DATABASE_URL/USERNAME/PASSWORD` cho database test rỗng có tên bắt đầu `jumpking_it`; runner bên ngoài chịu trách nhiệm cleanup.
 
+Integration chỉ giữ tối đa bốn Spring test contexts để giới hạn tài nguyên của các server thử nghiệm.
+
 Có thể chạy nhóm bị ảnh hưởng bằng `-IntegrationTest 'RoomRaceIT'` (nhiều class ngăn bằng dấu phẩy); bỏ tham số để chạy toàn bộ integration. Unit tests vẫn chạy trong cả hai trường hợp.
+
+Thêm `-DatabaseRecovery` để thử restart MySQL và restore dump vào database test mới; đối chiếu số dòng/checksum ba bảng. Chỉ thực hiện trên instance do runner tạo; dump được cleanup cùng instance.
 
 Đặt `E2E_BROWSER_PATH` thành đường dẫn Chrome/Chromium trước khi chạy integration để nghiệm thu Account, contracts và Solo sync qua UI với backend/MySQL cô lập. Harness tự chạy Vite/cổng riêng và đóng sau test; bỏ biến này thì browser integration được ghi là skipped, không coi là đã nghiệm thu UI. `npm run test:e2e` riêng chỉ chạy các scenarios không cần backend, trừ khi cung cấp `E2E_BASE_URL` và cờ online tương ứng.
 
 Kết quả E2E độc lập ở frontend/test-results; harness online dùng .local/browser-online-tests. Khi có E2E_BROWSER_PATH, integration chạy thêm harness riêng cho ending Room, Fly Community và Fly Room; output tương ứng .local/browser-room-ending-tests, .local/browser-fly-online-tests và .local/browser-room-fly-tests. Có thể đổi bằng E2E_OUTPUT_DIR; các lần chạy đồng thời phải dùng thư mục riêng.
+
+Integration cũng chạy `IdentityRaceBrowserIT`: giữ phản hồi `/auth/me` ẩn danh thật đến sau khi đăng ký thành công; phản hồi cũ không được ghi đè Account mới. Output ở `.local/browser-identity-race-tests`.
+
+Với `-Web` và `E2E_BROWSER_PATH`, `SchemaIT` còn chạy Chrome trực tiếp từ JAR: Account, Community save/Continue và Room hai người Start/Pause/End/Leave/History; không đi qua Vite. Output ở `.local/browser-packaged-tests`.
 
 ## Scenarios và oracles
 

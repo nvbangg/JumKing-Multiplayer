@@ -53,6 +53,7 @@
       <id>integration</id>
       <build><plugins><plugin>
         <groupId>org.apache.maven.plugins</groupId><artifactId>maven-failsafe-plugin</artifactId>
+        <configuration><systemPropertyVariables><spring.test.context.cache.maxSize>4</spring.test.context.cache.maxSize></systemPropertyVariables></configuration>
         <executions><execution><goals><goal>integration-test</goal><goal>verify</goal></goals></execution></executions>
       </plugin></plugins></build>
     </profile>

@@ -1,7 +1,16 @@
 package jumpking.records;
 
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.*;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
+import java.util.Optional;
 
 public interface PlayRunRepository extends JpaRepository<PlayRun, String> {
     boolean existsByUserIdAndKind(long userId, String kind);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from PlayRun r where r.id = :id")
+    Optional<PlayRun> lockById(@Param("id") String id);
+    @Modifying(flushAutomatically = true)
+    @Query("update PlayRun r set r.userId = :target where r.userId = :source and r.kind = 'ROOM'")
+    int transferRoomRuns(@Param("source") long source, @Param("target") long target);
 }

@@ -6,17 +6,21 @@ import java.time.*;
 import java.util.*;
 import jumpking.game.SharedData;
 import jumpking.identity.GuestHistoryService;
-import jumpking.room.Memberships;
 import jumpking.support.TestDatabase;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
+@org.springframework.boot.test.context.SpringBootTest(classes = jumpking.JumpKingApplication.class)
 class RoomRunsIT {
+    @org.springframework.test.context.DynamicPropertySource static void database(org.springframework.test.context.DynamicPropertyRegistry properties) {
+        var db = TestDatabase.get().dataSource;
+        properties.add("spring.datasource.url", db::getUrl); properties.add("spring.datasource.username", db::getUsername); properties.add("spring.datasource.password", db::getPassword);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired GuestHistoryService merge;
+    @org.springframework.beans.factory.annotation.Autowired RoomRuns records;
     @Test void wholeRosterCommitsAtomicallyAndLateWritesResolveMergedGuestsWithoutDuplicates() throws Exception {
         var db = TestDatabase.get(); var jdbc = db.jdbc;
-        var transactions = new TransactionTemplate(new DataSourceTransactionManager(db.dataSource)); var owners = new RunOwners(jdbc, transactions);
-        var shared = new SharedData(new ObjectMapper()); var records = new RoomRuns(jdbc, owners, Clock.systemUTC(), shared);
+        var shared = new SharedData(new ObjectMapper());
         var users = new ArrayList<Long>(); String match = UUID.randomUUID().toString(), a = UUID.randomUUID().toString(), b = UUID.randomUUID().toString();
         String trigger = "room_rollback_" + UUID.randomUUID().toString().replace("-", "");
         try {
@@ -37,7 +41,7 @@ class RoomRunsIT {
                 new RoomRuns.Run(a, users.get(0), "Guest A", "ACTIVE", 60, 1, 0, 100, 100, 40, null, null, false, null),
                 new RoomRuns.Run(b, users.get(1), "Guest B", "ACTIVE", 60, 1, 0, 90, 120, 40, null, null, false, null)));
             records.save(update); records.save(start);
-            var merge = new GuestHistoryService(jdbc, transactions, owners, new Memberships(), event -> {}); merge.merge(users.get(0), users.get(2));
+            merge.merge(users.get(0), users.get(2));
             var finish = new RoomRuns.Write(match, "ABCDEF", "RACE", null, 3, started, ended, 61, "FINISH", List.of(
                 new RoomRuns.Run(a, users.get(0), "Guest A", "FINISHED", 61, 2, 0, 200, 200, 61, 61L, 1, true, ended),
                 new RoomRuns.Run(b, users.get(1), "Guest B", "UNFINISHED", 61, 1, 0, 100, 120, 40, null, 2, false, ended)));

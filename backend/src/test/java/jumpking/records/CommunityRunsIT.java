@@ -2,7 +2,6 @@ package jumpking.records;
 
 import static org.assertj.core.api.Assertions.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.Clock;
 import java.util.*;
 import java.util.concurrent.*;
 import jumpking.game.*;
@@ -12,18 +11,20 @@ import jumpking.support.TestDatabase;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
+@org.springframework.boot.test.context.SpringBootTest(classes = jumpking.JumpKingApplication.class)
 class CommunityRunsIT {
+    @org.springframework.test.context.DynamicPropertySource static void database(org.springframework.test.context.DynamicPropertyRegistry properties) {
+        var db = TestDatabase.get().dataSource;
+        properties.add("spring.datasource.url", db::getUrl); properties.add("spring.datasource.username", db::getUsername); properties.add("spring.datasource.password", db::getPassword);
+    }
+
     static JdbcTemplate jdbc;
-    static CommunityRuns records;
+    @org.springframework.beans.factory.annotation.Autowired CommunityRuns records;
     static SharedData shared;
     static ObjectMapper json = new ObjectMapper();
     @BeforeAll static void setup() throws Exception {
         var db = TestDatabase.get(); jdbc = db.jdbc; shared = new SharedData(json);
-        var owners = new RunOwners(jdbc, new TransactionTemplate(new DataSourceTransactionManager(db.dataSource)));
-        records = new CommunityRuns(jdbc, json, owners, Clock.systemUTC());
     }
     long account() {
         String name = "checkpoint_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);

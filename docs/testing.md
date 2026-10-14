@@ -101,6 +101,20 @@ Theo [yêu cầu học phần](course-materials/final-project/final-project/Inst
 
 So sánh snapshot-only với prediction/reconciliation bằng cùng map/tuning và workload. Đo input-to-display latency, correction magnitude/frequency, snapshot jitter, tick time/overrun, messages/bytes, CPU/RAM và độ trễ/lỗi persistence. Dùng 1/2/max clients, thêm nhiều phòng để tìm giới hạn; báo p50/p95/p99 khi phù hợp. Không có clock synchronization thì đo RTT, không suy one-way latency.
 
+Các thực nghiệm opt-in, từ root:
+
+```powershell
+$env:JK_WORKLOAD_RUN = 'true'
+./scripts/test-mysql.ps1 -MySqlHome '<MySQL 8.4>' -JavaHome '<JDK 25>' -IntegrationTest OnlineWorkloadIT
+Remove-Item Env:JK_WORKLOAD_RUN
+cd frontend
+$env:JK_NETCODE_EXPERIMENT = 'true'
+npm run test:e2e -- e2e/netcode-experiment.spec.ts --workers=1
+Remove-Item Env:JK_NETCODE_EXPERIMENT
+```
+
+Workload chạy Community một người, Room 2/10 người và hai Room; input 60 Hz, đo RTT/snapshot/bytes/CPU/heap/final save. Mỗi mẫu 5 giây, client và server chung JVM nên CPU/heap gồm cả driver, chưa xác định sức chứa tối đa. Compute tick đo riêng 1.800 mẫu sau 600 tick warm-up, không gồm scheduler/serialization/socket/JDBC. Netcode dùng Chrome với input chung, snapshot 20 Hz, độ trễ một chiều mô hình 0/50/100 ms và jitter 0–2 tick; không có packet loss/clock drift. Kết quả JSON ở `.local/reports/`; đây là các phép đo khác nhau, không suy độ trễ Internet từ mô hình.
+
 Nghiệm thu Local, LAN/ZeroTier bằng hai thiết bị và điện thoại thật; kiểm tra clean clone, setup/config, build/run, restart, backup/restore và cập nhật tương thích. Thiếu thiết bị/Docker hoặc check thất bại phải ghi BLOCKED/NOT RUN, không đánh dấu hoàn tất.
 
 Đối chiếu README với build configuration; ghi checks/commit vào PLAN. Raw traces/screenshots/logs ở `.local/reports/` hoặc reports được ignore. Git giữ tests/fixtures/scripts tái tạo và báo cáo bàn giao, không dữ liệu riêng tư.

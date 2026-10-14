@@ -18,12 +18,30 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @EnabledIfEnvironmentVariable(named = "E2E_BROWSER_PATH", matches = ".+")
 @SpringBootTest(classes = JumpKingApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AccountBrowserIT {
     private static final int VITE_PORT = freePort();
     @LocalServerPort int port;
+    @Autowired PasswordEncoder passwords;
+    private record MergeFixture(long guest, long account, String token, String username, String email, String password, String run) {}
+    private MergeFixture mergeFixture() {
+        var jdbc = TestDatabase.get().jdbc; String name = "merge_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        String email = name + "@example.test", password = java.util.UUID.randomUUID().toString();
+        byte[] bytes = new byte[32]; new java.security.SecureRandom().nextBytes(bytes);
+        String token = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes), hash = GuestIdentity.hash(token);
+        jdbc.update("INSERT INTO users(type,guest_token_hash,created_at) VALUES ('GUEST',?,UTC_TIMESTAMP(3))", hash);
+        long guest = jdbc.queryForObject("SELECT id FROM users WHERE guest_token_hash=?", Long.class, hash);
+        jdbc.update("INSERT INTO users(type,username,email,password_hash,created_at) VALUES ('ACCOUNT',?,?,?,UTC_TIMESTAMP(3))", name, email, passwords.encode(password));
+        long account = jdbc.queryForObject("SELECT id FROM users WHERE email=?", Long.class, email);
+        String match = java.util.UUID.randomUUID().toString(), run = java.util.UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO matches(id,room_code,mode,started_at,ended_at,end_reason) VALUES (?,'ABCDEF','RACE',UTC_TIMESTAMP(3),UTC_TIMESTAMP(3),'HOST_ENDED')", match);
+        jdbc.update("INSERT INTO play_runs(id,user_id,kind,match_id,status,nickname,started_at,updated_at,ended_at) VALUES (?,?,'ROOM',?,'UNFINISHED','Guest Player',UTC_TIMESTAMP(3),UTC_TIMESTAMP(3),UTC_TIMESTAMP(3))", run, guest, match);
+        return new MergeFixture(guest, account, token, name, email, password, run);
+    }
     @DynamicPropertySource static void database(DynamicPropertyRegistry properties) {
         var db = TestDatabase.get().dataSource;
         properties.add("spring.datasource.url", db::getUrl); properties.add("spring.datasource.username", db::getUsername); properties.add("spring.datasource.password", db::getPassword);
@@ -51,9 +69,15 @@ class AccountBrowserIT {
             assertThat(ready).isTrue();
             var builder = new ProcessBuilder("node", "node_modules/@playwright/test/cli.js", "test", "e2e/account-online.spec.ts", "--workers=1").directory(frontend);
             builder.environment().put("E2E_BASE_URL", origin); builder.environment().put("E2E_AUTH_ONLINE", "true");
+            var merge = mergeFixture();
+            builder.environment().put("E2E_MERGE_USERNAME", merge.username); builder.environment().put("E2E_MERGE_EMAIL", merge.email);
+            builder.environment().put("E2E_MERGE_PASSWORD", merge.password); builder.environment().put("E2E_MERGE_GUEST", merge.token);
             browser = builder.redirectErrorStream(true).redirectOutput(Path.of("target/auth-browser-test.log").toFile()).start();
             assertThat(browser.waitFor(120, TimeUnit.SECONDS)).as("Browser test timeout; inspect target/auth-browser-test.log").isTrue();
             assertThat(browser.exitValue()).as("Inspect target/auth-browser-test.log and frontend/test-results").isZero();
+            var jdbc = TestDatabase.get().jdbc;
+            assertThat(jdbc.queryForObject("SELECT user_id FROM play_runs WHERE id=?", Long.class, merge.run)).isEqualTo(merge.account);
+            assertThat(jdbc.queryForObject("SELECT merged_into_user_id FROM users WHERE id=?", Long.class, merge.guest)).isEqualTo(merge.account);
         } finally {
             if (browser != null && browser.isAlive()) { browser.destroyForcibly(); browser.waitFor(5, TimeUnit.SECONDS); }
             vite.destroy(); if (!vite.waitFor(10, TimeUnit.SECONDS)) { vite.destroyForcibly(); vite.waitFor(5, TimeUnit.SECONDS); }

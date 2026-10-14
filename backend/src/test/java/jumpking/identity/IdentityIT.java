@@ -193,6 +193,11 @@ class IdentityIT {
             assertThat(tree(login).path("account").path("id").asText()).isEqualTo(accountId); assertThat(guest.cookie("JSESSIONID")).isNotEqualTo(before);
             assertThat(TestDatabase.get().jdbc.queryForObject("SELECT type FROM users WHERE id=?", String.class, guestId)).isEqualTo("GUEST");
             assertThat(TestDatabase.get().jdbc.queryForObject("SELECT user_id FROM play_runs WHERE user_id=?", Long.class, guestId)).isEqualTo(guestId);
+            guest.token(); assertThat(guest.send("/auth/guest-history/merge", "POST", "{\"source\":1}").statusCode()).isEqualTo(400);
+            assertThat(guest.send("/auth/guest-history/merge", "POST", null).statusCode()).isEqualTo(200);
+            assertThat(guest.send("/auth/guest-history/merge", "POST", null).statusCode()).isEqualTo(200);
+            assertThat(TestDatabase.get().jdbc.queryForObject("SELECT merged_into_user_id FROM users WHERE id=?", Long.class, guestId)).isEqualTo(Long.parseLong(accountId));
+            assertThat(TestDatabase.get().jdbc.queryForObject("SELECT COUNT(*) FROM play_runs WHERE user_id=?", Integer.class, guestId)).isZero();
         }
     }
     @Test void registeringGuestPromotesTheSameOwnerWithoutMovingSolo() throws Exception {

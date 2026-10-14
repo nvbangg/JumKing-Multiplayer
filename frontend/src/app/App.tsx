@@ -15,7 +15,7 @@ import { OptionsButtons, ControlsHelp } from '../features/solo/OptionsPanel';
 import { AudioBus } from '../game/presentation/AudioBus';
 import { loadManifest } from '../game/content/assets';
 
-type Screen = 'home' | 'play' | 'sign-in' | 'register' | 'account' | 'community' | 'leaderboard' | 'history' | 'detail' | 'options' | 'controls' | 'nickname' | 'join' | 'lobby' | 'results';
+type Screen = 'home' | 'play' | 'sign-in' | 'register' | 'merge-history' | 'account' | 'community' | 'leaderboard' | 'history' | 'detail' | 'options' | 'controls' | 'nickname' | 'join' | 'lobby' | 'results';
 interface SoloLaunch { profile: string; action: 'new' | 'continue' | 'auto'; expectedRunId: string | null }
 const initialIdentity: Identity = { authenticated: false, guest: false, account: null };
 const routes: Partial<Record<Screen, string>> = { home: '/', play: '/play', history: '/history', community: '/community', options: '/options', account: '/account', 'sign-in': '/sign-in', register: '/register' };
@@ -157,7 +157,7 @@ export function App() {
   return <main className="home">
     <header className="brand"><h1><img src="/assets/title_logo.png" alt="JumpKing" /></h1></header>
     <div className={screen === 'home' ? 'home-layout' : 'single-panel'}>
-      <MenuPanel title={screen === 'home' ? undefined : ({ 'sign-in': 'Sign In', register: 'Create Account', account: 'Account', community: 'Community Tower', leaderboard: 'Leaderboard', history: 'History', detail: 'Game Details', options: 'Options', controls: 'Controls', nickname: roomIntent.roomId ? 'Join Room' : 'Play with Friends', join: 'Join by ID', lobby: room?.kind === 'COMMUNITY' ? 'Community Tower' : 'Lobby', results: 'Results' } as Partial<Record<Screen, string>>)[screen]} onBack={screen === 'home' || screen === 'lobby' || screen === 'results' ? undefined : back}>
+      <MenuPanel title={screen === 'home' ? undefined : ({ 'sign-in': 'Sign In', register: 'Create Account', 'merge-history': 'Guest Room History', account: 'Account', community: 'Community Tower', leaderboard: 'Leaderboard', history: 'History', detail: 'Game Details', options: 'Options', controls: 'Controls', nickname: roomIntent.roomId ? 'Join Room' : 'Play with Friends', join: 'Join by ID', lobby: room?.kind === 'COMMUNITY' ? 'Community Tower' : 'Lobby', results: 'Results' } as Partial<Record<Screen, string>>)[screen]} onBack={screen === 'home' || screen === 'lobby' || screen === 'results' ? undefined : back}>
         {screen === 'home' && <>
           {activeSolo && <button onClick={() => openSolo('continue')} disabled={pending}>Continue Solo</button>}
           <button onClick={() => openSolo('new')} disabled={pending}>New Solo Game</button>
@@ -168,8 +168,9 @@ export function App() {
           <button onClick={() => setScreen('options')}>Options</button>
           <div className="account-actions">{identity.account ? <button onClick={() => setScreen('account')}>{identity.account.username}</button> : <><button onClick={() => setScreen('sign-in')}>Sign In</button><button onClick={() => setScreen('register')}>Create Account</button></>}</div>
         </>}
-        {(screen === 'sign-in' || screen === 'register') && <AuthForm key={screen} register={screen === 'register'} onSuccess={value => { setIdentity(value); back(); }} onSwitch={() => setScreen(screen === 'register' ? 'sign-in' : 'register')} />}
-        {screen === 'account' && identity.account && <><dl className="account-info"><dt>Username</dt><dd>{identity.account.username}</dd><dt>Email</dt><dd>{identity.account.email}</dd></dl><button disabled={pending} onClick={() => { void execute(async () => { await api('/auth/logout', 'POST'); clearCsrf(); setIdentity(initialIdentity); back(); }); }}>Sign Out</button></>}
+        {(screen === 'sign-in' || screen === 'register') && <AuthForm key={screen} register={screen === 'register'} onSuccess={value => { setIdentity(value); if (value.guestHistoryAvailable) setScreen('merge-history'); else back(); }} onSwitch={() => setScreen(screen === 'register' ? 'sign-in' : 'register')} />}
+        {screen === 'merge-history' && <><p>Add this Guest's Room history to your account?</p><button disabled={pending} onClick={() => { void execute(async () => { const result = await api<{ merged: boolean }>('/auth/guest-history/merge', 'POST'); if (!result.merged) throw new Error('History could not be merged'); back(); }); }}>Merge Guest Room History</button><button disabled={pending} onClick={back}>Skip</button></>}
+        {screen === 'account' && identity.account && <><dl className="account-info"><dt>Username</dt><dd>{identity.account.username}</dd><dt>Email</dt><dd>{identity.account.email}</dd></dl><button disabled={pending} onClick={() => { void execute(async () => { await api('/auth/logout', 'POST'); clearCsrf(); setIdentity(initialIdentity); setIdentity(await api<Identity>('/auth/me').catch(() => initialIdentity)); back(); }); }}>Sign Out</button></>}
         {screen === 'community' && <>
           {!identity.authenticated ? <><p>Sign in to play Community Tower.</p><button onClick={() => setScreen('sign-in')}>Sign In</button><button onClick={() => setScreen('register')}>Create Account</button></> : <>
             {communityRun && <button disabled={pending} onClick={() => command('JOIN_COMMUNITY')}>Continue</button>}

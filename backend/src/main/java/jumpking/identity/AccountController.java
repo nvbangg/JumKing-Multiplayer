@@ -44,6 +44,11 @@ public class AccountController {
             HttpServletRequest request, HttpServletResponse response) {
         Long guest = guests.resolve(request); boolean history = accounts.guestHistory(guest);
         var account = accounts.login(form, identity.owner(request), value -> signIn(value, request, response));
+        long target = Long.parseLong(account.id()); var session = request.getSession(false);
+        if (guest != null) session.setAttribute(GuestHistoryService.CANDIDATE, new GuestHistoryService.Candidate(guest, target));
+        else if (!(session.getAttribute(GuestHistoryService.CANDIDATE) instanceof GuestHistoryService.Candidate candidate) || candidate.target() != target) {
+            session.removeAttribute(GuestHistoryService.CANDIDATE);
+        }
         return new LoginResponse(true, false, account, history);
     }
     @PostMapping("/logout") public Map<String, Boolean> logout(HttpServletRequest request, HttpServletResponse response) {

@@ -5,6 +5,10 @@ import { Adventure, ADVENTURE } from '../../game/simulation/Adventure';
 import map from '../../../../shared/maps/main-babe.json';
 
 const STORE = Object.freeze({ name: 'jumpking', version: 2, writerLeaseMs: 10000 });
+export const SOLO_SAVE_EVENT = 'jumpking-solo-saved';
+export function notifySoloSaved(profile: string, urgent = false): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(SOLO_SAVE_EVENT, { detail: { profile, urgent } }));
+}
 export type RunStatus = 'ACTIVE' | 'FINISHED' | 'ABANDONED';
 export interface SoloRun {
   id: string; profile: string; revision: number; syncedRevision: number; status: RunStatus;
@@ -136,6 +140,7 @@ export class SoloWriter {
       }
       profiles.put({ key: profile, activeRunId: run.id, writerId, leaseExpiresAt: Date.now() + STORE.writerLeaseMs, wardrobe: existing?.wardrobe || [], equipped: existing?.equipped || [] } satisfies Profile);
       await done;
+      notifySoloSaved(profile, true);
       return new SoloWriter(db, writerId, run, releaseLock);
     } catch (error) { try { tx.abort(); } catch { } await done.catch(() => {}); db.close(); await releaseLock?.(); throw error; }
   }
@@ -176,6 +181,7 @@ export class SoloWriter {
         await done;
         this.committedRevision = next.revision;
         this.observed.revision = next.revision; this.observed.syncedRevision = next.syncedRevision;
+        notifySoloSaved(view.profile);
         return next;
       } catch (error) { try { tx.abort(); } catch { } await done.catch(() => {}); throw error; }
     });

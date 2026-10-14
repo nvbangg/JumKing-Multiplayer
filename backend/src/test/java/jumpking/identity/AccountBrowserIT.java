@@ -67,8 +67,9 @@ class AccountBrowserIT {
                 Thread.sleep(250);
             }
             assertThat(ready).isTrue();
-            var builder = new ProcessBuilder("node", "node_modules/@playwright/test/cli.js", "test", "e2e/account-online.spec.ts", "--workers=1").directory(frontend);
+            var builder = new ProcessBuilder("node", "node_modules/@playwright/test/cli.js", "test", "e2e/.*-online.spec.ts", "--workers=1").directory(frontend);
             builder.environment().put("E2E_BASE_URL", origin); builder.environment().put("E2E_AUTH_ONLINE", "true");
+            builder.environment().put("E2E_OUTPUT_DIR", "../.local/browser-online-tests");
             var merge = mergeFixture();
             builder.environment().put("E2E_MERGE_USERNAME", merge.username); builder.environment().put("E2E_MERGE_EMAIL", merge.email);
             builder.environment().put("E2E_MERGE_PASSWORD", merge.password); builder.environment().put("E2E_MERGE_GUEST", merge.token);

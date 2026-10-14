@@ -11,7 +11,7 @@ export function backendOrigin(): string {
 }
 let csrf: { token: string; headerName: string } | null = null;
 export function clearCsrf(): void { csrf = null; }
-export async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
+export async function api<T>(path: string, method = 'GET', body?: unknown, accountId?: string): Promise<T> {
   if (!path.startsWith('/') || path.startsWith('//')) throw new Error('Invalid API path');
   if (method !== 'GET' && !csrf) {
     csrf = await api('/auth/csrf');
@@ -22,7 +22,7 @@ export async function api<T>(path: string, method = 'GET', body?: unknown): Prom
   try {
     const response = await fetch(backendOrigin() + '/api' + path, {
       method, credentials: 'include', signal: controller.signal,
-      headers: { Accept: 'application/json', ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(method !== 'GET' && csrf ? { [csrf.headerName]: csrf.token } : {}) },
+      headers: { Accept: 'application/json', ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(accountId ? { 'X-Account-ID': accountId } : {}), ...(method !== 'GET' && csrf ? { [csrf.headerName]: csrf.token } : {}) },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const contentType = response.headers.get('Content-Type') || '';

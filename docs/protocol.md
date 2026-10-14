@@ -59,6 +59,8 @@ SoloMetrics={revision,status,playTicks,jumps,falls,currentProgress,maxProgress,p
 
 - id là UUID; revision nguyên dương, ticks/counters nguyên không âm trong biên số an toàn và kiểu cột SQL, progress hữu hạn. status: ACTIVE/FINISHED/ABANDONED; invariant theo [data](data.md#ghi-lượt-và-đồng-bộ-solo).
 - Chỉ nhận các fields trên; server gán owner từ session và kind=SOLO. Timestamps lượt do client khai báo, updated_at do server đặt. UUID thuộc owner/kind khác trả 404; revision xung đột trả CONFLICT.
+- ACK trả revision request đã xử lý hoặc bỏ vì cũ; không xác nhận revision local mới hơn. Timestamps dùng độ chính xác mili giây của schema.
+- Client gửi X-Account-ID để kiểm tra phiên chưa đổi Account giữa các tab; header khác Account trong session trả CONFLICT, không dùng header để cấp quyền hay chọn owner.
 - Sync khi có mạng mỗi 5 giây, khi Pause/New Game/Save & Exit; tối đa 60 requests/phút/Account. Gộp hàng chờ theo lượt; retry giữ UUID/revision/nội dung.
 
 Page 0–100000, size/limit 1–100; timestamps ISO-8601 UTC. Chỉ trả Account ID/email của chính phiên, không lộ credentials/token. Detail sai owner trả 404 như không tồn tại.

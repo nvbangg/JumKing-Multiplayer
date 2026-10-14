@@ -14,6 +14,7 @@ import { Results } from '../features/rooms/Results';
 import { OptionsButtons, ControlsHelp } from '../features/solo/OptionsPanel';
 import { AudioBus } from '../game/presentation/AudioBus';
 import { loadManifest } from '../game/content/assets';
+import { SoloSync } from '../features/solo/sync';
 
 type Screen = 'home' | 'play' | 'sign-in' | 'register' | 'merge-history' | 'account' | 'community' | 'leaderboard' | 'history' | 'detail' | 'options' | 'controls' | 'nickname' | 'join' | 'lobby' | 'results';
 interface SoloLaunch { profile: string; action: 'new' | 'continue' | 'auto'; expectedRunId: string | null }
@@ -47,9 +48,20 @@ export function App() {
   const [flyAllowed, setFlyAllowed] = useState(__SOLO_FLY_ENABLED__);
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
+  const [recordsRevision, setRecordsRevision] = useState(0);
+  const [syncError, setSyncError] = useState('');
+  const [pendingHistory, setPendingHistory] = useState<Set<string>>(new Set());
+  const sync = useRef<SoloSync | null>(null);
   const socket = useRef<GameSocket | null>(null);
   const profile = identity.account ? backendOrigin() + ':account:' + identity.account.id : 'guest';
   const playing = screen === 'play';
+  useEffect(() => {
+    setSyncError('');
+    if (!identity.account) return;
+    const worker = new SoloSync(profile, identity.account.id, () => setRecordsRevision(value => value + 1), setSyncError); sync.current = worker;
+    return () => { worker.stop(); if (sync.current === worker) sync.current = null; };
+  }, [profile, identity.account?.id]);
+  useEffect(() => { if (screen === 'home' || screen === 'history') sync.current?.request(true); }, [screen]);
   useEffect(() => {
     if (playing || !options.sound) return;
     let disposed = false, music: AudioBus | undefined;
@@ -94,6 +106,7 @@ export function App() {
     void soloRuns(profile).then(runs => {
       if (disposed) return;
       setActiveSolo(runs.find(run => run.status === 'ACTIVE') || null);
+      setPendingHistory(new Set(identity.authenticated ? runs.filter(run => run.revision > run.syncedRevision).map(run => run.id) : []));
       if (!identity.authenticated) setStatistics(soloStatistics(runs));
       if (screen === 'history') setHistory(soloHistory(runs));
     }).catch(cause => { if (!disposed) setError(cause instanceof Error ? cause.message : 'Browser storage is unavailable'); });
@@ -115,10 +128,10 @@ export function App() {
       const local = soloHistory(await soloRuns(profile));
       const combined = new Map(local.map(item => [item.kind + ':' + item.id, item]));
       for (const item of result.items) combined.set(item.kind + ':' + item.id, item);
-      if (!disposed) setHistory([...combined.values()].sort((a, b) => b.endedAt.localeCompare(a.endedAt) || b.id.localeCompare(a.id)));
+      if (!disposed) setHistory([...combined.values()].sort((a, b) => b.endedAt.localeCompare(a.endedAt) || a.kind.localeCompare(b.kind) || b.id.localeCompare(a.id)));
     }).catch(cause => { if (!disposed) setError(cause.message); });
     return () => { disposed = true; };
-  }, [profile, screen, identity.authenticated, identity.guest]);
+  }, [profile, screen, identity.authenticated, identity.guest, recordsRevision]);
 
   const openSolo = (action: 'new' | 'continue') => { void execute(async () => {
     const current = await currentSolo(profile).catch(cause => {
@@ -179,7 +192,7 @@ export function App() {
           <button onClick={() => setScreen('leaderboard')}>Leaderboard</button>
         </>}
         {screen === 'leaderboard' && <ol className="leaderboard">{leaderboard.map(entry => <li key={entry.id}><span>{entry.rank}. {entry.username}</span><strong>{entry.finishTimeMs === null ? Math.floor(entry.maxProgress) + ' px' : duration(entry.finishTimeMs)}</strong></li>)}{!leaderboard.length && !error && <p>No results yet.</p>}</ol>}
-        {screen === 'history' && <div className="history-list">{history.map(item => <button key={item.kind + ':' + item.id} onClick={() => { setDetail(item); setScreen('detail'); }}><span className="kind-label">{item.kind}</span><span>{new Date(item.endedAt).toLocaleDateString()} · {item.status}</span><span>{duration(item.finishTimeMs ?? item.playTimeMs)}</span></button>)}{!history.length && <p>No completed games.</p>}</div>}
+        {screen === 'history' && <div className="history-list">{history.map(item => <button key={item.kind + ':' + item.id} onClick={() => { setDetail(item); setScreen('detail'); }}><span className="kind-label">{item.kind}</span><span>{new Date(item.endedAt).toLocaleDateString()} · {item.status}{item.kind === 'SOLO' && pendingHistory.has(item.id) ? ' · Pending sync' : ''}</span><span>{duration(item.finishTimeMs ?? item.playTimeMs)}</span></button>)}{!history.length && <p>No completed games.</p>}</div>}
         {screen === 'detail' && detail && <dl className="record-detail"><dt>Type</dt><dd>{detail.kind}</dd><dt>Result</dt><dd>{detail.status}</dd><dt>Play Time</dt><dd>{duration(detail.playTimeMs)}</dd><dt>Finish Time</dt><dd>{duration(detail.finishTimeMs)}</dd><dt>Jumps</dt><dd>{detail.jumps}</dd><dt>Falls</dt><dd>{detail.falls}</dd><dt>Peak</dt><dd>{Math.floor(detail.maxProgress)} px</dd>{detail.room && <><dt>Room</dt><dd>{detail.room.roomCode}</dd><dt>Mode</dt><dd>{detail.room.mode}</dd><dt>Rank</dt><dd>{detail.room.rank}</dd></>}</dl>}
         {screen === 'options' && <OptionsButtons options={options} flyAllowed={flyAllowed} onChange={updateOptions} onControls={() => setScreen('controls')} onError={setError} />}
         {screen === 'controls' && <ControlsHelp flyAllowed={flyAllowed} />}
@@ -199,6 +212,7 @@ export function App() {
         {screen === 'lobby' && room && <Lobby room={room} selfId={socket.current?.selfId || null} pending={pending} command={command} />}
         {screen === 'results' && result && <Results result={result} room={room} selfId={socket.current?.selfId || null} pending={pending} onAgain={() => command('PLAY_AGAIN', { matchId: result.playId })} onLeave={() => command('LEAVE_ROOM')} />}
         {error && <p className="error" role="alert">{error}</p>}
+        {syncError && (screen === 'home' || screen === 'history') && <p role="status">Solo sync pending: {syncError}</p>}
       </MenuPanel>
       {screen === 'home' && <StatisticsPanel statistics={statistics} />}
     </div>

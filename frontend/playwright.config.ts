@@ -5,6 +5,7 @@ if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Inv
 const localUrl = 'http://127.0.0.1:' + port;
 export default defineConfig({
   testDir: './e2e',
+  outputDir: process.env.E2E_OUTPUT_DIR || 'test-results',
   fullyParallel: true,
   workers: 2,
   use: {

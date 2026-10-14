@@ -6,7 +6,7 @@ import { SoloRuntime } from './SoloRuntime';
 import { PRESENTATION } from '../../game/presentation/config';
 import type { PlayerState } from '../../game/simulation/types';
 import rules from '../../../../shared/rules.json';
-import { SoloWriter, StorageUnavailable } from './storage';
+import { SoloWriter, StorageUnavailable, notifySoloSaved } from './storage';
 import { TouchControls } from '../../game/input/TouchControls';
 import { AudioBus } from '../../game/presentation/AudioBus';
 import { readOptions, saveOptions, type Options } from './options';
@@ -50,7 +50,7 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
     try { await storage.save(); setSaveStatus('SAVED'); setSaveError(''); }
     catch (cause) { session.pause(); input.current?.cancel(); setPaused(true); setSaveStatus('FAILED'); setSaveError(cause instanceof Error ? cause.message : 'Could not save Solo'); throw cause; }
   };
-  const pause = () => { if (runtime.current?.simulation.finished) { skipEnding.current?.(); return; } pauseRequested.current = true; runtime.current?.pause(); audio.current?.pause(true); flight.current?.cancel(); input.current?.cancel(); setMenu('pause'); setPaused(true); void flush().catch(() => {}); };
+  const pause = () => { if (runtime.current?.simulation.finished) { skipEnding.current?.(); return; } pauseRequested.current = true; runtime.current?.pause(); audio.current?.pause(true); flight.current?.cancel(); input.current?.cancel(); setMenu('pause'); setPaused(true); void flush().then(() => notifySoloSaved(profile, true)).catch(() => {}); };
   const updateOptions = (key: keyof Options) => {
     const next = { ...options, [key]: !options[key] }; setOptions(next); audio.current?.setEnabled(next.sound);
     if (key === 'fly') { flight.current?.setEnabled(next.fly); void flush().catch(() => {}); }

@@ -28,6 +28,7 @@ class GuestHistoryIT {
     @Autowired RunOwners owners;
     @Autowired JdbcTemplate jdbc;
     @Autowired Memberships memberships;
+    @Autowired jumpking.records.RecordsService records;
     private long guest() {
         String hash = UUID.randomUUID().toString().replace("-", "").repeat(2);
         jdbc.update("INSERT INTO users(type,guest_token_hash,created_at) VALUES ('GUEST',?,UTC_TIMESTAMP(3))", hash);
@@ -54,6 +55,7 @@ class GuestHistoryIT {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM play_runs WHERE match_id=? AND user_id=?", Integer.class, match, account)).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT SUM(jumps) FROM play_runs WHERE match_id=? AND user_id=?", Integer.class, match, account)).isEqualTo(8);
         assertThat(jdbc.queryForObject("SELECT COUNT(DISTINCT match_id) FROM play_runs WHERE user_id=?", Integer.class, account)).isEqualTo(1);
+        assertThat(records.statistics(account).matchesPlayed()).isEqualTo(1); assertThat(records.statistics(account).totalJumps()).isEqualTo(8);
         owners.write(guest, canonical -> jdbc.update("UPDATE play_runs SET jumps=7,revision=2 WHERE id=? AND user_id=?", run, canonical));
         assertThat(jdbc.queryForObject("SELECT jumps FROM play_runs WHERE id=?", Integer.class, run)).isEqualTo(7);
         assertThatThrownBy(() -> history.merge(guest, account())).isInstanceOf(jumpking.network.ApiException.class);

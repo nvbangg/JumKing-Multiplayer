@@ -17,6 +17,7 @@ import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicLong;
 import jumpking.JumpKingApplication;
 import jumpking.support.TestDatabase;
+import jumpking.records.SoloMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -77,6 +78,67 @@ class IdentityIT {
         jdbc.update("INSERT INTO matches(id,room_code,mode,started_at) VALUES (?,'ABCDEF','RACE',UTC_TIMESTAMP(3))", match);
         jdbc.update("INSERT INTO play_runs(id,user_id,kind,match_id,status,nickname,started_at,updated_at) VALUES (?,?,'ROOM',?,'ACTIVE','Guest Player',UTC_TIMESTAMP(3),UTC_TIMESTAMP(3))",
             java.util.UUID.randomUUID().toString(), guest, match);
+    }
+    private String metrics(long revision, long ticks, String status) throws Exception {
+        var body = json.createObjectNode().put("revision", revision).put("status", status).put("playTicks", ticks).put("jumps", ticks > 0 ? 1 : 0).put("falls", 0)
+            .put("currentProgress", 0).put("maxProgress", 0).put("peakReachedTicks", 0).put("startedAt", "2026-01-01T00:00:00.000Z");
+        if (status.equals("FINISHED")) body.put("finishTicks", ticks); else body.putNull("finishTicks");
+        if (status.equals("ACTIVE")) body.putNull("endedAt"); else body.put("endedAt", "2026-01-01T00:00:10.000Z");
+        return body.toString();
+    }
+    @Test void soloSyncIsRevisionedOwnerScopedAndStatsHistoryCountCommittedRunsOnce() throws Exception {
+        try (var client = client(); var other = client()) {
+            client.token(); assertThat(client.send("/auth/register", "POST", registration(unique(), unique() + "@example.test", "A secure solo password")).statusCode()).isEqualTo(200); client.token();
+            String account = tree(client.send("/auth/me", "GET", null)).path("account").path("id").asText();
+            String id = java.util.UUID.randomUUID().toString(), path = "/solo/runs/" + id;
+            assertThat(client.send(path, "PUT", metrics(1, 60, "ACTIVE"), "X-Account-ID", "wrong-account").statusCode()).isEqualTo(409);
+            assertThat(client.send(path, "PUT", metrics(1, 60, "ACTIVE"), "X-Account-ID", account).statusCode()).isEqualTo(200);
+            assertThat(client.send(path, "PUT", metrics(1, 60, "ACTIVE")).statusCode()).isEqualTo(200);
+            assertThat(client.send(path, "PUT", metrics(1, 120, "ACTIVE")).statusCode()).isEqualTo(409);
+            assertThat(client.send(path, "PUT", metrics(2, 120, "ACTIVE")).statusCode()).isEqualTo(200);
+            assertThat(tree(client.send(path, "PUT", metrics(1, 60, "ACTIVE"))).path("revision").asLong()).isEqualTo(1);
+            assertThat(TestDatabase.get().jdbc.queryForObject("SELECT play_ticks FROM play_runs WHERE id=?", Long.class, id)).isEqualTo(120);
+            assertThat(client.send(path, "PUT", metrics(3, 120, "FINISHED")).statusCode()).isEqualTo(200);
+            assertThat(client.send(path, "PUT", metrics(4, 180, "ACTIVE")).statusCode()).isEqualTo(409);
+            String second = java.util.UUID.randomUUID().toString(); assertThat(client.send("/solo/runs/" + second, "PUT", metrics(1, 60, "ABANDONED")).statusCode()).isEqualTo(200);
+            var stats = tree(client.send("/profile/me", "GET", null)).path("total");
+            assertThat(stats.path("totalPlayTimeMs").asLong()).isEqualTo(3000); assertThat(stats.path("totalJumps").asLong()).isEqualTo(2); assertThat(stats.path("finishes").asLong()).isEqualTo(1); assertThat(stats.path("bestFinishTimeMs").asLong()).isEqualTo(2000);
+            var history = tree(client.send("/history?page=0&size=1", "GET", null)); assertThat(history.path("items").size()).isEqualTo(1); assertThat(history.path("hasNext").asBoolean()).isTrue();
+            assertThat(tree(client.send("/history/SOLO/" + id, "GET", null)).path("status").asText()).isEqualTo("FINISHED");
+            other.token(); assertThat(other.send("/auth/register", "POST", registration(unique(), unique() + "@example.test", "Another solo password")).statusCode()).isEqualTo(200); other.token();
+            assertThat(other.send(path, "PUT", metrics(4, 180, "ACTIVE")).statusCode()).isEqualTo(404);
+            assertThat(other.send("/history/SOLO/" + id, "GET", null).statusCode()).isEqualTo(404);
+            assertThat(client.send("/history?page=invalid", "GET", null).statusCode()).isEqualTo(400);
+        }
+    }
+    @Test void soloSyncRejectsScalarCoercionUnknownFieldsAndForeignKinds() throws Exception {
+        try (var client = client()) {
+            client.token(); assertThat(client.send("/auth/register", "POST", registration(unique(), unique() + "@example.test", "A strict solo password")).statusCode()).isEqualTo(200); client.token();
+            String path = "/solo/runs/" + java.util.UUID.randomUUID();
+            for (String body : java.util.List.of(metrics(1, 60, "ACTIVE").replace("\"revision\":1", "\"revision\":\"1\""), metrics(1, 60, "ACTIVE").replace("\"revision\":1", "\"revision\":1.5"),
+                    metrics(1, 60, "ACTIVE").replace("\"status\":\"ACTIVE\"", "\"status\":0"), metrics(1, 60, "ACTIVE").replace("\"startedAt\":\"2026-01-01T00:00:00.000Z\"", "\"startedAt\":0"),
+                    metrics(1, 60, "ACTIVE").replace("}", ",\"snapshot\":{}}"), metrics(SoloMetrics.MAX_SAFE_INTEGER + 1, 60, "ACTIVE"))) {
+                assertThat(client.send(path, "PUT", body).statusCode()).as(body).isEqualTo(400);
+            }
+            long owner = tree(client.send("/auth/me", "GET", null)).path("account").path("id").asLong(); roomHistory(owner);
+            String roomRun = TestDatabase.get().jdbc.queryForObject("SELECT id FROM play_runs WHERE user_id=?", String.class, owner);
+            TestDatabase.get().jdbc.update("UPDATE play_runs SET status='DNF',ended_at=UTC_TIMESTAMP(3) WHERE id=?", roomRun);
+            assertThat(client.send("/solo/runs/" + roomRun, "PUT", metrics(1, 60, "ACTIVE")).statusCode()).isEqualTo(404);
+        }
+    }
+    @Test void soloQuotaCountsInvalidRequestsAndLargeTickTotalsDoNotOverflow() throws Exception {
+        try (var client = client()) {
+            client.token(); assertThat(client.send("/auth/register", "POST", registration(unique(), unique() + "@example.test", "A bounded Solo password")).statusCode()).isEqualTo(200); client.token();
+            String first = "/solo/runs/" + java.util.UUID.randomUUID(), second = "/solo/runs/" + java.util.UUID.randomUUID();
+            assertThat(client.send(first, "PUT", metrics(1, SoloMetrics.MAX_SAFE_INTEGER, "ACTIVE")).statusCode()).isEqualTo(200);
+            assertThat(client.send(second, "PUT", metrics(1, SoloMetrics.MAX_SAFE_INTEGER, "ACTIVE")).statusCode()).isEqualTo(200);
+            var expected = java.math.BigInteger.valueOf(SoloMetrics.MAX_SAFE_INTEGER).multiply(java.math.BigInteger.valueOf(2000)).divide(java.math.BigInteger.valueOf(60));
+            assertThat(tree(client.send("/profile/me", "GET", null)).path("total").path("totalPlayTimeMs").bigIntegerValue()).isEqualTo(expected);
+            assertThat(client.send(first, "PUT", "{invalid-json").statusCode()).isEqualTo(400);
+            for (int index = 0; index < 57; index++) assertThat(client.send(first, "PUT", metrics(1, SoloMetrics.MAX_SAFE_INTEGER, "ACTIVE")).statusCode()).isEqualTo(200);
+            var limited = client.send(first, "PUT", metrics(1, SoloMetrics.MAX_SAFE_INTEGER, "ACTIVE")); assertThat(limited.statusCode()).isEqualTo(429);
+            assertThat(limited.headers().firstValue("Retry-After")).contains("60");
+        }
     }
     @Test void publicMapAndConfigComeFromPackagedSharedDataAndServerFlags() throws Exception {
         try (var client = client()) {

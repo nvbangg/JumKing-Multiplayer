@@ -56,7 +56,7 @@ public class SecurityConfiguration {
         var cors = new CorsConfiguration();
         cors.setAllowedOrigins(settings.allowedOrigins()); cors.setAllowCredentials(true);
         cors.setAllowedMethods(List.of("GET", "POST", "PUT", "OPTIONS"));
-        cors.setAllowedHeaders(List.of("Accept", "Content-Type", "X-CSRF-TOKEN")); cors.setMaxAge(600L);
+        cors.setAllowedHeaders(List.of("Accept", "Content-Type", "X-CSRF-TOKEN", "X-Account-ID")); cors.setMaxAge(600L);
         var source = new UrlBasedCorsConfigurationSource(); source.registerCorsConfiguration("/**", cors);
         var filter = new CorsFilter(source);
         filter.setCorsProcessor(new DefaultCorsProcessor() {

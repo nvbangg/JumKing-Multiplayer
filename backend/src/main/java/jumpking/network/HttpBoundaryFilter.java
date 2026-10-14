@@ -41,11 +41,11 @@ public class HttpBoundaryFilter extends OncePerRequestFilter {
             }
             var session = request.getSession(false);
             if (session != null && !sessions.valid(session, false)) throw new ApiException(401, "SESSION_EXPIRED", "Your session has expired");
+            String account = account(session);
+            if (account != null && "PUT".equals(request.getMethod()) && request.getRequestURI().startsWith("/api/solo/runs/")) limits.solo(account);
             if ("POST".equals(request.getMethod()) && AUTH_MUTATIONS.contains(request.getRequestURI())) {
                 String guest = GuestIdentity.token(request);
-                Object security = session == null ? null : session.getAttribute("SPRING_SECURITY_CONTEXT");
-                String identity = security instanceof org.springframework.security.core.context.SecurityContext context && context.getAuthentication() != null
-                    ? "account:" + context.getAuthentication().getName() : guest == null ? null : "guest:" + GuestIdentity.hash(guest);
+                String identity = account != null ? "account:" + account : guest == null ? null : "guest:" + GuestIdentity.hash(guest);
                 limits.check(request.getRemoteAddr(), identity);
             }
             if (!Set.of("GET", "HEAD", "OPTIONS").contains(request.getMethod())) {
@@ -63,6 +63,16 @@ public class HttpBoundaryFilter extends OncePerRequestFilter {
             if (error.status() == 429) response.setHeader("Retry-After", "60");
             ApiErrors.write(response, json, error.status(), error.code(), error.getMessage());
         }
+    }
+    private static String account(jakarta.servlet.http.HttpSession session) {
+        Object security;
+        try { security = session == null ? null : session.getAttribute("SPRING_SECURITY_CONTEXT"); }
+        catch (IllegalStateException expired) { throw new ApiException(401, "SESSION_EXPIRED", "Your session has expired"); }
+        if (security instanceof org.springframework.security.core.context.SecurityContext context && context.getAuthentication() != null
+                && context.getAuthentication().getAuthorities().stream().anyMatch(authority -> authority.getAuthority().equals("ROLE_ACCOUNT"))) {
+            return context.getAuthentication().getName();
+        }
+        return null;
     }
     private static HttpServletRequest buffered(HttpServletRequest original, byte[] body) {
         return new HttpServletRequestWrapper(original) {

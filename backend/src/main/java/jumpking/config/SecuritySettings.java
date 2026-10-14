@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties("app")
 public record SecuritySettings(List<String> allowedOrigins, Duration sessionAbsoluteTimeout,
-        int authRatePerMinute, int httpBodyLimit, int rateBucketLimit) {
+        int authRatePerMinute, int httpBodyLimit, int rateBucketLimit, int soloSyncRatePerMinute) {
     public SecuritySettings {
         if (allowedOrigins == null || allowedOrigins.isEmpty()) throw new IllegalArgumentException("An origin allowlist is required");
         allowedOrigins = List.copyOf(allowedOrigins);
@@ -19,7 +19,7 @@ public record SecuritySettings(List<String> allowedOrigins, Duration sessionAbso
         }
         if (sessionAbsoluteTimeout == null || sessionAbsoluteTimeout.isNegative() || sessionAbsoluteTimeout.isZero()
                 || sessionAbsoluteTimeout.toSeconds() > Integer.MAX_VALUE - 60
-                || authRatePerMinute < 1 || httpBodyLimit < 1 || rateBucketLimit < 1) throw new IllegalArgumentException("Invalid security bounds");
+                || authRatePerMinute < 1 || httpBodyLimit < 1 || rateBucketLimit < 1 || soloSyncRatePerMinute < 1) throw new IllegalArgumentException("Invalid security bounds");
     }
 
     public boolean acceptsOrigin(String origin) { return origin != null && allowedOrigins.contains(origin); }

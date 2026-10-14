@@ -15,6 +15,7 @@ test('totals retain abandoned and active attempts but best time only uses finish
   expect(soloStatistics(rows)).toEqual({ totalPlayTimeMs: 7500, totalJumps: 12, totalFalls: 4,
     finishes: 2, matchesPlayed: 0, wins: 0, bestFinishTimeMs: 1500 });
   expect(soloStatistics([rows[0]!]).bestFinishTimeMs).toBeNull();
+  expect(soloStatistics([run({ playTicks: 1 }), run({ playTicks: 2 })]).totalPlayTimeMs).toBe(50);
 });
 
 test('history excludes active saves and sorts terminal summaries without altering IDs', () => {

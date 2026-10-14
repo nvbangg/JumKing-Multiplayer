@@ -59,7 +59,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 - [x] Đồng bộ ngoại hình/nhãn tên/animation/audio peers; kiểm tra self/peers, camera/screen, slot reuse và dedupe effects.
 - [x] Hoàn thiện chat Community; kiểm tra focus, plain text, history và giới hạn.
 - [x] Hoàn thiện leaderboard/UI; kiểm tra best từng Account, comparator, đồng hạng và dữ liệu đã commit.
-- [ ] Hoàn thiện thống kê tổng; kiểm tra Guest local/Room, Account cả ba kiểu chơi, best và chống cộng trùng.
+- [x] Hoàn thiện thống kê tổng; kiểm tra Guest local/Room, Account cả ba kiểu chơi, best và chống cộng trùng.
 - [ ] Hoàn thiện History Solo/Community và contract chung; kiểm tra ownership, pagination, pending/sync và terminal state.
 - [ ] Hoàn thiện Community Finish/ending riêng; kiểm tra flush/finalize, Skip/New Run và peers tiếp tục.
 - [ ] Tích hợp Fly Mode online; kiểm tra server gate, prediction/checkpoint và thành tích.
@@ -143,5 +143,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 05 — presentation online | PASS — type-check/build, 59 frontend unit tests, backend/MySQL regression và 13 Chrome E2E online. Peers chỉ nhận pose/trang bị công khai; hai người có nhãn tên/màu riêng qua renderer chung, cùng bộ camera/animation đã test 43 screens. Server gửi effects theo screen, client dedupe eventSeq và bỏ self event của lượt cũ; Chrome xác minh một JUMP tự thân/một JUMP peer với mức âm lượng riêng, replay không phát lặp. Slot/membership đã nghiệm thu ở mốc trước |
 | Phase 05 — chat | PASS — type-check/build, 59 frontend/39 backend unit tests, 36 MySQL integration tests và 13 Chrome E2E online. Hai Account gửi/nhận text và nhận lại 50 tin gần nhất khi Join; HTML không thực thi. Kiểm tra Unicode, cooldown, focus/cancel và chat không gia hạn AFK/pause; lịch sử chỉ ở RAM của sảnh |
 | Phase 05 — leaderboard | PASS — type-check/build, 59 frontend unit tests, MySQL regression và 13 Chrome E2E online. SQL chọn một Community run hoàn chỉnh/Account, tính RANK trước LIMIT, đồng hạng 1,1,3; không ghép peak/time khác lượt hoặc lấy Solo. Chrome đối chiếu tên/rank/peak với API sau Save & Exit; leaderboard chỉ nằm trong Community menu |
+| Phase 05 — thống kê | PASS — frontend unit/type-check/build và MySQL regression. Tổng ticks đổi sang ms sau khi cộng; SQL gộp ba kiểu chơi, best chỉ từ Finish, Room matches/wins đếm DISTINCT sau Merge. Test dữ liệu Room bằng fixtures; writer gameplay Room theo Phase 06. Chrome kiểm tra tổng Community + Solo đã sync sau reload không cộng lại local |
 | Phase 05 còn lại–07 | NOT RUN — chưa nghiệm thu đầy đủ |
 | Phase 08 | Chưa thực hiện |

@@ -10,8 +10,8 @@ export function duration(ms: number | null): string {
   return `${hours ? hours + ':' : ''}${String(minutes % 60).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 }
 export function soloStatistics(runs: SoloRun[]): Statistics {
-  return runs.reduce((total, run) => {
-    total.totalPlayTimeMs += ticksToMs(run.playTicks); total.totalJumps += run.jumps; total.totalFalls += run.falls;
+  const total = runs.reduce((total, run) => {
+    total.totalJumps += run.jumps; total.totalFalls += run.falls;
     if (run.status === 'FINISHED') {
       total.finishes++;
       const finish = ticksToMs(run.finishTicks!);
@@ -19,6 +19,8 @@ export function soloStatistics(runs: SoloRun[]): Statistics {
     }
     return total;
   }, { ...EMPTY_STATS });
+  total.totalPlayTimeMs = ticksToMs(runs.reduce((ticks, run) => ticks + run.playTicks, 0));
+  return total;
 }
 export function soloHistory(runs: SoloRun[]): HistoryItem[] {
   return runs.filter(run => run.status !== 'ACTIVE').map<HistoryItem>(run => ({

@@ -65,7 +65,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
         java.time.Instant finishedAt;
         int pendingWrites;
         String saveStatus = "SAVED";
-        PlayerInput lastPhysicalInput = PlayerInput.NEUTRAL;
+        PlayerInput lastPhysicalInput = new PlayerInput(false, false, false, false, false, false);
         GameEnvelope leaveCommand;
         GameEnvelope operationCommand;
         Member(GameConnection connection, RoomDirectory.Slot slot) { this.connection = connection; identity = connection.identity(); this.slot = slot; }
@@ -163,8 +163,16 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                 }
                 case "SET_COMMUNITY_PAUSED" -> {
                     GameEnvelope.fields(command.payload(), Set.of("paused")); boolean paused = GameEnvelope.bool(command.payload(), "paused", false);
+                    if (!paused && player.saveStatus.equals("FAILED")) {
+                        player.operation = true; player.operationCommand = command;
+                        save(tower, player, true, () -> {
+                            player.operation = false; player.operationCommand = null; resume(player);
+                            if (player.connection != null) player.connection.reply(command, "COMMUNITY_RUN_STATE", runPayload(player)); snapshots(tower);
+                        });
+                        return;
+                    }
                     if (paused) pause(player);
-                    else if (!player.leaving && !player.finished && (player.paused || player.pausePending)) { player.paused = player.pausePending = false; player.lastPhysical = time.nanos(); player.generation++; player.input.reset(player.stored.id(), player.generation); }
+                    else resume(player);
                     if (paused && player.paused) save(tower, player, true, () -> runState(player));
                     connection.reply(command, "COMMUNITY_RUN_STATE", runPayload(player));
                     snapshots(tower);
@@ -178,6 +186,11 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                 default -> throw GameEnvelope.invalid();
             }
         }));
+    }
+    private void resume(Member player) {
+        if (!player.leaving && !player.finished && (player.paused || player.pausePending)) {
+            player.paused = player.pausePending = false; player.lastPhysical = time.nanos(); player.generation++; player.input.reset(player.stored.id(), player.generation);
+        }
     }
     private void newRun(Tower tower, Member player, GameEnvelope command) {
         GameEnvelope.fields(command.payload(), Set.of("expectedRunId"));
@@ -265,12 +278,14 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
         if (player.finished) player.terminalQueued = true;
         var snapshot = player.game.snapshot(); long revision = ++player.revision; player.saveStatus = "PENDING"; player.saving = true; player.pendingWrites++; player.lastSave = time.nanos();
         var write = new CommunityRuns.Write(player.stored.id(), player.identity.owner(), revision, player.finished ? "FINISHED" : "ACTIVE", snapshot, player.game.physics().progress(), player.maximum, player.peakTicks, player.finished ? player.finishedAt : null);
+        runState(player);
         try { player.writer.submit(write, flush, (outcome, error) -> {
             if (outcome == CheckpointWriter.Outcome.RETRYING) { tower.actor.execute(() -> { pause(player); runState(player); }); return; }
             if (outcome == CheckpointWriter.Outcome.SUPERSEDED) { tower.actor.execute(() -> player.saving = --player.pendingWrites > 0); return; }
             if (outcome == CheckpointWriter.Outcome.SAVED) { tower.actor.execute(() -> {
                 player.savedRevision = Math.max(player.savedRevision, revision); player.saving = --player.pendingWrites > 0; player.saveStatus = player.savedRevision == player.revision ? "SAVED" : "PENDING";
-                if (flush) { if (player.connection != null) player.connection.send("SAVE_STATUS", Map.of("playId", write.id(), "revision", revision, "saveStatus", "SAVED")); committed.run(); }
+                if (player.connection != null) player.connection.send("SAVE_STATUS", Map.of("playId", write.id(), "revision", revision, "saveStatus", "SAVED"));
+                if (flush) committed.run();
                 if (write.status().equals("FINISHED")) { var actions = List.copyOf(player.terminalActions); player.terminalActions.clear(); actions.forEach(Runnable::run); }
             }); }
             else { tower.actor.execute(() -> {

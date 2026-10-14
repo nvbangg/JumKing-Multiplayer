@@ -46,8 +46,10 @@ class CommunityLifecycleIT {
         try (var client = new GameClient(port)) {
             client.register(); client.connect(); var join = client.ok("JOIN_COMMUNITY", Map.of());
             client.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT"));
+            step(client, 29_999);
             client.input(Map.of("playId", join.path("playId").asText(), "generation", 1, "seq", 1, "left", false, "right", false, "jump", false));
-            step(client, 59_999); assertThat(client.snapshot().path("self").path("paused").asBoolean()).isFalse();
+            client.ok("GET_ROOM_STATE", Map.of());
+            step(client, 30_000); assertThat(client.snapshot().path("self").path("paused").asBoolean()).isFalse();
             time.advance(1); client.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT") && message.path("payload").path("self").path("paused").asBoolean());
             assertThat(client.snapshot().path("self").path("paused").asBoolean()).isTrue();
             long stoppedTicks = client.snapshot().path("self").path("simulation").path("physics").path("ticks").asLong();
@@ -88,6 +90,23 @@ class CommunityLifecycleIT {
             time.advance(1); GameClient.until(() -> memberships.find(client.owner) == null);
             client.connect(); var continued = client.ok("JOIN_COMMUNITY", Map.of()); assertThat(continued.path("playId").asText()).isEqualTo(joined.path("playId").asText());
             client.ok("LEAVE_ROOM", Map.of());
+        }
+    }
+    @Test void failedSaveKeepsMembershipAndResumeCannotBypassDatabaseFailure() throws Exception {
+        try (var client = new GameClient(port)) {
+            client.register(); client.connect(); var joined = client.ok("JOIN_COMMUNITY", Map.of()); client.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT"));
+            String trigger = "pause_failure_" + UUID.randomUUID().toString().replace("-", ""); var jdbc = TestDatabase.get().jdbc;
+            jdbc.execute("CREATE TRIGGER " + trigger + " BEFORE UPDATE ON play_runs FOR EACH ROW BEGIN IF OLD.user_id=" + client.owner + " THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='injected save failure'; END IF; END");
+            try {
+                assertThat(client.command("LEAVE_ROOM", Map.of()).path("payload").path("code").asText()).isEqualTo("SAVE_FAILED");
+                assertThat(memberships.find(client.owner)).isNotNull();
+                assertThat(client.command("SET_COMMUNITY_PAUSED", Map.of("paused", false)).path("payload").path("code").asText()).isEqualTo("SAVE_FAILED");
+                var state = client.ok("GET_ROOM_STATE", Map.of()); assertThat(state.path("members").get(0).path("paused").asBoolean()).isTrue();
+                assertThat(client.messages.stream().anyMatch(message -> message.path("type").asText().equals("ROOM_LEFT"))).isFalse();
+            } finally { jdbc.execute("DROP TRIGGER " + trigger); }
+            assertThat(client.ok("SET_COMMUNITY_PAUSED", Map.of("paused", false)).path("paused").asBoolean()).isFalse();
+            client.ok("LEAVE_ROOM", Map.of()); assertThat(memberships.find(client.owner)).isNull();
+            assertThat(client.request("/community/current", "GET", null).path("run").path("id").asText()).isEqualTo(joined.path("playId").asText());
         }
     }
 }

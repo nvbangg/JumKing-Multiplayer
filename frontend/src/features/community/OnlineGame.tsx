@@ -22,7 +22,7 @@ export function OnlineGame({ socket, room }: { socket: GameSocket; room: RoomSta
   const pause = () => {
     if (!runtime.current || runtime.current.menu) return;
     runtime.current.menu = true; runtime.current.cancel(); input.current?.cancel(); audio.current?.pause(true); setMenu('pause');
-    if (room.kind === 'COMMUNITY') void socket.command('SET_COMMUNITY_PAUSED', { paused: true }).catch(cause => setError(cause.message));
+    if (room.kind === 'COMMUNITY') { setSaveStatus('PENDING'); void socket.command('SET_COMMUNITY_PAUSED', { paused: true }).catch(cause => setError(cause.message)); }
   };
   pauseRef.current = pause;
   useEffect(() => { runtime.current?.updateRoom(room); }, [room]);
@@ -48,7 +48,7 @@ export function OnlineGame({ socket, room }: { socket: GameSocket; room: RoomSta
       }, config.features.flyEnabled, message => { setError(message); setMenu('pause'); controls.cancel(); });
       runtime.current = session;
       if (socket.lastSnapshot) session.receive(socket.lastSnapshot);
-      game = renderer.createGame(container.current!, manifest, session, () => setReady(true), setError);
+      game = renderer.createGame(container.current!, manifest, session, () => { setReady(true); if (document.hidden || !document.hasFocus()) pauseRef.current(); }, setError);
     })().catch(cause => { if (!disposed) setError(cause instanceof Error ? cause.message : 'Unable to load online game'); });
     return () => { disposed = true; controller.abort(); unsubscribe(); controls.dispose(); runtime.current?.cancel(); runtime.current = null; input.current = null; game?.destroy(true); audio.current?.dispose(); audio.current = null;
       document.removeEventListener('visibilitychange', hidden); window.removeEventListener('blur', blur);

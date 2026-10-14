@@ -63,6 +63,14 @@ class RoomRankingIT {
                 assertThat(finished.path("reason").asText()).as(mode).isEqualTo("FINISH");
                 for (var result : finished.path("results")) { assertThat(result.path("rank").asInt()).isEqualTo(1); assertThat(result.path("isWinner").asBoolean()).isTrue(); }
                 saved(a);
+                for (var client : List.of(a, b)) {
+                    var ending = client.await(message -> message.path("type").asText().equals("PLAYER_FINISHED")).path("payload");
+                    assertThat(ending.path("playId").asText()).isEqualTo(game.play); assertThat(ending.path("showEnding").asBoolean()).isTrue();
+                    assertThat(ending.path("ending").path("screen").asInt()).isEqualTo(42);
+                    assertThat(ending.path("ending").path("equipped").toString()).isEqualTo(before.adventure().path("equipped").toString());
+                    client.ok("GET_ROOM_STATE", Map.of());
+                    assertThat(client.messages.stream().filter(message -> message.path("type").asText().equals("PLAYER_FINISHED")).count()).isEqualTo(1);
+                }
                 assertThat(TestDatabase.get().jdbc.queryForObject("SELECT COUNT(*) FROM play_runs WHERE match_id=? AND finish_ticks=16957 AND `rank`=1 AND is_winner=TRUE", Integer.class, game.play)).as(mode).isEqualTo(2);
                 a.ok("LEAVE_ROOM", Map.of()); b.ok("LEAVE_ROOM", Map.of());
             }
@@ -82,6 +90,8 @@ class RoomRankingIT {
                 }); c.ok("LEAVE_ROOM", Map.of()); time.advance(50);
                 a.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT") && message.path("payload").path("elapsedTimeMs").asLong() > 1666);
                 a.ok("END_MATCH", Map.of()); saved(a);
+                assertThat(a.messages.stream().filter(message -> message.path("type").asText().equals("PLAYER_FINISHED"))).isEmpty();
+                assertThat(b.messages.stream().filter(message -> message.path("type").asText().equals("PLAYER_FINISHED"))).isEmpty();
                 var jdbc = TestDatabase.get().jdbc;
                 assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM play_runs WHERE match_id=? AND is_winner=TRUE", Integer.class, game.play)).isZero();
                 assertThat(jdbc.queryForObject("SELECT play_ticks FROM play_runs WHERE match_id=? AND user_id=?", Long.class, game.play, c.owner)).isEqualTo(100);

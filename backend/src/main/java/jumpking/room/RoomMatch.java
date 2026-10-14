@@ -23,6 +23,7 @@ final class RoomMatch {
         Long finish;
         Integer rank;
         boolean winner;
+        Map<String, Object> ending;
         Instant endedAt;
         Player(Spec spec, GameSimulation game, InputFrames input) { this.spec = spec; this.game = game; this.input = input; }
     }
@@ -59,10 +60,14 @@ final class RoomMatch {
         for (var player : players.values()) {
             if (!player.status.equals("ACTIVE")) continue;
             var input = player.input.poll(now); if (input.cancel()) player.game.physics().cancelInput();
+            var beforeEnding = player.game.adventure().snapshot();
             var effect = player.game.tick(input.input(), settings.mode().equals("HARDCORE")); events.add(new Events(player, effect));
             double progress = player.game.physics().progress();
             if (progress > player.maximum) { player.maximum = progress; player.peak = player.game.physics().snapshot().ticks; }
-            if (player.game.finished()) { player.status = "FINISHED"; player.finish = ticks; }
+            if (player.game.finished()) {
+                player.status = "FINISHED"; player.finish = ticks;
+                player.ending = Map.of("screen", player.game.physics().snapshot().screen, "equipped", beforeEnding.path("equipped"), "ravenDone", beforeEnding.path("birds").path("raven").path("done").asBoolean());
+            }
         }
         if (players.values().stream().anyMatch(player -> player.finish != null)) finish("FINISH", instant);
         else if (limitTicks > 0 && ticks >= limitTicks) finish("TIME_LIMIT", instant);

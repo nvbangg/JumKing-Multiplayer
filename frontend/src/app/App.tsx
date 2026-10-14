@@ -13,6 +13,7 @@ import { GameSocket, type MatchResult, type RoomState } from '../network/GameSoc
 import { EMPTY_STATS, type HistoryItem, type Identity, type Statistics, type LeaderboardEntry } from '../network/contracts';
 import { Lobby } from '../features/rooms/Lobby';
 import { Results } from '../features/rooms/Results';
+import { roomFinishScreen } from '../features/rooms/ending';
 import { OptionsButtons, ControlsHelp } from '../features/solo/OptionsPanel';
 import { AudioBus } from '../game/presentation/AudioBus';
 import { loadManifest } from '../game/content/assets';
@@ -48,6 +49,7 @@ export function App() {
   const [room, setRoom] = useState<RoomState | null>(null);
   const [result, setResult] = useState<MatchResult | null>(null);
   const resultRef = useRef<MatchResult | null>(null);
+  const viewedEnding = useRef<string | null>(null);
   const [roomIntent, setRoomIntent] = useState<{ roomId?: string }>({});
   const [options, setOptions] = useState(readOptions);
   const [flyAllowed, setFlyAllowed] = useState(__SOLO_FLY_ENABLED__);
@@ -162,12 +164,14 @@ export function App() {
         if (next.result && typeof next.result === 'object') { resultRef.current = next.result as MatchResult; setResult(next.result as MatchResult); }
         if (next.state === 'PLAYING' || next.state === 'PAUSED') { setScreen('online'); return; }
         const self = next.members?.find(member => member.playerId === socket.current?.selfId);
-        setScreen(resultRef.current && self?.nextMatchConfirmed !== true && (next.state === 'WAITING' || next.state === 'FINISHED') ? 'results' : 'lobby');
+        setScreen(resultRef.current && self?.nextMatchConfirmed !== true && (next.state === 'WAITING' || next.state === 'FINISHED')
+          ? roomFinishScreen(resultRef.current, socket.current?.selfId || null, viewedEnding.current) : 'lobby');
       }
-      else if (type === 'GAME_FINISHED') { const finished = payload as unknown as MatchResult; resultRef.current = finished; setResult(finished); setScreen('results'); }
+      else if (type === 'GAME_FINISHED') { const finished = payload as unknown as MatchResult; resultRef.current = finished; setResult(finished); setScreen(roomFinishScreen(finished, socket.current?.selfId || null, viewedEnding.current)); }
       else if (type === 'GAME_STARTED') { resultRef.current = null; setResult(null); }
       else if (type === 'SAVE_STATUS' && resultRef.current !== null && resultRef.current.playId === payload.playId && ['PENDING', 'SAVED', 'FAILED'].includes(String(payload.saveStatus))) {
         const updated = { ...resultRef.current, saveStatus: payload.saveStatus as MatchResult['saveStatus'] }; resultRef.current = updated; setResult(updated);
+        setScreen(roomFinishScreen(updated, socket.current?.selfId || null, viewedEnding.current));
       }
       else if (type === 'ROOM_LEFT') { setRoom(null); setResult(null); resultRef.current = null; socket.current?.close(); socket.current = null; back(); }
       else if (type === 'ERROR') setError(String(payload.message));
@@ -188,7 +192,9 @@ export function App() {
   };
 
   if (screen === 'play') return <SoloGame {...launch} onExit={() => { setOptions(readOptions()); back(); }} />;
-  if (screen === 'online' && room && socket.current) return <OnlineGame room={room} socket={socket.current} onHome={() => {
+  if (screen === 'online' && room && socket.current) return <OnlineGame room={room} socket={socket.current} onResults={() => {
+    viewedEnding.current = resultRef.current?.playId || null; setScreen('results');
+  }} onHome={() => {
     socket.current?.close(); socket.current = null; setRoom(null); setScreen('home'); clearCsrf();
     void api<Identity>('/auth/me').then(setIdentity).catch(cause => {
       if (cause instanceof ApiError && ['SESSION_EXPIRED', 'UNAUTHENTICATED'].includes(cause.code)) setIdentity(initialIdentity);

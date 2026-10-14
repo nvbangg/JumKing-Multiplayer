@@ -79,7 +79,7 @@ Mỗi checkbox là một commit gồm implementation, tests và docs liên quan;
 - [x] Triển khai No Walk; kiểm tra hướng/vận tốc trên nền, nhảy/bounce và luật kết thúc.
 - [x] Hoàn thiện comparator bốn mode; kiểm tra progress/peak/time, DNF, winner và đồng hạng.
 - [x] Hoàn thiện Room writer và tích hợp History chung; kiểm tra ghi định kỳ, finalize/retry, Merge, permissions/pagination và restart.
-- [ ] Tích hợp Room ending cho winners; kiểm tra người khác tới Results và không ending khi chưa Finish.
+- [x] Tích hợp Room ending cho winners; kiểm tra người khác tới Results và không ending khi chưa Finish.
 - [ ] Nghiệm thu Fly Mode trong bốn mode Room; kiểm tra respawn, Finish, History/Stats và xếp hạng.
 
 ## Phase 07 — Nghiệm thu
@@ -162,5 +162,6 @@ Ghi kết quả/checks chưa chạy và commit theo checkbox; raw reports theo [
 | Phase 06 — No Walk | PASS — type-check/build, 65 frontend/48 backend unit tests, MySQL regression các mode và 22 Chrome E2E online. Input ngang trên nền giữ x/vx, charge vẫn nhảy ngang; bật tường hai hướng khớp fixtures độc lập, không đổi hướng giữa không trung. WS kiểm tra jump/bounce/History thực tế; Chrome đọc snapshot khi giữ Right xác minh đứng yên, nhảy và lưu Results. Đã xem screenshot màn chơi |
 | Phase 06 — comparator tích hợp | PASS — 48 backend unit tests và RoomRankingIT qua WS/MySQL. Cả bốn mode Finish ở tick native 16.957, lưu hai hạng nhất/winners cùng tick. Kiểm tra current bằng nhau: Time Limit dùng peak, ba mode còn lại đồng hạng; Leave chốt DNF/metrics trong khi người khác tiếp tục. Host End không tạo winner; thứ tự UUID không phá đồng hạng |
 | Phase 06 — writer/History | PASS — 49 backend unit tests, 63 MySQL integration tests, 22 Chrome E2E online và 1 Fly E2E riêng; JAR web/Vite proxy. Queue quá tải không mất callback/cleanup; Join bị từ chối giải phóng membership/color. Tất cả Leave khi final write lỗi vẫn retry cùng kết quả, giải phóng phòng sau commit. Shutdown flush trước đóng DB; restart chốt ABORTED từ metrics đã commit, không nhân rows/ticks. History/Merge, ownership và pagination đạt regression |
-| Phase 06 còn lại–07 | NOT RUN — chưa nghiệm thu đầy đủ |
+| Phase 06 — ending Room | PASS — 66 frontend/49 backend unit tests, kiểm thử MySQL ending/ranking bốn mode và Chrome hai identities. Chỉ winners nhận ending sau commit; lỗi lưu không phát ending, retry/reconnect giữ cùng kết quả. Peers vào Results/xác nhận ván tiếp, winner Skip/View Results/Play Again không bị broadcast cắt cảnh hoặc phát ending cũ. Đã xem screenshot; không ending khi Host End/timeout chưa Finish |
+| Phase 06 còn lại–07 | Chưa nghiệm thu đầy đủ; regression online mở rộng còn timeout kết nối loopback cần kiểm tra trong Phase 07 |
 | Phase 08 | Chưa thực hiện |

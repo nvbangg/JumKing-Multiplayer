@@ -19,7 +19,7 @@ import { FlightToggle } from '../../game/input/FlightToggle';
 import { ADVENTURE, type AdventureState } from '../../game/simulation/Adventure';
 import { AdventureEffects } from '../../game/netcode/AdventureEffects';
 
-export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room: RoomState; onHome: () => void }) {
+export function OnlineGame({ socket, room, onHome, onResults }: { socket: GameSocket; room: RoomState; onHome: () => void; onResults: () => void }) {
   const container = useRef<HTMLDivElement>(null), runtime = useRef<OnlineRuntime | null>(null), input = useRef<InputController | null>(null), audio = useRef<AudioBus | null>(null);
   const [ready, setReady] = useState(false), [menu, setMenu] = useState<'pause' | 'options' | 'controls' | 'inventory' | null>(null);
   const [inventory, setInventory] = useState<AdventureState | null>(null);
@@ -146,7 +146,9 @@ export function OnlineGame({ socket, room, onHome }: { socket: GameSocket; room:
     {!ready && <p className="game-message" role="status">Loading…</p>}
     {ready && !ending && <div className="game-hud"><span>Jumps: {jumps}{options.displayTimer && <span className="timer" aria-label="Play time">{duration(elapsed)}</span>}{remaining !== null && <span className="timer" aria-label="Time left">Time Left: {duration(Math.ceil(remaining / 1000) * 1000)}</span>}</span><span className="room-code" aria-label="Room ID">{room.roomId}</span><span><button onClick={() => { runtime.current?.cancel(); input.current?.cancel(); setChatOpen(true); }}>Chat</button><button onClick={pause}>Menu</button></span></div>}
     {ready && !ending && !menu && !chatOpen && <TouchControls input={input} flying={flying} />}
-    {ending && <div className="ending-actions">{ending === 'playing' ? <button onClick={() => skipEnding.current?.()}>Skip</button> : <><button disabled={!pictureReady || pending} onClick={() => { void newGame(); }}>New Game</button><button disabled={!pictureReady || pending || disconnected} onClick={() => { void command('LEAVE_ROOM'); }}>Back to Menu</button></>}</div>}
+    {ending && <div className="ending-actions">{ending === 'playing' ? <button onClick={() => skipEnding.current?.()}>Skip</button> : <>{room.kind === 'ROOM'
+      ? <button disabled={!pictureReady} onClick={onResults}>View Results</button>
+      : <button disabled={!pictureReady || pending} onClick={() => { void newGame(); }}>New Game</button>}<button disabled={!pictureReady || pending || disconnected} onClick={() => { void command('LEAVE_ROOM'); }}>Back to Menu</button></>}</div>}
     {ready && chatOpen && <ChatPanel messages={messages} colors={rules.appearanceColors} onSend={async text => { await socket.command('CHAT_SEND', { text }); }} onClose={() => { setChatOpen(false); if (!runtime.current?.menu) input.current?.resume(); }} />}
     {menu && <section className="game-overlay" aria-label="Game menu"><MenuPanel title={menu === 'pause' ? 'Paused' : menu === 'options' ? 'Options' : menu === 'inventory' ? 'Inventory' : 'Controls'} onBack={menu === 'pause' ? undefined : () => setMenu(menu === 'controls' ? 'options' : 'pause')}>
       {menu === 'pause' && <>{disconnected ? <><button disabled={pending} onClick={() => { setPending(true); void socket.reconnect().catch(cause => setError(cause.message)).finally(() => setPending(false)); }}>Reconnect</button><button onClick={onHome}>Back to Menu</button></> : <button disabled={pending || (room.state === 'PAUSED' && room.hostPlayerId !== socket.selfId)} onClick={() => { void resume(); }}>{room.kind === 'ROOM' && room.state === 'PAUSED' ? room.hostPlayerId === socket.selfId ? 'Resume Room' : 'Room Paused' : 'Resume'}</button>}<button onClick={() => setMenu('options')}>Options</button><button onClick={() => { runtime.current?.cancel(); input.current?.cancel(); setChatOpen(true); }}>Open Chat</button>

@@ -54,6 +54,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         final long order;
         GameConnection connection;
         boolean confirmed = true;
+        String endingNotifiedPlay;
         long disconnectedAt, generation;
         Member(GameConnection connection, RoomDirectory.Slot slot, String nickname, long order) { this.connection = connection; identity = connection.identity(); this.slot = slot; this.nickname = nickname; this.order = order; }
     }
@@ -181,6 +182,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         if (old != null && old != connection) old.close(org.springframework.web.socket.CloseStatus.NORMAL);
         if (room.match != null && room.match.players.containsKey(player.id)) room.match.players.get(player.id).input.reset(room.match.id, player.generation);
         room.nextTick = time.nanos(); connection.reply(command, "RECONNECT_OK", context(room, player)); broadcast(room); chatHistory(room, player); snapshots(room);
+        player.endingNotifiedPlay = null; finishNotice(room, player);
     }
     private void chooseHost(Room room) {
         var old = room.host == null ? null : room.players.get(room.host);
@@ -322,7 +324,10 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
             match.pendingWrites--;
             if (outcome == CheckpointWriter.Outcome.SAVED) match.savedRevision = Math.max(match.savedRevision, value.revision());
             match.saveStatus = outcome == CheckpointWriter.Outcome.FAILED ? "FAILED" : match.savedRevision >= match.revision ? "SAVED" : "PENDING";
-            if (match.endedAt != null && match.saveStatus.equals("SAVED")) { match.durable.complete(null); if (room.retired) dispose(room); }
+            if (match.endedAt != null && match.saveStatus.equals("SAVED")) {
+                match.durable.complete(null); if (room.retired) dispose(room);
+                if (room.match == match) for (var player : room.players.values()) finishNotice(room, player);
+            }
             var status = json.createObjectNode().put("playId", match.id).putNull("revision").put("saveStatus", match.saveStatus);
             for (var player : room.players.values()) if (player.connection != null) player.connection.send("SAVE_STATUS", status);
             if (room.match == match) broadcast(room);
@@ -330,6 +335,13 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
             match.pendingWrites--; match.saveStatus = "FAILED";
             for (var player : room.players.values()) if (player.connection != null) player.connection.send("ERROR", Map.of("code", "SAVE_FAILED", "message", "Room results could not be saved"));
         }
+    }
+    private void finishNotice(Room room, Member member) {
+        var match = room.match; if (match == null || !match.saveStatus.equals("SAVED") || member.connection == null || match.id.equals(member.endingNotifiedPlay)) return;
+        var player = match.players.get(member.id);
+        if (player == null || !player.winner || player.ending == null) return;
+        member.connection.send("PLAYER_FINISHED", Map.of("playerId", member.id, "playId", match.id, "result", match.results(), "showEnding", true, "ending", player.ending));
+        member.endingNotifiedPlay = match.id;
     }
     private void emit(Room room, List<RoomMatch.Events> events) {
         var effects = json.createArrayNode();

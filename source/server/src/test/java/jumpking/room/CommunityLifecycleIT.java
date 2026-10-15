@@ -52,8 +52,10 @@ class CommunityLifecycleIT {
             client.await(message -> message.path("type").asText().equals("ERROR") && message.path("payload").path("code").asText().equals("INVALID_MESSAGE"));
             step(client, 100);
             var physics = client.snapshot().path("self").path("simulation").path("physics");
-            assertThat(client.command("EQUIP_ITEM", Map.of("itemId", "Cap", "equipped", true)).path("payload").path("code").asText()).isEqualTo("CONFLICT");
-            assertThat(client.snapshot().path("self").path("simulation").path("adventure").path("equipped").size()).isZero();
+            client.messages.removeIf(message -> message.path("type").asText().equals("ERROR"));
+            client.socket.sendText(json.writeValueAsString(Map.of("v", 1, "type", "EQUIP_ITEM", "requestId", "removed-api", "payload", Map.of("itemId", "Cap", "equipped", true))), true).join();
+            client.await(message -> message.path("type").asText().equals("ERROR") && message.path("payload").path("code").asText().equals("INVALID_MESSAGE"));
+            assertThat(client.snapshot().path("self").path("simulation").path("adventure").has("equipped")).isFalse();
             assertThat(physics.path("freeFlight").asBoolean()).isFalse(); assertThat(physics.path("screen").asInt()).isZero();
             assertThat(physics.path("jumps").asInt()).isZero(); assertThat(client.snapshot().path("self").path("status").asText()).isEqualTo("ACTIVE");
             client.ok("LEAVE_ROOM", Map.of());
@@ -84,7 +86,7 @@ class CommunityLifecycleIT {
     @Test void airbornePauseWaitsForLandingAndResumeHasNewGenerationWithoutPausedTime() throws Exception {
         try (var client = new GameClient(port)) {
             client.register(); var map = json.convertValue(shared.map(), GameMap.class);
-            var game = new GameSimulation(map, new Physics(json.convertValue(shared.physics(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Number>>() {})), shared.adventure(), false, false, List.of());
+            var game = new GameSimulation(map, new Physics(json.convertValue(shared.physics(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Number>>() {})), shared.adventure(), false, false);
             var initial = records.open(client.owner, false, null, game.snapshot()); double maximum = 0; long peak = 0;
             for (int tick = 0; tick < 40; tick++) { game.tick(new PlayerInput(false, false, true)); if (game.physics().progress() > maximum) { maximum = game.physics().progress(); peak = game.physics().snapshot().ticks; } }
             assertThat(game.physics().snapshot().grounded).isFalse();

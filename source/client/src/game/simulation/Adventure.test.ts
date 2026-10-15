@@ -10,8 +10,7 @@ import checkpoints from '../../../../common/fixtures/main-babe-checkpoints.json'
 
 function projection(adventure: Adventure) {
   const state = adventure.snapshot();
-  return { inventory: state.inventory, equipped: state.equipped, collected: state.collected, flags: state.flags,
-    birds: state.birds, merchants: state.merchants,
+  return { flags: state.flags,
     readables: Object.fromEntries(Object.entries(state.readables).filter(([, s]) => s.wait > 0 || s.done)),
     dialogue: Object.fromEntries(Object.entries(state.dialogue).map(([id, s]) => [id, {
       introduced: s.introduced, best: s.best, loop: s.loop, flags: s.flags, line: s.line, ticks: s.ticks, wait: s.wait, busy: s.busy, talks: s.talks,
@@ -31,17 +30,19 @@ test.each(fixtures.cases)('adventure matches independent checkpoints: $name', fi
     const restored = new Adventure(map); restored.restore(adventure.snapshot()); adventure = restored;
   }
 });
-test('equipment validates ownership and layer and malformed adventure restore is atomic', () => {
-  const adventure = new Adventure(map, ['Cap', 'Shoes']);
-  expect(adventure.equip('Crown', true)).toBe(false);
-  adventure.complete();
-  expect(adventure.snapshot().equipped).toEqual(['Shoes', 'Crown']);
-  expect(adventure.equip('Cap', true)).toBe(true);
-  expect(adventure.snapshot().equipped).toEqual(['Shoes', 'Cap']);
-  const saved = adventure.snapshot();
-  expect(() => adventure.restore({ ...saved, inventory: { GoldRing: -1 } })).toThrow();
-  expect(() => adventure.restore({ ...saved, equipped: ['Cap', 'Crown'] })).toThrow();
-  expect(adventure.snapshot()).toEqual(saved);
+test('restores dialogue atomically and rejects malformed counters and flags', () => {
+  const adventure = new Adventure(map); adventure.complete(); const saved = adventure.snapshot();
+  expect(adventure.completed).toBe(true);
+  expect(() => adventure.restore({ ...saved, flags: ['UnknownFlag'] })).toThrow();
+  const invalid = structuredClone(saved); invalid.dialogue.old_man!.ticks = -1;
+  expect(() => adventure.restore(invalid)).toThrow(); expect(adventure.snapshot()).toEqual(saved);
+});
+test('old save retains dialogue and completion while dropping removed item state', () => {
+  const adventure = new Adventure(map), saved = adventure.snapshot();
+  saved.dialogue.old_man!.wait = 10;
+  adventure.restore({ ...saved, codecVersion: 1, flags: ['CompletedNormalGame', 'CHASE_BIRD_PAST_SNOWSTORM'], inventory: { Cap: 1 }, equipped: ['Cap'], collected: [], birds: {}, merchants: {} });
+  expect(adventure.snapshot()).toEqual({ ...saved, flags: ['CompletedNormalGame'] });
+  expect(Object.keys(adventure.snapshot()).sort()).toEqual(['codecVersion', 'dialogue', 'flags', 'readables']);
 });
 test('full game restores adventure and environment without changing the legitimate physics route', () => {
   const game = new GameSimulation(map);
@@ -58,7 +59,7 @@ test('full game restores adventure and environment without changing the legitima
     expect(game.physics.snapshot()).toEqual(checkpoints[index]);
     if (index % 17 === 0) game.restore(game.snapshot());
   }
-  expect(game.finished).toBe(true); expect(game.adventure.has('Crown')).toBe(true);
+  expect(game.finished).toBe(true); expect(game.adventure.completed).toBe(true);
   expect(new Set(game.snapshot().world.registeredScreens).size).toBe(43);
   const state = game.snapshot();
   expect(() => game.restore({ ...state, world: { ...state.world, lastTick: state.physics.ticks + 1 } })).toThrow();

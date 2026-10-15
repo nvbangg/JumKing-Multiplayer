@@ -11,7 +11,7 @@ test('native bitmap NPC and readable dialogue render while gameplay continues', 
     const [manifest, map] = await Promise.all([fetch('/assets/manifest.json').then(r => r.json()), fetch('/shared/maps/main-babe.json').then(r => r.json())]);
     const gameState = new GameSimulation(map), parent = document.createElement('div');
     parent.style.cssText = 'position:fixed;inset:0;background:black;z-index:100'; document.body.append(parent);
-    const runtime = { advance() {}, frame: () => { const s = gameState.snapshot(); return { self: { id: 'self', nickname: 'Player', color: '#ffffff', state: s.physics, equipment: s.adventure.equipped, adventure: s.adventure }, peers: [], world: s.world }; } };
+    const runtime = { advance() {}, frame: () => { const s = gameState.snapshot(); return { self: { id: 'self', nickname: 'Player', color: '#ffffff', state: s.physics, crowned: gameState.adventure.completed, adventure: s.adventure }, peers: [], world: s.world }; } };
     let ready!: () => void; const loaded = new Promise<void>(resolve => { ready = resolve; });
     const failures: string[] = [], game = createGame(parent, manifest, runtime, ready, (message: string) => failures.push(message));
     const frames = () => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));

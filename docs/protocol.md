@@ -144,7 +144,7 @@ Client nhận diện nhấn đúp khi Fly Mode được bật và gửi freeFlig
 | COMMUNITY_RUN_STATE | {run:RunSummary,generation,paused,pausePending,saveStatus} |
 | PLAYER_EFFECTS | {roomId,events:[{eventSeq,playerId,playId,screen,effect,terrain}]} |
 | ADVENTURE_EVENTS | {roomId,playId,events:[{eventSeq,kind,type,id}]}; chỉ owner, kind=ADVENTURE/WORLD, nội dung hiển thị tra tại client |
-| PLAYER_FINISHED | {playerId,playId,result,showEnding,ending:{screen,equipped,ravenDone}}; sau commit, riêng người Finish ở Community hoặc winners ở Room; result tương ứng RunSummary/MatchResult |
+| PLAYER_FINISHED | {playerId,playId,result,showEnding,ending:{screen}}; sau commit, riêng người Finish ở Community hoặc winners ở Room; result tương ứng RunSummary/MatchResult |
 | GAME_FINISHED | {playId,reason,durationMs,results,saveStatus}; Room broadcast |
 | SAVE_STATUS | {playId,revision,saveStatus}; chỉ owner checkpoint hoặc members của match |
 | CHAT_MESSAGE / CHAT_HISTORY | {roomId,messages:[{id,playerId,nickname,text,sentAt,colorSlot}]}; client bỏ chat từ sảnh cũ |
@@ -155,7 +155,7 @@ kind COMMUNITY/ROOM; host/settings null cho Community. Member={playerId,nickname
 
 Room state là WAITING/COUNTDOWN/PLAYING/PAUSED/FINISHED; Community state=PLAYING, Pause thuộc từng lượt. pauseExpiresAt là UTC ISO-8601 chỉ khi Room PAUSED, còn lại null. currentPlay chứa metadata và kết quả nếu đã finalize; chưa có membership thì fields null, members=[]. Xác nhận/Host theo [gameplay](gameplay.md#room-và-xếp-hạng).
 
-self gồm lastProcessedInputSeq, status, metrics và full simulation để restore/replay: position/velocity, grounded/charge, direction/buffers, splat/knocked, terrain/wind, freeFlight/phasingFall, screen/ticks/jumps/falls/airChargeTicks và adventure. Peers chỉ có public render state, ngoại hình, progress và status; không broadcast checkpoint/secrets.
+self gồm lastProcessedInputSeq, status, metrics và full simulation để restore/replay: position/velocity, grounded/charge, direction/buffers, splat/knocked, terrain/wind, freeFlight/phasingFall, screen/ticks/jumps/falls/airChargeTicks và adventure. Mỗi peer gồm {playerId,nickname,colorSlot,state,crowned,status}; không broadcast checkpoint/secrets.
 
 adventure gồm ID/counters tiến độ hội thoại. Vương miện là ngoại hình profile tự cấp theo data, không có lệnh trang bị. Client dựng nội dung theo [architecture](architecture.md#công-nghệ-và-trách-nhiệm); thay đổi state phải do server xác nhận.
 

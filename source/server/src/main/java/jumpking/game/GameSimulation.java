@@ -20,9 +20,9 @@ public final class GameSimulation {
     private Adventure adventure;
     private ObjectNode world;
 
-    public GameSimulation(GameMap map, Physics p, JsonNode data, boolean flyAllowed, boolean noWalk, List<String> wardrobe) {
+    public GameSimulation(GameMap map, Physics p, JsonNode data, boolean flyAllowed, boolean noWalk) {
         this.map = map; this.p = p; this.data = data.deepCopy(); this.flyAllowed = flyAllowed; this.noWalk = noWalk;
-        physics = new Simulation(map, p, flyAllowed, noWalk); adventure = new Adventure(data, map, p, wardrobe);
+        physics = new Simulation(map, p, flyAllowed, noWalk); adventure = new Adventure(data, map, p);
         world = JsonNodeFactory.instance.objectNode().put("lastTick", 0).put("weatherWind", 0); world.putArray("registeredScreens");
         var walls = world.putObject("walls");
         for (JsonNode wall : data.path("walls")) walls.putObject(wall.path("id").asText()).put("touching", false).put("canPlay", true).put("fadeTicks", 0);
@@ -42,7 +42,7 @@ public final class GameSimulation {
             var state = w.path("walls").path(wall.path("id").asText());
             if (!state.path("touching").isBoolean() || !state.path("canPlay").isBoolean() || !state.path("fadeTicks").isIntegralNumber() || state.path("fadeTicks").asInt() < 0 || state.path("fadeTicks").asInt() > data.path("tuning").path("wallFadeTicks").asInt()) throw new IllegalArgumentException("Invalid wall snapshot");
         }
-        var candidate = new GameSimulation(map, p, data, flyAllowed, noWalk, List.of());
+        var candidate = new GameSimulation(map, p, data, flyAllowed, noWalk);
         candidate.physics.restore(saved.physics()); candidate.adventure.restore(saved.adventure());
         physics = candidate.physics; adventure = candidate.adventure; world = w.deepCopy();
     }

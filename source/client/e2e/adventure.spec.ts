@@ -1,31 +1,39 @@
 import { expect, test } from '@playwright/test';
 import checkpoints from '../../common/fixtures/main-babe-checkpoints.json' with { type: 'json' };
 
-test('Solo picks up Cap, saves equipment choice and retains wardrobe in a new game', async ({ page }) => {
-  await page.goto('/');
+test('legacy item save retains run, dialogue and earned crown without Inventory', async ({ page }) => {
+  await page.goto('/assets/title_logo.png');
   await page.evaluate(async () => {
-    const storage = '/src/features/solo/storage.ts', simulation = '/src/game/simulation/GameSimulation.ts';
-    const { SoloWriter } = await import(storage), { GameSimulation } = await import(simulation);
-    const map = await (await fetch('/shared/maps/main-babe.json')).json(), game = new GameSimulation(map);
-    game.physics.restore({ ...game.physics.snapshot(), x: 311, y: 118 - 5 * map.screenHeight, screen: 5, vy: 0 });
-    const writer = await SoloWriter.open('guest', 'new', game.snapshot());
-    writer.observe(game.snapshot(), map.progressOriginY, false); await writer.save(); await writer.close();
+    const path = '/src/game/simulation/GameSimulation.ts', { GameSimulation } = await import(path);
+    const map = await (await fetch('/shared/maps/main-babe.json')).json(), snapshot = new GameSimulation(map).snapshot();
+    Object.assign(snapshot.adventure, { codecVersion: 1, inventory: { Cap: 1 }, equipped: ['Cap'], collected: [], birds: {}, merchants: {} });
+    snapshot.adventure.dialogue.old_man.introduced = true;
+    await new Promise<void>((resolve, reject) => {
+      const open = indexedDB.open('jumpking', 2);
+      open.onupgradeneeded = () => { open.result.createObjectStore('profiles', { keyPath: 'key' }); open.result.createObjectStore('runs', { keyPath: 'id' }).createIndex('profile', 'profile'); };
+      open.onerror = () => reject(open.error);
+      open.onsuccess = () => {
+        const db = open.result, tx = db.transaction(['profiles', 'runs'], 'readwrite');
+        tx.objectStore('profiles').put({ key: 'guest', activeRunId: 'item-save', writerId: null, leaseExpiresAt: 0, wardrobe: ['Cap', 'Crown'], equipped: ['Cap'] });
+        tx.objectStore('runs').put({ id: 'item-save', profile: 'guest', revision: 7, syncedRevision: 4, status: 'ACTIVE', playTicks: 0, jumps: 0, falls: 0, currentProgress: 0, maxProgress: 0, peakReachedTicks: 0, finishTicks: null, startedAt: '2026-01-01T00:00:00.000Z', endedAt: null, snapshot });
+        tx.oncomplete = () => { db.close(); resolve(); }; tx.onerror = () => reject(tx.error);
+      };
+    });
   });
-  await page.reload();
-  await page.getByRole('button', { name: 'Continue Solo', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Menu', exact: true })).toBeVisible();
+  await page.goto('/'); await page.getByRole('button', { name: 'Continue Solo', exact: true }).click();
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
-  await page.getByRole('button', { name: 'Inventory', exact: true }).click();
-  await expect(page.getByRole('switch', { name: 'Cap: On', exact: true })).toBeVisible();
-  await page.getByRole('switch', { name: 'Cap: On', exact: true }).click();
-  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Inventory', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Save & Exit', exact: true }).click();
-  page.once('dialog', dialog => dialog.accept());
-  await page.getByRole('button', { name: 'New Solo Game', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Menu', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Menu', exact: true }).click();
-  await page.getByRole('button', { name: 'Inventory', exact: true }).click();
-  await expect(page.getByRole('switch', { name: 'Cap: Off', exact: true })).toBeVisible();
+  const restored = await page.evaluate(async () => {
+    const path = '/src/features/solo/storage.ts', { currentSolo, openStore } = await import(path);
+    const run = await currentSolo('guest'), db = await openStore();
+    const profile = await new Promise(resolve => { const req = db.transaction('profiles').objectStore('profiles').get('guest'); req.onsuccess = () => resolve(req.result); });
+    db.close(); return { run, profile };
+  });
+  expect(restored.run).toMatchObject({ id: 'item-save', syncedRevision: 4, snapshot: { adventure: { codecVersion: 2, dialogue: { old_man: { introduced: true } } } } });
+  expect(restored.profile).toMatchObject({ crownUnlocked: true });
+  expect(restored.profile).not.toHaveProperty('wardrobe'); expect(restored.profile).not.toHaveProperty('equipped');
+  expect(restored.run.snapshot.adventure).not.toHaveProperty('inventory');
 });
 
 test('IndexedDB upgrades physics-only saves without deleting run identity or totals', async ({ page }) => {
@@ -58,6 +66,6 @@ test('IndexedDB upgrades physics-only saves without deleting run identity or tot
     const path = '/src/features/solo/storage.ts', { currentSolo } = await import(path);
     const run = await currentSolo('guest'); return { id: run.id, jumps: run.jumps, ticks: run.playTicks, adventureCodec: run.snapshot.adventure.codecVersion, worldTick: run.snapshot.world.lastTick };
   });
-  expect(restored).toMatchObject({ id: 'old-run', jumps: 1, adventureCodec: 1 });
+  expect(restored).toMatchObject({ id: 'old-run', jumps: 1, adventureCodec: 2 });
   expect(restored.ticks).toBeGreaterThanOrEqual(111); expect(restored.worldTick).toBe(restored.ticks);
 });

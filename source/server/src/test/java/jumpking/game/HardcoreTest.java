@@ -17,7 +17,7 @@ class HardcoreTest {
         shared = new SharedData(json); map = json.treeToValue(shared.map(), GameMap.class);
         physics = new Physics(json.convertValue(shared.physics(), new TypeReference<Map<String, Number>>() {}));
     }
-    private GameSimulation game() { return new GameSimulation(map, physics, shared.adventure(), false, false, List.of()); }
+    private GameSimulation game() { return new GameSimulation(map, physics, shared.adventure(), false, false); }
     @Test void splatRespawnsTheBodyButKeepsCountersAndAdventure() {
         var game = game(); var pose = game.physics().snapshot(); pose.y = 280; pose.vy = 10; pose.grounded = false; pose.ticks = 500; pose.jumps = 12; pose.falls = 2;
         game.physics().restore(pose);
@@ -34,6 +34,6 @@ class HardcoreTest {
         var race = game(); race.restore(before); var hardcore = game(); hardcore.restore(before);
         assertThat(race.tick(PlayerInput.NEUTRAL).movement()).contains("SPLAT"); assertThat(race.finished()).isTrue();
         assertThat(hardcore.tick(PlayerInput.NEUTRAL, true).movement()).contains("SPLAT"); assertThat(hardcore.finished()).isFalse();
-        assertThat(hardcore.adventure().snapshot().path("inventory").path("Crown").asInt()).isZero();
+        assertThat(hardcore.adventure().completed()).isFalse();
     }
 }

@@ -16,11 +16,10 @@ export class MainBabeEnding {
   private world: Phaser.GameObjects.Container;
   private hud: Phaser.GameObjects.Container;
   private camera: { x: number; y: number };
-  private equipped: string[];
+  private crowned = false;
   private picture?: Phaser.GameObjects.Image;
-  constructor(private scene: Phaser.Scene, private manifest: AssetManifest, private signal: EndingSignal,
+  constructor(private scene: Phaser.Scene, private manifest: AssetManifest, signal: EndingSignal,
     private onSound: (key: string) => void, private onPicture: () => void) {
-    this.equipped = [...signal.equipped];
     this.camera = { x: scene.cameras.main.scrollX, y: scene.cameras.main.scrollY };
     this.world = scene.add.container(0, -signal.screen * V.height).setDepth(V.endingDepth);
     this.hud = scene.add.container(0, 0).setScrollFactor(0).setDepth(V.endingDepth + 1);
@@ -45,7 +44,7 @@ export class MainBabeEnding {
   }
   private dress(actor: Actor): void {
     for (const sprite of actor.sprites) sprite.destroy();
-    const textures = [actor.texture, ...(actor.king ? this.manifest.skins.filter(skin => this.equipped.includes(skin.item)).sort((a, b) => Number(a.layer === 'Hat') - Number(b.layer === 'Hat')).map(skin => skin.texture) : [])];
+    const textures = [actor.texture, ...(actor.king ? (this.crowned ? [this.manifest.crown] : []) : [])];
     actor.sprites = textures.map(texture => {
       const frame = FRAMES[actor.frame]!;
       const sprite = this.scene.add.sprite(0, 0, texture, this.register(texture, actor.frame)).setOrigin(frame.originX, frame.originY);
@@ -85,13 +84,12 @@ export class MainBabeEnding {
   }
   private sound(key: string, time: number): void { this.at(time, () => this.onSound(key)); }
   private awardCrown(time: number): void {
-    this.at(time, () => { this.equipped = this.equipped.filter(item => this.manifest.skins.find(skin => skin.item === item)?.layer !== 'Hat'); this.equipped.push('Crown'); for (const actor of this.actors.filter(value => value.king)) this.dress(actor); });
+    this.at(time, () => { this.crowned = true; for (const actor of this.actors.filter(value => value.king)) this.dress(actor); });
   }
   private cherubs(time: number): { actor: Actor; delivered: number } {
-    const raven = this.signal.ravenDone, group = raven ? 'ravenCrown' : 'cherub';
-    const actor = this.actor(479, 2, group + (raven ? '.0' : '.deliver0'), true, raven ? 'props/textures/raven/raven_crown' : 'king/base');
+    const actor = this.actor(479, 2, 'cherub.deliver0', true);
     actor.root.setVisible(false); this.at(time, () => actor.root.setVisible(true));
-    this.loop(actor, raven ? ['ravenCrown.0', 'ravenCrown.1', 'ravenCrown.2'] : ['cherub.deliver0', 'cherub.deliver1'], time, raven ? 0.1 : 1 / 30);
+    this.loop(actor, ['cherub.deliver0', 'cherub.deliver1'], time, 1 / 30);
     const x = [480], y = [0]; let currentX = 480, currentY = 0, lastY = 0;
     for (let tick = 1; tick <= 60; tick++) {
       currentX += tick < 40 ? -5 : Math.max(-5, -(currentX - 240) * 0.25);
@@ -105,9 +103,7 @@ export class MainBabeEnding {
     return { actor, delivered: time + 4 };
   }
   private escape(actor: Actor, time: number): void {
-    const raven = this.signal.ravenDone;
-    if (raven) this.at(time, () => { actor.texture = 'props/textures/raven/raven'; actor.frame = 'ravenFly.0'; this.dress(actor); });
-    this.loop(actor, raven ? ['ravenFly.0', 'ravenFly.1', 'ravenFly.2'] : ['cherub.escape0', 'cherub.escape1'], time, raven ? 0.1 : 1 / 30);
+    this.loop(actor, ['cherub.escape0', 'cherub.escape1'], time, 1 / 30);
     this.at(time, () => {
       let x = actor.root.x, y = actor.root.y, vx = 0, vy = -0.1; const points = [{ x, y }];
       for (let i = 1; i < 1000; i++) { if (i % 4 === 0) { vx += 0.5; vy *= 1.2; } x += vx / 4; y += vy / 4; points.push({ x, y }); if (x < 0 || x >= V.width || y < 2 || y >= V.height) break; }
@@ -152,7 +148,7 @@ export class MainBabeEnding {
   private toPicture(): void {
     if (this.state !== 'PLAYING') return; this.state = 'PICTURE'; this.clear(); this.world.destroy(true); this.hud.destroy(true);
     this.scene.cameras.main.setScroll(this.camera.x, this.camera.y);
-    this.picture = this.scene.add.image(0, 0, this.equipped.includes('Shoes') ? 'ending/imageshoes' : 'ending/imagecrown').setOrigin(0).setScrollFactor(0).setDepth(V.endingDepth + 2).setName('ending-picture');
+    this.picture = this.scene.add.image(0, 0, 'ending/imagecrown').setOrigin(0).setScrollFactor(0).setDepth(V.endingDepth + 2).setName('ending-picture');
     this.onPicture();
   }
   dispose(): void {

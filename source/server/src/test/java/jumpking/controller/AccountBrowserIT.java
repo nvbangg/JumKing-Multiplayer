@@ -37,8 +37,8 @@ class AccountBrowserIT {
         String name = "adventure_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12), email = name + "@example.test", password = java.util.UUID.randomUUID().toString();
         jdbc.update("INSERT INTO users(type,username,email,password_hash,created_at) VALUES ('ACCOUNT',?,?,?,UTC_TIMESTAMP(3))", name, email, passwords.encode(password));
         long owner = jdbc.queryForObject("SELECT id FROM users WHERE email=?", Long.class, email);
-        var game = new jumpking.game.GameSimulation(json.treeToValue(shared.map(), jumpking.game.GameMap.class), new jumpking.game.Physics(json.convertValue(shared.physics(), new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Number>>() {})), shared.adventure(), false, false, java.util.List.of());
-        var physics = game.physics().snapshot(); physics.x = 296; physics.y = -1682; physics.screen = 5;
+        var game = new jumpking.game.GameSimulation(json.treeToValue(shared.map(), jumpking.game.GameMap.class), new jumpking.game.Physics(json.convertValue(shared.physics(), new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Number>>() {})), shared.adventure(), false, false);
+        var physics = game.physics().snapshot();
         game.physics().restore(physics); communityRuns.open(owner, false, null, game.snapshot());
         return new AdventureFixture(email, password);
     }

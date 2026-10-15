@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class CommunityTower implements GameCommandHandler, AutoCloseable {
-    private static final Set<String> COMMANDS = Set.of("JOIN_COMMUNITY", "JOIN_ROOM", "GET_ROOM_STATE", "LEAVE_ROOM", "PLAYER_INPUT", "CANCEL_INPUT", "RECONNECT", "SET_COMMUNITY_PAUSED", "EQUIP_ITEM", "NEW_COMMUNITY_RUN", "CHAT_SEND");
+    private static final Set<String> COMMANDS = Set.of("JOIN_COMMUNITY", "JOIN_ROOM", "GET_ROOM_STATE", "LEAVE_ROOM", "PLAYER_INPUT", "CANCEL_INPUT", "RECONNECT", "SET_COMMUNITY_PAUSED", "NEW_COMMUNITY_RUN", "CHAT_SEND");
     private final GameWorkers workers;
     private final RoomDirectory directory;
     private final Memberships memberships;
@@ -118,8 +118,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                     var frame = player.input.poll(now);
                     if (frame.cancel() || player.pausePending) player.game.physics().cancelInput();
                     var input = player.pausePending ? PlayerInput.NEUTRAL : frame.input();
-                    var beforeEnding = player.game.adventure().snapshot();
-                    var events = player.game.tick(input); double progress = player.game.physics().progress();
+                        var events = player.game.tick(input); double progress = player.game.physics().progress();
                     if (player.connection != null && (!events.adventure().isEmpty() || !events.world().isEmpty())) {
                         var cues = json.createArrayNode();
                         for (var event : events.adventure()) cues.addObject().put("eventSeq", ++eventSeq).put("kind", "ADVENTURE").put("type", event.type()).put("id", event.id());
@@ -131,7 +130,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                         .put("screen", pose.screen).put("effect", effect).put("terrain", pose.snow ? "SNOW" : pose.ice ? "ICE" : "NORMAL"));
                     if (progress > player.maximum) { player.maximum = progress; player.peakTicks = player.game.physics().snapshot().ticks; }
                     if (player.game.finished()) {
-                        player.ending = Map.of("screen", pose.screen, "equipped", beforeEnding.path("equipped"), "ravenDone", beforeEnding.path("birds").path("raven").path("done").asBoolean());
+                        player.ending = Map.of("screen", pose.screen);
                         player.finished = true; player.finishedAt = clock.instant(); player.paused = true; player.pausedAt = now; player.pausePending = false;
                         save(this, player, true, () -> finishNotice(player));
                     }
@@ -202,11 +201,6 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                     connection.reply(command, "COMMUNITY_RUN_STATE", runPayload(player));
                     snapshots(tower);
                 }
-                case "EQUIP_ITEM" -> {
-                    GameEnvelope.fields(command.payload(), Set.of("itemId", "equipped"));
-                    if (!player.game.adventure().equip(GameEnvelope.text(command.payload(), "itemId"), GameEnvelope.bool(command.payload(), "equipped", false))) throw new ApiException(409, "CONFLICT", "Item is not owned or cannot be equipped");
-                    connection.reply(command, "COMMUNITY_RUN_STATE", runPayload(player)); save(tower, player, true, () -> runState(player));
-                }
                 case "NEW_COMMUNITY_RUN" -> newRun(tower, player, command);
                 case "CHAT_SEND" -> {
                     GameEnvelope.fields(command.payload(), Set.of("text"));
@@ -233,7 +227,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
         save(tower, player, true, () -> {
             try { database.execute(() -> {
                 try {
-                    var game = new GameSimulation(map, physics, adventure, flags.flyEnabled(), false, List.of());
+                    var game = new GameSimulation(map, physics, adventure, flags.flyEnabled(), false);
                     var stored = records.open(player.identity.owner(), true, expected, game.snapshot());
                     tower.actor.complete(() -> {
                         player.game = game; player.stored = stored; player.revision = player.savedRevision = stored.revision(); player.maximum = 0; player.peakTicks = 0;
@@ -273,7 +267,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
             try {
                 database.execute(() -> {
                     try {
-                        var game = new GameSimulation(map, physics, adventure, flags.flyEnabled(), false, List.of());
+                        var game = new GameSimulation(map, physics, adventure, flags.flyEnabled(), false);
                         var stored = records.open(player.identity.owner(), replace, expected, game.snapshot()); game.restore(stored.snapshot()); game.physics().cancelInput();
                         tower.actor.complete(() -> {
                             player.game = game; player.stored = stored; player.revision = player.savedRevision = stored.revision(); player.maximum = stored.maximum(); player.peakTicks = stored.peak(); player.loading = false;
@@ -447,7 +441,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                 var p = peers.addObject().put("playerId", peer.id).put("nickname", peer.identity.username()).put("colorSlot", peer.slot.color()).put("status", peer.finished ? "FINISHED" : "ACTIVE");
                 ObjectNode pose = json.valueToTree(peer.game.physics().snapshot());
                 pose.retain(List.of("x", "y", "vx", "vy", "grounded", "charge", "direction", "splat", "knocked", "ice", "snow", "wind", "screen", "ticks", "jumps", "falls"));
-                p.set("state", pose); p.set("equipment", peer.game.adventure().snapshot().path("equipped"));
+                p.set("state", pose); p.put("crowned", peer.game.adventure().completed());
             }
             self.connection.snapshot(value);
         }

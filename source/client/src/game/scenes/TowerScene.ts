@@ -9,7 +9,7 @@ import { ConversationVisuals } from '../presentation/ConversationVisuals';
 import { MainBabeEnding } from '../presentation/MainBabeEnding';
 import { ENDING_FRAMES, endingFrameName } from '../presentation/endingFrames';
 
-interface Avatar { sprite: Phaser.GameObjects.Sprite; name: Phaser.GameObjects.Text; layers: Map<string, Phaser.GameObjects.Sprite> }
+interface Avatar { sprite: Phaser.GameObjects.Sprite; name: Phaser.GameObjects.Text; crown: Phaser.GameObjects.Sprite }
 export class TowerScene extends Phaser.Scene {
   private avatars = new Map<string, Avatar>();
   private visuals: Phaser.GameObjects.GameObject[] = [];
@@ -33,7 +33,7 @@ export class TowerScene extends Phaser.Scene {
     this.load.on('loaderror', (file: Phaser.Loader.File) => this.onError('Could not load ' + file.key));
   }
   create(): void {
-    for (const key of ['king/base', ...this.manifest.skins.map(skin => skin.texture)]) {
+    for (const key of ['king/base', this.manifest.crown]) {
       const texture = this.textures.get(key);
       PLAYER_FRAMES.forEach((name, i) => { if (!texture.has(name)) texture.add(name, 0, V.spriteStartX + i % V.spriteColumns * V.spriteSize, Math.floor(i / V.spriteColumns) * V.spriteSize, V.spriteSize, V.spriteSize); });
     }
@@ -80,7 +80,7 @@ export class TowerScene extends Phaser.Scene {
       avatar = {
         sprite: this.add.sprite(0, 0, 'king/base', 'idle').setOrigin(0.5, 1).setName('player:' + player.id),
         name: this.add.text(0, 0, '', { fontFamily: 'monospace', fontSize: V.nameFontSize, color: '#ffffff', stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5, 1).setDepth(V.nameDepth),
-        layers: new Map(),
+        crown: this.add.sprite(0, 0, this.manifest.crown, 'idle').setOrigin(0.5, 1).setVisible(false),
       };
       this.avatars.set(player.id, avatar);
     }
@@ -90,27 +90,21 @@ export class TowerScene extends Phaser.Scene {
       .setDepth(self ? V.selfDepth : V.peerDepth).setTint(Phaser.Display.Color.HexStringToColor(player.color).color).setVisible(visible);
     avatar.name.setText(player.nickname);
     avatar.name.setPosition(Phaser.Math.Clamp(s.x + PHYSICS.bodyWidth / 2, avatar.name.width / 2, V.width - avatar.name.width / 2), s.y - V.nameGap).setVisible(visible);
-    const equipped = this.manifest.skins.filter(skin => player.equipment.includes(skin.item));
-    for (const [item, sprite] of avatar.layers) if (!equipped.some(skin => skin.item === item)) { sprite.destroy(); avatar.layers.delete(item); }
-    equipped.forEach((skin, index) => {
-      let sprite = avatar!.layers.get(skin.item);
-      if (!sprite) { sprite = this.add.sprite(0, 0, skin.texture, 'idle').setOrigin(0.5, 1); avatar!.layers.set(skin.item, sprite); }
-      sprite.setPosition(avatar!.sprite.x, avatar!.sprite.y).setFrame(avatar!.sprite.frame.name).setFlipX(avatar!.sprite.flipX)
-        .setDepth(avatar!.sprite.depth + (index + 1) / 10).setAlpha(avatar!.sprite.alpha).setTint(avatar!.sprite.tintTopLeft).setVisible(visible);
-    });
+    avatar.crown.setPosition(avatar.sprite.x, avatar.sprite.y).setFrame(avatar.sprite.frame.name).setFlipX(avatar.sprite.flipX)
+      .setDepth(avatar.sprite.depth + 0.1).setAlpha(avatar.sprite.alpha).setTint(avatar.sprite.tintTopLeft).setVisible(visible && player.crowned);
   }
   private render(): void {
     const frame = this.runtime.frame();
     if (frame.self.state.screen !== this.screen) this.drawScreen(frame.self.state.screen);
     const present = new Set([frame.self.id, ...frame.peers.map(peer => peer.id)]);
-    for (const [id, avatar] of this.avatars) if (!present.has(id)) { avatar.sprite.destroy(); avatar.name.destroy(); for (const sprite of avatar.layers.values()) sprite.destroy(); this.avatars.delete(id); }
+    for (const [id, avatar] of this.avatars) if (!present.has(id)) { avatar.sprite.destroy(); avatar.name.destroy(); avatar.crown.destroy(); this.avatars.delete(id); }
     for (const peer of frame.peers) this.avatar(peer, false);
     this.avatar(frame.self, true);
     this.adventureVisuals?.render(frame);
     this.conversations?.render(frame, this.npcSprites);
     if (frame.ending && !this.ending) {
       this.endingId = frame.ending.id;
-      for (const avatar of this.avatars.values()) { avatar.sprite.setVisible(false); avatar.name.setVisible(false); for (const sprite of avatar.layers.values()) sprite.setVisible(false); }
+      for (const avatar of this.avatars.values()) { avatar.sprite.setVisible(false); avatar.name.setVisible(false); avatar.crown.setVisible(false); }
       this.babe?.setVisible(false);
       this.ending = new MainBabeEnding(this, this.manifest, frame.ending, key => this.hooks.onSound?.(key), () => this.hooks.onEndingComplete?.());
       this.hooks.onEndingStart?.(() => this.ending?.skip());

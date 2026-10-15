@@ -8,7 +8,7 @@ export class AdventureEffects {
     if (this.room !== roomId) { this.room = roomId; this.last = 0; }
     const result: Cue[] = [];
     for (const cue of payload.events as Cue[]) {
-      if (!cue || !Number.isSafeInteger(cue.eventSeq) || cue.eventSeq < 1 || typeof cue.id !== 'string' || !(cue.kind === 'WORLD' ? ['WALL', 'JINGLE'] : cue.kind === 'ADVENTURE' ? ['PICKUP', 'SALE', 'FLEE', 'SPEECH'] : []).includes(cue.type)) throw new Error('Invalid adventure effect');
+      if (!cue || !Number.isSafeInteger(cue.eventSeq) || cue.eventSeq < 1 || typeof cue.id !== 'string' || !(cue.kind === 'WORLD' ? ['WALL', 'JINGLE'] : cue.kind === 'ADVENTURE' ? ['SPEECH'] : []).includes(cue.type)) throw new Error('Invalid adventure effect');
       if (cue.eventSeq <= this.last) continue; this.last = cue.eventSeq; result.push(cue);
     }
     return result;

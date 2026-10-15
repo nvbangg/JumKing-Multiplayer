@@ -19,7 +19,7 @@ test('restoring at Finish grants the reward before autosave and exposes one endi
   const session = new SoloRuntime(map, () => NEUTRAL_INPUT, () => {});
   const snapshot = session.game.snapshot(); snapshot.physics = { ...checkpoints.at(-1)!, codecVersion: 1 }; snapshot.world.lastTick = snapshot.physics.ticks;
   session.restore(snapshot);
-  expect(session.game.adventure.has('Crown')).toBe(true);
+  expect(session.game.adventure.completed).toBe(true);
   const signal = session.frame().ending;
   session.advance(1000); session.advance(1000);
   expect(session.frame().ending).toBe(signal);

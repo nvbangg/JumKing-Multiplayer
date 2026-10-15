@@ -1,10 +1,10 @@
 import { PHYSICS } from '../../game/simulation/tuning';
 import { uuid } from '../../network/ids';
 import { GameSimulation, type GameSnapshot } from '../../game/simulation/GameSimulation';
-import { Adventure, ADVENTURE } from '../../game/simulation/Adventure';
+import { Adventure } from '../../game/simulation/Adventure';
 import map from '../../../../common/maps/main-babe.json';
 
-const STORE = Object.freeze({ name: 'jumpking', version: 2, writerLeaseMs: 10000 });
+const STORE = Object.freeze({ name: 'jumpking', version: 3, writerLeaseMs: 10000 });
 export const SOLO_SAVE_EVENT = 'jumpking-solo-saved';
 export function notifySoloSaved(profile: string, urgent = false): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(SOLO_SAVE_EVENT, { detail: { profile, urgent } }));
@@ -16,7 +16,7 @@ export interface SoloRun {
   peakReachedTicks: number; finishTicks: number | null; startedAt: string; endedAt: string | null;
   snapshot: GameSnapshot | null;
 }
-interface Profile { key: string; activeRunId: string | null; writerId: string | null; leaseExpiresAt: number; wardrobe: string[]; equipped: string[] }
+interface Profile { key: string; activeRunId: string | null; writerId: string | null; leaseExpiresAt: number; crownUnlocked: boolean }
 
 export class StorageUnavailable extends Error {
   constructor(message = 'Browser storage is unavailable. This game cannot be saved.') { super(message); }
@@ -49,8 +49,14 @@ export async function openStore(): Promise<IDBDatabase> {
           }
           row.continue();
         };
+      }
+      if (event.oldVersion > 0 && event.oldVersion < 3) {
         const profiles = open.transaction!.objectStore('profiles').openCursor();
-        profiles.onsuccess = () => { const row = profiles.result; if (row) { row.update({ ...row.value, wardrobe: [], equipped: [] }); row.continue(); } };
+        profiles.onsuccess = () => {
+          const row = profiles.result; if (!row) return;
+          const { wardrobe, equipped: _equipped, ...profile } = row.value;
+          row.update({ ...profile, crownUnlocked: profile.crownUnlocked === true || Array.isArray(wardrobe) && wardrobe.includes('Crown') }); row.continue();
+        };
       }
     };
     open.onerror = () => reject(open.error || new Error('Browser storage is unavailable'));
@@ -128,9 +134,8 @@ export class SoloWriter {
       if (action === 'new' && (run?.id || null) !== expectedRunId) throw new Error('The Solo save changed. Return to the menu and try again.');
       if (action === 'new' || !run) {
         if (run?.status === 'ACTIVE') runs.put({ ...run, status: 'ABANDONED', endedAt: terminalTime(run.startedAt), snapshot: null, revision: run.revision + 1 });
-        const adventure = new Adventure(map, existing?.wardrobe || []);
-        for (const item of adventure.snapshot().equipped) adventure.equip(item, false);
-        for (const item of existing?.equipped || []) adventure.equip(item, true);
+        const adventure = new Adventure(map);
+        if (existing?.crownUnlocked) adventure.complete();
         run = {
           id: uuid(), profile, revision: 1, syncedRevision: 0, status: 'ACTIVE',
           playTicks: 0, jumps: 0, falls: 0, currentProgress: 0, maxProgress: 0, peakReachedTicks: 0,
@@ -138,7 +143,7 @@ export class SoloWriter {
         };
         runs.put(run);
       }
-      profiles.put({ key: profile, activeRunId: run.id, writerId, leaseExpiresAt: Date.now() + STORE.writerLeaseMs, wardrobe: existing?.wardrobe || [], equipped: existing?.equipped || [] } satisfies Profile);
+      profiles.put({ key: profile, activeRunId: run.id, writerId, leaseExpiresAt: Date.now() + STORE.writerLeaseMs, crownUnlocked: existing?.crownUnlocked || false } satisfies Profile);
       await done;
       notifySoloSaved(profile, true);
       return new SoloWriter(db, writerId, run, releaseLock);
@@ -176,8 +181,7 @@ export class SoloWriter {
           return stored;
         }
         runs.put(next);
-        const wardrobe = [...new Set([...(profile.wardrobe || []), ...ADVENTURE.skins.filter(skin => (view.snapshot?.adventure.inventory[skin.item] || 0) > 0).map(skin => skin.item)])];
-        profiles.put({ ...profile, activeRunId: next.status === 'ACTIVE' ? next.id : null, leaseExpiresAt: Date.now() + STORE.writerLeaseMs, wardrobe, equipped: view.snapshot?.adventure.equipped || profile.equipped || [] });
+        profiles.put({ ...profile, activeRunId: next.status === 'ACTIVE' ? next.id : null, leaseExpiresAt: Date.now() + STORE.writerLeaseMs, crownUnlocked: profile.crownUnlocked || view.status === 'FINISHED' });
         await done;
         this.committedRevision = next.revision;
         this.observed.revision = next.revision; this.observed.syncedRevision = next.syncedRevision;

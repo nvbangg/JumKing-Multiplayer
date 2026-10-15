@@ -12,7 +12,7 @@ import { NETWORK } from '../../network/config';
 export interface OnlineSnapshot {
   roomId: string; serverTick: number; playId: string; generation: number; elapsedTimeMs: number; remainingTimeMs: number | null;
   self: { lastProcessedInputSeq: number; status: string; paused: boolean; simulation: GameSnapshot; metrics: Record<string, unknown> };
-  peers: { playerId: string; nickname: string; colorSlot: number; state: RenderPose; equipment: string[]; status: string }[];
+  peers: { playerId: string; nickname: string; colorSlot: number; state: RenderPose; crowned: boolean; status: string }[];
 }
 export class OnlineRuntime implements GameRuntime {
   readonly game: GameSimulation;
@@ -36,8 +36,8 @@ export class OnlineRuntime implements GameRuntime {
     if (payload.playerId !== this.socket.selfId || payload.showEnding !== true || typeof payload.playId !== 'string') return;
     if (this.socket.playContext && payload.playId !== this.socket.playContext.playId) return;
     const ending = payload.ending as Partial<EndingSignal> | undefined;
-    if (!ending || !Number.isInteger(ending.screen) || ending.screen !== this.game.physics.map.finish.screen || !Array.isArray(ending.equipped) || ending.equipped.some(item => typeof item !== 'string') || typeof ending.ravenDone !== 'boolean') throw new Error('Invalid ending state');
-    this.ending ??= { id: payload.playId, screen: ending.screen!, equipped: [...ending.equipped], ravenDone: ending.ravenDone };
+    if (!ending || !Number.isInteger(ending.screen) || ending.screen !== this.game.physics.map.finish.screen) throw new Error('Invalid ending state');
+    this.ending ??= { id: payload.playId, screen: ending.screen! };
   }
   receive(payload: Record<string, unknown>): void {
     const value = payload as unknown as OnlineSnapshot;
@@ -77,8 +77,8 @@ export class OnlineRuntime implements GameRuntime {
   frame(): WorldFrame {
     const saved = this.game.snapshot(), self = this.room.members.find(member => member.playerId === this.socket.selfId);
     const color = (slot: number) => rules.appearanceColors[slot] || rules.appearanceColors[0]!;
-    const peers: RenderPlayer[] = this.peers.frame(performance.now()).map(peer => ({ id: peer.playerId, nickname: peer.nickname, color: color(peer.colorSlot), state: peer.state, equipment: peer.equipment }));
-    return { self: { id: this.socket.selfId || 'self', nickname: self?.nickname || 'Player', color: color(self?.colorSlot || 0), state: saved.physics, equipment: saved.adventure.equipped, adventure: saved.adventure }, peers, world: saved.world,
+    const peers: RenderPlayer[] = this.peers.frame(performance.now()).map(peer => ({ id: peer.playerId, nickname: peer.nickname, color: color(peer.colorSlot), state: peer.state, crowned: peer.crowned }));
+    return { self: { id: this.socket.selfId || 'self', nickname: self?.nickname || 'Player', color: color(self?.colorSlot || 0), state: saved.physics, crowned: this.game.adventure.completed, adventure: saved.adventure }, peers, world: saved.world,
       ...(this.ending?.id === this.latest?.playId && this.latest?.self.status === 'FINISHED' ? { ending: this.ending } : {}) };
   }
 }

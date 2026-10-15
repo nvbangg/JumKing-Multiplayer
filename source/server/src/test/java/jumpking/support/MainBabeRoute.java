@@ -10,7 +10,7 @@ import jumpking.game.*;
 public final class MainBabeRoute {
     private MainBabeRoute() {}
     public static GameSimulation.Snapshot beforeFinish(SharedData shared, ObjectMapper json) throws Exception {
-        var game = new GameSimulation(json.treeToValue(shared.map(), GameMap.class), new Physics(json.convertValue(shared.physics(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Number>>() {})), shared.adventure(), false, false, List.of());
+        var game = new GameSimulation(json.treeToValue(shared.map(), GameMap.class), new Physics(json.convertValue(shared.physics(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Number>>() {})), shared.adventure(), false, false);
         var checkpoints = json.readTree(Path.of("../common/fixtures/main-babe-checkpoints.json").toFile());
         long target = checkpoints.get(checkpoints.size() - 1).path("ticks").asLong() - 1;
         java.util.function.Consumer<PlayerInput> step = input -> { if (game.physics().snapshot().ticks < target) game.tick(input); };

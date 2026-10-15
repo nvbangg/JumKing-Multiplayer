@@ -18,7 +18,7 @@ test('renderer draws all 43 screens and keeps self above translucent peers', asy
     const loaded = new Promise<void>(resolve => { ready = resolve; });
     const runtime = {
       advance() {},
-      frame: () => ({ self: { id: 'self', nickname: 'You', color: '#ffffff', state, equipment: ['Cap'] }, peers: [{ id: 'peer', nickname: 'Friend', color: '#ffffff', state: { ...state, x: state.x + 30 }, equipment: ['Cap'] }] }),
+      frame: () => ({ self: { id: 'self', nickname: 'You', color: '#ffffff', state, crowned: state.screen % 2 === 0 }, peers: [{ id: 'peer', nickname: 'Friend', color: '#ffffff', state: { ...state, x: state.x + 30 }, crowned: state.screen % 2 === 0 }] }),
     };
     const game = createGame(parent, manifest, runtime, ready, (error: string) => failures.push(error));
     await loaded;
@@ -34,8 +34,8 @@ test('renderer draws all 43 screens and keeps self above translucent peers', asy
         const self = sprites.find((sprite: { alpha: number }) => sprite.alpha === 1);
         const peer = sprites.find((sprite: { alpha: number }) => sprite.alpha === 0.7);
         if (self.depth <= peer.depth) failures.push('Self depth ' + screen);
-        const caps = scene.children.list.filter((child: { type: string; texture?: { key: string } }) => child.type === 'Sprite' && child.texture?.key === 'king/cap');
-        if (caps.length !== 2 || !caps.some((cap: { alpha: number; depth: number }) => cap.alpha === 1 && cap.depth > self.depth) || !caps.some((cap: { alpha: number; depth: number }) => cap.alpha === 0.7 && cap.depth < self.depth)) failures.push('Equipment ' + screen);
+        const crowns = scene.children.list.filter((child: { type: string; texture?: { key: string } }) => child.type === 'Sprite' && child.texture?.key === manifest.crown);
+        if (crowns.length !== 2 || !crowns.some((crown: { alpha: number; depth: number }) => crown.alpha === 1 && crown.depth > self.depth) || !crowns.some((crown: { alpha: number; depth: number }) => crown.alpha === 0.7 && crown.depth < self.depth) || crowns.some((crown: { visible: boolean }) => crown.visible !== (screen % 2 === 0))) failures.push('Crown ' + screen);
         if (scene.cameras.main.scrollY !== -screen * 360) failures.push('Camera ' + screen);
         const labels = scene.children.list.filter((child: { type: string }) => child.type === 'Text');
         if (labels.length !== 2 || labels.some((label: { alpha: number; visible: boolean }) => label.alpha !== 1 || !label.visible)) failures.push('Names ' + screen);

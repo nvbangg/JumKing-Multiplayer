@@ -13,7 +13,6 @@ import { readOptions, saveOptions, type Options } from './options';
 import { OptionsButtons, ControlsHelp } from './OptionsPanel';
 import { MenuPanel } from '../../components/MenuPanel';
 import { duration, ticksToMs } from '../records/format';
-import { ADVENTURE } from '../../game/simulation/Adventure';
 import { FlightToggle } from '../../game/input/FlightToggle';
 
 export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = null, onExit }: {
@@ -27,8 +26,7 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
   const closing = useRef(false);
   const audio = useRef<AudioBus | null>(null);
   const [options, setOptions] = useState(readOptions);
-  const [menu, setMenu] = useState<'pause' | 'options' | 'controls' | 'inventory'>('pause');
-  const [, setInventoryRevision] = useState(0);
+  const [menu, setMenu] = useState<'pause' | 'options' | 'controls'>('pause');
   const [optionError, setOptionError] = useState('');
   const [ending, setEnding] = useState<'playing' | 'picture' | null>(null);
   const [pictureReady, setPictureReady] = useState(false);
@@ -92,7 +90,7 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
         const now = performance.now();
         if (now - lastHud >= PRESENTATION.hudIntervalMs) { setState(frame); lastHud = now; }
       }, 'Player', (effects, frame) => { for (const effect of effects) audio.current?.effect(effect, frame); }, (events, world) => {
-        for (const event of events) audio.current?.play(event.type === 'FLEE' ? 'audio/event_sfx/bird_fly' : event.type === 'SPEECH' ? 'audio/talking' : 'audio/plink');
+        if (events.length) audio.current?.play('audio/talking');
         for (const event of world) audio.current?.play(event.type === 'JINGLE' ? 'audio/music/event_music/ending_jingle' : manifest.walls.find(wall => wall.id === event.id)?.appearSound || 'audio/illusion');
       });
       const storage = await SoloWriter.open(profile, action, session.game.snapshot(), expectedRunId).catch(cause => {
@@ -151,23 +149,14 @@ export function SoloGame({ profile = 'guest', action = 'auto', expectedRunId = n
     {ready && !ending && <div className="game-hud"><span>Jumps: {state?.jumps ?? 0}{options.displayTimer && <span className="timer" aria-label="Play time">{duration(ticksToMs(state?.ticks || 0))}</span>}</span><button onClick={pause}>Menu</button></div>}
     {ready && !paused && !ending && <TouchControls input={input} flying={state?.freeFlight} />}
     {ending && <div className="ending-actions">{ending === 'playing' ? <button onClick={() => skipEnding.current?.()}>Skip</button> : <button disabled={!pictureReady || leaving} onClick={() => { void leave(); }}>{leaving ? 'Saving…' : 'Back to Menu'}</button>}</div>}
-    {paused && <section className="game-overlay" aria-label="Game menu"><MenuPanel title={menu === 'pause' ? 'Paused' : menu === 'options' ? 'Options' : menu === 'inventory' ? 'Inventory' : 'Controls'} onBack={menu === 'pause' ? undefined : () => setMenu(menu === 'controls' ? 'options' : 'pause')}>
+    {paused && <section className="game-overlay" aria-label="Game menu"><MenuPanel title={menu === 'pause' ? 'Paused' : menu === 'options' ? 'Options' : 'Controls'} onBack={menu === 'pause' ? undefined : () => setMenu(menu === 'controls' ? 'options' : 'pause')}>
       {menu === 'pause' && <><button disabled={leaving} onClick={() => { pauseRequested.current = false; input.current?.resume(); runtime.current?.resume(); audio.current?.pause(false); setPaused(false); }}>Resume</button>
         <button onClick={() => setMenu('options')}>Options</button>
-        <button onClick={() => setMenu('inventory')}>Inventory</button>
         <button disabled={leaving} onClick={() => { void leave(); }}>{leaving ? 'Saving…' : 'Save & Exit'}</button>
         {saveStatus === 'FAILED' && <button disabled={leaving} onClick={() => { void discardUnsaved(); }}>Leave Without Saving</button>}
         <small role="status">{saveStatus === 'SAVED' ? 'Saved' : saveStatus === 'PENDING' ? 'Saving…' : 'Save failed'}</small></>}
       {menu === 'options' && <OptionsButtons options={options} flyAllowed={__SOLO_FLY_ENABLED__} onChange={updateOptions} onControls={() => setMenu('controls')} onError={setOptionError} />}
       {menu === 'controls' && <ControlsHelp flyAllowed={__SOLO_FLY_ENABLED__} />}
-      {menu === 'inventory' && <>
-        {Object.entries(runtime.current?.game.adventure.snapshot().inventory || {}).filter(([, amount]) => amount > 0).map(([item, amount]) => ADVENTURE.skins.some(skin => skin.item === item)
-          ? <button key={item} role="switch" aria-checked={runtime.current!.game.adventure.snapshot().equipped.includes(item)} onClick={() => {
-            const adventure = runtime.current!.game.adventure; adventure.equip(item, !adventure.snapshot().equipped.includes(item)); setInventoryRevision(value => value + 1); void flush().catch(() => {});
-          }}>{item}: {runtime.current!.game.adventure.snapshot().equipped.includes(item) ? 'On' : 'Off'}</button>
-          : <p key={item}>{item}: {amount}</p>)}
-        {!Object.values(runtime.current?.game.adventure.snapshot().inventory || {}).some(amount => amount > 0) && <p>No items yet.</p>}
-      </>}
       {optionError && <p role="alert">{optionError}</p>}
       </MenuPanel>
     </section>}

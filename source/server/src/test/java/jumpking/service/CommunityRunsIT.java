@@ -31,7 +31,7 @@ class CommunityRunsIT {
         jdbc.update("INSERT INTO users(type,username,email,password_hash,created_at) VALUES ('ACCOUNT',?,?,'unused-test-hash',UTC_TIMESTAMP(3))", name, name + "@example.test");
         return jdbc.queryForObject("SELECT id FROM users WHERE username=?", Long.class, name);
     }
-    GameSimulation game() { return new GameSimulation(json.convertValue(shared.map(), GameMap.class), new Physics(json.convertValue(shared.physics(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Number>>() {})), shared.adventure(), false, false, List.of()); }
+    GameSimulation game() { return new GameSimulation(json.convertValue(shared.map(), GameMap.class), new Physics(json.convertValue(shared.physics(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Number>>() {})), shared.adventure(), false, false); }
     CommunityRuns.Write progressed(CommunityRuns.Stored stored, long revision) {
         var game = game(); game.restore(stored.snapshot()); double maximum = stored.maximum(); long peak = stored.peak();
         for (int tick = 0; tick < 100; tick++) {

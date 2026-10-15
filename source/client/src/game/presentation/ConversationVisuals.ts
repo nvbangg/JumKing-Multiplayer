@@ -35,11 +35,6 @@ export class ConversationVisuals {
       const rule = ADVENTURE.npcs.find(value => value.id === npc.name), speaker = state.dialogue[npc.name];
       let line: string | undefined, ticks = 0, characterTicks = 1;
       if (rule && speaker?.quote !== null && speaker?.quote !== undefined) { line = npcQuote(npc, speaker.quote)[speaker.line]; ticks = speaker.ticks; characterTicks = P.tickRate * rule.characterSeconds; }
-      const merchant = state.merchants[npc.name], merchantRule = ADVENTURE.merchants.find(value => value.id === npc.name), definition = this.manifest.merchants.find(value => value.name === npc.name);
-      if (merchant && definition && merchantRule && merchant.stage !== 'WAITING' && merchant.stage !== 'BUSY') {
-        const field = ({ INTRO: 'intro', SALE: 'sale', SELL: 'sell', NO_GOLD: 'noGold', SOLD: 'sold' } as const)[merchant.stage];
-        line = definition[field][merchant.line]?.replaceAll('[gold_count]', String(merchant.price)); ticks = merchant.ticks; characterTicks = P.tickRate * merchantRule.characterSeconds;
-      }
       if (!line) {
         const busy = speaker?.busy || 0, duration = npc.busy.reduce((sum, step) => sum + step.duration, 0);
         let selected = '0', elapsed = duration ? (ADVENTURE.tuning.npcBusyTicks - busy) / P.tickRate % duration : 0;

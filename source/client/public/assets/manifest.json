@@ -6665,265 +6665,6 @@
           ]
         }
       ]
-    },
-    {
-      "name": "merchant",
-      "font": "font/sf_pixolde",
-      "screen": 14,
-      "position": {
-        "X": 50,
-        "Y": 304
-      },
-      "cells": {
-        "X": 2,
-        "Y": 2
-      },
-      "bubble": {
-        "direction": "Right",
-        "anchor": {
-          "X": "Left",
-          "Y": "Down"
-        },
-        "width": 160
-      },
-      "trigger": {
-        "center_x": 0.5,
-        "center_y": 0.5,
-        "width": 80,
-        "height": 50
-      },
-      "delay": 1,
-      "speed": 0.05,
-      "talking": [
-        {
-          "sprite_index": 0,
-          "duration": 0.2
-        },
-        {
-          "sprite_index": 3,
-          "duration": 0.2
-        }
-      ],
-      "busy": [
-        {
-          "sprite_index": 0,
-          "duration": 0.3
-        },
-        {
-          "sprite_index": 1,
-          "duration": 0.3
-        }
-      ],
-      "texture": "props/textures/old_man/merchant",
-      "intro": [
-        "Greetings!",
-        "These boots are fit for a legendary hero!",
-        "Crafted by a distinguished master, with these you'll get to that babe in no time!",
-        "Since I like you I'll cut you a deal...",
-        "For only [gold_count] measly gold, they are yours!",
-        "What do you say, eh?"
-      ],
-      "looping": [],
-      "flagQuotes": [
-        {
-          "flag": "CompletedNormalGame",
-          "quotes": [
-            [
-              "Oh my! Royalty visiting my humble boutique?",
-              "I am pleased to offer my premium selection to a connoisseur such as yourself!",
-              "This is an exquisite pair of boots, crafted with attention to the finest detail...",
-              "Since you are clearly a man of fine taste, I will offer you an exclusive deal of [gold_count] gold for these fantastic boots!",
-              "Is my lord interested?"
-            ]
-          ]
-        }
-      ],
-      "screenQuotes": [
-        {
-          "screen": 2,
-          "lines": [
-            "It appears there aren't many other customers around...",
-            "You don't happen to have any rich friends?"
-          ]
-        },
-        {
-          "screen": 2,
-          "lines": [
-            "I wonder if there is hidden treasure in any of these houses...",
-            "...the owners are probably long dead, right?"
-          ]
-        },
-        {
-          "screen": 2,
-          "lines": [
-            "I'm going out of business unless I can sell these boots!"
-          ]
-        },
-        {
-          "screen": 2,
-          "lines": [
-            "I came here to offer my wares,",
-            "but it seems as though the clientele is quite limited!"
-          ]
-        }
-      ]
-    }
-  ],
-  "items": [
-    {
-      "id": "world:0",
-      "item": "Cap",
-      "screen": 5,
-      "x": 320,
-      "y": 144,
-      "texture": "props/worlditems/cap",
-      "width": 14,
-      "height": 6,
-      "displayOnly": false,
-      "invisible": false
-    }
-  ],
-  "itemTextures": {
-    "GoldRing": "props/textures/raven/gold_ring",
-    "Cap": "props/worlditems/cap"
-  },
-  "skins": [
-    {
-      "item": "Crown",
-      "texture": "king/crown",
-      "layer": "Hat"
-    },
-    {
-      "item": "Shoes",
-      "texture": "king/shoes",
-      "layer": "Boots"
-    },
-    {
-      "item": "Cap",
-      "texture": "king/cap",
-      "layer": "Hat"
-    }
-  ],
-  "birds": [
-    {
-      "name": "raven",
-      "texture": "props/textures/raven/raven",
-      "sound": "audio/event_sfx/bird_fly",
-      "item": "GoldRing",
-      "positions": [
-        {
-          "screen": 2,
-          "x": 34,
-          "y": 88,
-          "treasure": false,
-          "direction": 1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 4,
-          "x": 64,
-          "y": 80,
-          "treasure": false,
-          "direction": 1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 8,
-          "x": 417,
-          "y": 200,
-          "treasure": false,
-          "direction": -1,
-          "flyDirection": -1
-        },
-        {
-          "screen": 10,
-          "x": 24,
-          "y": 200,
-          "treasure": true,
-          "direction": 1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 14,
-          "x": 27,
-          "y": 72,
-          "treasure": true,
-          "direction": 1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 15,
-          "x": 24,
-          "y": 72,
-          "treasure": true,
-          "direction": 1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 17,
-          "x": 125,
-          "y": 296,
-          "treasure": true,
-          "direction": 1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 18,
-          "x": 448,
-          "y": 160,
-          "treasure": true,
-          "direction": -1,
-          "flyDirection": -1
-        },
-        {
-          "screen": 19,
-          "x": 458,
-          "y": 264,
-          "treasure": true,
-          "direction": -1,
-          "flyDirection": -1
-        },
-        {
-          "screen": 21,
-          "x": 148,
-          "y": 328,
-          "treasure": true,
-          "direction": 1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 22,
-          "x": 21,
-          "y": 96,
-          "treasure": true,
-          "direction": 1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 24,
-          "x": 69,
-          "y": 184,
-          "treasure": true,
-          "direction": -1,
-          "flyDirection": 1
-        },
-        {
-          "screen": 25,
-          "x": 459,
-          "y": 184,
-          "treasure": true,
-          "direction": -1,
-          "flyDirection": -1
-        },
-        {
-          "screen": 31,
-          "x": 291,
-          "y": 88,
-          "treasure": false,
-          "direction": -1,
-          "flyDirection": -1
-        }
-      ]
     }
   ],
   "messages": [
@@ -7050,91 +6791,6 @@
         "All this struggle, for what? Never have I even been rewarded with as much as a glimpse! ",
         "I could get comfortable here... Yes, maybe I will try again some other time. ",
         "But then again, could it be the legends are true?\" "
-      ]
-    }
-  ],
-  "merchants": [
-    {
-      "name": "merchant",
-      "screen": 14,
-      "item": "Shoes",
-      "currency": "GoldRing",
-      "basePrice": 0,
-      "increase": 1,
-      "trigger": {
-        "x": 10,
-        "y": 279,
-        "width": 80,
-        "height": 50
-      },
-      "delay": 1,
-      "speed": 0.05,
-      "intro": [
-        "Greetings!",
-        "These boots are fit for a legendary hero!",
-        "Crafted by a distinguished master, with these you'll get to that babe in no time!",
-        "Since I like you I'll cut you a deal...",
-        "For only [gold_count] measly gold, they are yours!",
-        "What do you say, eh?"
-      ],
-      "sale": [
-        "Never slip with these expert-jumpers' boots!",
-        "Only [gold_count] gold, and you will stand steady forever!",
-        "Great for those steep climbs!",
-        "Tired of falling?",
-        "Then these boots are for you!",
-        "Extra special price, [gold_count] gold!",
-        "With these boots, you will soar through the sky like a bird!",
-        "Winged boots, only [gold_count] gold!",
-        "I saw you eyeing these boots!",
-        "The babe couldn't possibly resist a man with these works of art on his feet!",
-        "Get them while they're hot! [gold_count] gold!",
-        "Imagine flying through the sky!",
-        "Not possible!",
-        "But next best thing is these boots!",
-        "For only [gold_count] gold you will feel like you're flying!",
-        "Say good-bye to falling ever again!",
-        "With these boots you will feel the sensation of flight!",
-        "[gold_count] gold and they are yours forever!",
-        "Tired of hitting your face on the ground over and over?",
-        "Buy these boots and never fall again!",
-        "[gold_count] gold! Satisfaction guaranteed!",
-        "Have you been to the babe yet? - Of course not! How could you hope to reach her with those old boots on?",
-        "But you are in luck! For only [gold_count] these very-special boots can be yours!",
-        "Nothing could stop you with these beauties on!",
-        "Extra sale!",
-        "Performance-enhancing boots!",
-        "Exclusive and Limited Time Offer of [gold_count] gold!",
-        "Do you see this quality? Luxurious snake skin leather...",
-        "I give you extra good price, only for you!",
-        "[gold_count] gold!",
-        "Buy while you can!",
-        "Stock is running low!",
-        "[gold_count] gold!"
-      ],
-      "sell": [
-        "Oh! You have the gold!?",
-        "I'll take that...",
-        "And here you go! Extra-Special Performance-Enhancing Boots!",
-        "Put them on and leap away!"
-      ],
-      "noGold": [
-        "Oh, you don't have [gold_count] gold on you? I'm afraid the price point is at the bare minimum...",
-        "Oh, you can't afford the humble price of [gold_count] gold? ...My condolences.",
-        "[gold_count] is still too steep a price huh? Well, I'm not running a charity here alright?",
-        "Not enough gold eh? As usual...",
-        "Oh... I'm sure you will find some gold one day! It's merely [gold_count] gold after all!",
-        "If you were broke you could have said so from the start...",
-        "You don't have even as little as [gold_count] gold? Oh well...",
-        "You still don't have [gold_count] gold? What a shame...",
-        "Ah, I understand you can't afford them, times are hard indeed... But I need my gold! And you need these boots!"
-      ],
-      "sold": [
-        "Looking good!",
-        "A world of difference, right?",
-        "You're welcome!",
-        "Pleasure doing business with you!",
-        "Heh heh heh!"
       ]
     }
   ],
@@ -7381,10 +7037,10 @@
       "width": 480,
       "height": 360
     },
-    "ending/imageshoes": {
-      "file": "ending/imageshoes.png",
-      "width": 480,
-      "height": 360
+    "king/crown": {
+      "file": "king/crown.png",
+      "width": 832,
+      "height": 384
     },
     "screens/midground/1": {
       "file": "screens/midground/1.png",
@@ -7896,41 +7552,6 @@
       "width": 48,
       "height": 24
     },
-    "props/textures/old_man/merchant": {
-      "file": "props/textures/old_man/merchant.png",
-      "width": 64,
-      "height": 64
-    },
-    "props/worlditems/cap": {
-      "file": "props/worlditems/cap.png",
-      "width": 14,
-      "height": 6
-    },
-    "king/crown": {
-      "file": "king/crown.png",
-      "width": 832,
-      "height": 384
-    },
-    "king/shoes": {
-      "file": "king/shoes.png",
-      "width": 832,
-      "height": 384
-    },
-    "king/cap": {
-      "file": "king/cap.png",
-      "width": 832,
-      "height": 384
-    },
-    "props/textures/raven/raven": {
-      "file": "props/textures/raven/raven.png",
-      "width": 144,
-      "height": 128
-    },
-    "props/textures/raven/gold_ring": {
-      "file": "props/textures/raven/gold_ring.png",
-      "width": 8,
-      "height": 4
-    },
     "props/hidden_walls/textures/6_hidden_wall": {
       "file": "props/hidden_walls/textures/6_hidden_wall.png",
       "width": 177,
@@ -7971,11 +7592,6 @@
       "width": 127,
       "height": 50
     },
-    "props/textures/raven/raven_crown": {
-      "file": "props/textures/raven/raven_crown.png",
-      "width": 168,
-      "height": 48
-    },
     "particles/jump_particle": {
       "file": "particles/jump_particle.png",
       "width": 160,
@@ -8015,10 +7631,6 @@
     "audio/new_location": {
       "file": "audio/new_location.ogg",
       "duration": 6839
-    },
-    "audio/event_sfx/bird_fly": {
-      "file": "audio/event_sfx/bird_fly.ogg",
-      "duration": 683
     },
     "audio/illusion": {
       "file": "audio/illusion.ogg",
@@ -8202,7 +7814,7 @@
     "gui/checkbox.png": "116e72cb138f72b1a8b611e4c974b3a362fb8440ba5747aa4fadee921cde2116",
     "ending/ending_animations.png": "51464d7d6440a10b1e8bfd0b348b00cdfa54c9b90c081a1cb31e05a656b17142",
     "ending/imagecrown.png": "e199ec0eaa16a98bc913eb4fba3a853e8cdd956270c17808b8ad48114f2d1e60",
-    "ending/imageshoes.png": "da5bfdda2619cd8f2f3c5b14111d97497140c908f0b48c463f9b51636a4b7342",
+    "king/crown.png": "06efa22ef99cd0ce04abc3608f27520b9474ff19703420e315074f239cfebab8",
     "screens/midground/1.png": "f36c79f3178cd74484668d1bdc5ded6a946c1b27dd3137a7b230672da3fac187",
     "props/textures/Bonfire.png": "6823d5cfae6f7e8416fc4a3f9925962f921fafce0164a7226da5cf03ae61eb57",
     "props/textures/1_water.png": "5a7f183f9ffaab7d435ad647c36279a79ebdd5bc77a14e5b667636f722ffb00b",
@@ -8305,13 +7917,6 @@
     "props/textures/old_man/hermit.png": "10e2c58526dbe4a1f51a715db49dcb4feef4c390bf4142cbbd0622755040c7f5",
     "props/textures/old_man/old_man.png": "957626af7dedb08a570d10d67ccdebb132e6f4f85523d739119d84ce1a72cc69",
     "props/textures/old_man/skeleton.png": "02de1aa13b545800ba1a81c87ec884b9c5814d331ce4a6db7f8ca0e93150e4f8",
-    "props/textures/old_man/merchant.png": "4c89500434f045da39862e514547f2dabc15b1d632dc101c32d8187c9f97d782",
-    "props/worlditems/cap.png": "6cc7dbbba29d11f8620376b368ede21b845ab3512a85721322c71336dd29afe7",
-    "king/crown.png": "06efa22ef99cd0ce04abc3608f27520b9474ff19703420e315074f239cfebab8",
-    "king/shoes.png": "3122aacb20a6b7fa555e1d12fb2f6a0a873c974367d27504c85e926762a6354b",
-    "king/cap.png": "fd0f937fc5701c4606080c5765ef4861802dc445da7701d55a8baff241277028",
-    "props/textures/raven/raven.png": "be95d49c860a434180c01eec9cf0da69192d68627a857585c754eab8f087afa2",
-    "props/textures/raven/gold_ring.png": "6c7ca03563f9d0de4f6a67062c37f446a8813150315473936eb112d8fe1821c4",
     "props/hidden_walls/textures/6_hidden_wall.png": "acbe4d4c949184f4859fe86b5549ba8d1ad63bddb10a91c2401d979f423afac5",
     "props/hidden_walls/textures/7_hidden_wall1.png": "78097bd54a9356b3cb2465e6f3b326cd44c3d30ddd05afbd6094f2a198642816",
     "props/hidden_walls/textures/7_hidden_wall2_2.png": "50be818ce898fe0a9d59ae12ddf65fff920960636ccf6a15f8db9205d320f3f4",
@@ -8320,7 +7925,6 @@
     "props/hidden_walls/textures/8_hidden_wall1_2.png": "712c18b059df8d852cead2a2f566e8ab823c80cdcac76fc2b5fa15340bed2da6",
     "props/hidden_walls/textures/8_hidden_wall1_1.png": "c5acb09bd40976d781f50d124b832909c1eedb431a801d814edd0e47798d9b77",
     "props/hidden_walls/textures/22_hidden_wall1.png": "80b6d2c839331b0062a796940d5ac3b24fe2d9a2fd154a173d001ff7b720ada1",
-    "props/textures/raven/raven_crown.png": "3531cf0588e3fcd99fae9f6c3c344b65963a9e19116c5d18bf3920aefec28c9c",
     "particles/jump_particle.png": "033030af811ea57f5f68ef6509de03be0193d3f6ead2a7ef1cfae9a9f683c5e0",
     "particles/snow_jump_particle.png": "45674b51742719b1c18dc0b1092f797a01ee832d339f76da222018170d84e37e",
     "audio/music/menu loop/menu_intro.ogg": "e72d99f53da376a13d5aeff5b38e135d0f2f96a6cdb7352ef843d2b568f8051f",
@@ -8330,7 +7934,6 @@
     "audio/talking.ogg": "758db4489e8fb8f064b3b4712868210458e3efc202c28860a722a5359f0dee72",
     "audio/plink.ogg": "4a5b1ad43f4a2fea1b9d55fd3305e7a00290427ed01adb3a0ea77b21b6e22c40",
     "audio/new_location.ogg": "1be858bb3c96a167e5744fb9bbbcd64ac349330ba5f2823e40fe70c7e24e3d33",
-    "audio/event_sfx/bird_fly.ogg": "725b86a7c8375ae4b8e85b6bbc3d62b3355d954238bbed6d0a7e02929a05c197",
     "audio/illusion.ogg": "9e8918c85799f0301164fd5a35f45bdf6dd933160db758d93c27513a78377e45",
     "audio/babe/babe jump.ogg": "39fcf7fe1d3a34ec86f721c50081d307b30add14fa6a623d4bd69f1013903261",
     "audio/babe/babe kiss.ogg": "a1a88a21e55879d6d752cc66e6e55ce8ac19a16236d0908ea2fdf76a4094d4d7",
@@ -8379,5 +7982,6 @@
     "font/sf_pixolde.png": "0c261f9373973b20e81e7e574167df0fa67ed8b6928191748e4fd2dfa954f420",
     "font/sf_pixolde.xml": "3deb7e3475efb1b8ab8c0779504e3806d70c2894504eeb9abc1376afa737631d",
     "font/ttf_litter_lover2_bold.ttf": "aa0c7321bd35f5ff95a0e8e65a764c1c27d6ef6ef87f19450cd8f7cea991c355"
-  }
+  },
+  "crown": "king/crown"
 }

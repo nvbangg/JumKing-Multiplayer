@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
 /** Mỗi Room sở hữu một actor; registry chỉ giữ chỗ và không thực hiện I/O. */
 @Component
 public class RaceRoom implements GameCommandHandler, AutoCloseable {
-    private static final Set<String> COMMANDS = Set.of("CREATE_ROOM", "JOIN_ROOM", "GET_ROOM_STATE", "LEAVE_ROOM", "UPDATE_ROOM_SETTINGS", "RECONNECT", "CHAT_SEND", "START_GAME", "END_MATCH", "SET_ROOM_PAUSED", "PLAY_AGAIN", "PLAYER_INPUT", "CANCEL_INPUT", "EQUIP_ITEM");
+    private static final Set<String> COMMANDS = Set.of("CREATE_ROOM", "JOIN_ROOM", "GET_ROOM_STATE", "LEAVE_ROOM", "UPDATE_ROOM_SETTINGS", "RECONNECT", "CHAT_SEND", "START_GAME", "END_MATCH", "SET_ROOM_PAUSED", "PLAY_AGAIN", "PLAYER_INPUT", "CANCEL_INPUT");
     private final RoomDirectory directory;
     private final Memberships memberships;
     private final GameWorkers workers;
@@ -134,12 +134,6 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
                     racer.input.offer(command, time.nanos(), flags.flyEnabled());
                     if (!room.state.equals("PLAYING") || !racer.status.equals("ACTIVE")) racer.input.clear();
                     else if (command.type().equals("CANCEL_INPUT")) racer.game.physics().cancelInput();
-                }
-                case "EQUIP_ITEM" -> {
-                    GameEnvelope.fields(command.payload(), Set.of("itemId", "equipped"));
-                    var racer = room.match == null ? null : room.match.players.get(player.id);
-                    if (racer == null || !room.state.equals("PLAYING") || !racer.status.equals("ACTIVE") || !racer.game.adventure().equip(GameEnvelope.text(command.payload(), "itemId"), GameEnvelope.bool(command.payload(), "equipped", false))) throw new ApiException(409, "CONFLICT", "Item is not owned or cannot be equipped");
-                    connection.reply(command, "ROOM_STATE", state(room)); snapshots(room);
                 }
                 case "CHAT_SEND" -> {
                     GameEnvelope.fields(command.payload(), Set.of("text"));
@@ -377,7 +371,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
                 var peer = match.players.get(other.id); if (peer == null || other == member) continue;
                 var publicState = peers.addObject().put("playerId", other.id).put("nickname", other.nickname).put("colorSlot", other.slot.color()).put("status", peer.status);
                 ObjectNode pose = json.valueToTree(peer.game.physics().snapshot()); pose.retain(List.of("x", "y", "vx", "vy", "grounded", "charge", "direction", "splat", "knocked", "ice", "snow", "wind", "screen", "ticks", "jumps", "falls"));
-                publicState.set("state", pose); publicState.set("equipment", peer.game.adventure().snapshot().path("equipped"));
+                publicState.set("state", pose); publicState.put("crowned", peer.game.adventure().completed());
             }
             member.connection.snapshot(snapshot);
         }

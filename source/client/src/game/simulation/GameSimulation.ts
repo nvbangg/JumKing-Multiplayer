@@ -11,8 +11,8 @@ export class GameSimulation {
   readonly physics: Simulation;
   readonly adventure: Adventure;
   private world: WorldState;
-  constructor(readonly map: GameMap, flyAllowed = false, noWalk = false, wardrobe: readonly string[] = []) {
-    this.physics = new Simulation(map, flyAllowed, noWalk); this.adventure = new Adventure(map, wardrobe);
+  constructor(readonly map: GameMap, flyAllowed = false, noWalk = false) {
+    this.physics = new Simulation(map, flyAllowed, noWalk); this.adventure = new Adventure(map);
     this.world = { lastTick: 0, registeredScreens: [], weatherWind: 0, walls: Object.fromEntries(ADVENTURE.walls.map(wall => [wall.id, { touching: false, canPlay: true, fadeTicks: 0 }])) };
   }
   snapshot(): GameSnapshot { return { codecVersion: 1, physics: this.physics.snapshot(), adventure: this.adventure.snapshot(), world: structuredClone(this.world) }; }

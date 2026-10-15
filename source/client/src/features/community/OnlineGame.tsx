@@ -16,13 +16,11 @@ import { PRESENTATION } from '../../game/presentation/config';
 import { ChatPanel, type ChatMessage } from '../../components/ChatPanel';
 import rules from '../../../../common/rules.json';
 import { FlightToggle } from '../../game/input/FlightToggle';
-import { ADVENTURE, type AdventureState } from '../../game/simulation/Adventure';
 import { AdventureEffects } from '../../game/netcode/AdventureEffects';
 
 export function OnlineGame({ socket, room, onHome, onResults }: { socket: GameSocket; room: RoomState; onHome: () => void; onResults: () => void }) {
   const container = useRef<HTMLDivElement>(null), runtime = useRef<OnlineRuntime | null>(null), input = useRef<InputController | null>(null), audio = useRef<AudioBus | null>(null);
-  const [ready, setReady] = useState(false), [menu, setMenu] = useState<'pause' | 'options' | 'controls' | 'inventory' | null>(null);
-  const [inventory, setInventory] = useState<AdventureState | null>(null);
+  const [ready, setReady] = useState(false), [menu, setMenu] = useState<'pause' | 'options' | 'controls' | null>(null);
   const flight = useRef<FlightToggle | null>(null);
   const [flying, setFlying] = useState(false);
   const [options, setOptions] = useState(readOptions), [flyAllowed, setFlyAllowed] = useState(false);
@@ -62,7 +60,7 @@ export function OnlineGame({ socket, room, onHome, onResults }: { socket: GameSo
         if (type === 'ADVENTURE_EVENTS' && cueManifest && runtime.current?.latest) {
           for (const cue of adventureEffects.receive(payload, latestRoom.current.roomId, runtime.current.latest.playId)) {
             const key = cue.kind === 'WORLD' ? cue.type === 'JINGLE' ? 'audio/music/event_music/ending_jingle' : cueManifest.walls.find(wall => wall.id === cue.id)?.appearSound || 'audio/illusion'
-              : cue.type === 'FLEE' ? 'audio/event_sfx/bird_fly' : cue.type === 'SPEECH' ? 'audio/talking' : 'audio/plink';
+              : 'audio/talking';
             audio.current?.play(key);
           }
         }
@@ -84,7 +82,6 @@ export function OnlineGame({ socket, room, onHome, onResults }: { socket: GameSo
       cueManifest = manifest; setFlyAllowed(config.features.flyEnabled); audio.current = new AudioBus(manifest, readOptions().sound, setError);
       const session = new OnlineRuntime(parseMap(mapData), socket, latestRoom.current, () => controls.read(), (state, snapshot) => {
         setElapsed(snapshot.elapsedTimeMs); setRemaining(snapshot.remainingTimeMs); setJumps(state.jumps); setFlying(state.freeFlight); audio.current?.setScreen(state.screen);
-        setInventory(snapshot.self.simulation.adventure);
         if (!readOptions().fly && state.freeFlight) session.setFlight(false);
         if (snapshot.self.paused && !session.menu) { session.menu = true; controls.cancel(); setMenu('pause'); audio.current?.pause(true); }
       }, config.features.flyEnabled, message => { setError(message); setMenu('pause'); controls.cancel(); });
@@ -150,10 +147,9 @@ export function OnlineGame({ socket, room, onHome, onResults }: { socket: GameSo
       ? <button disabled={!pictureReady} onClick={onResults}>View Results</button>
       : <button disabled={!pictureReady || pending} onClick={() => { void newGame(); }}>New Game</button>}<button disabled={!pictureReady || pending || disconnected} onClick={() => { void command('LEAVE_ROOM'); }}>Back to Menu</button></>}</div>}
     {ready && chatOpen && <ChatPanel messages={messages} colors={rules.appearanceColors} onSend={async text => { await socket.command('CHAT_SEND', { text }); }} onClose={() => { setChatOpen(false); if (!runtime.current?.menu) input.current?.resume(); }} />}
-    {menu && <section className="game-overlay" aria-label="Game menu"><MenuPanel title={menu === 'pause' ? disconnected ? 'Disconnected' : room.kind === 'ROOM' ? room.state === 'PAUSED' ? 'Room Paused' : 'Game Menu' : 'Paused' : menu === 'options' ? 'Options' : menu === 'inventory' ? 'Inventory' : 'Controls'} onBack={menu === 'pause' ? undefined : () => setMenu(menu === 'controls' ? 'options' : 'pause')}>
+    {menu && <section className="game-overlay" aria-label="Game menu"><MenuPanel title={menu === 'pause' ? disconnected ? 'Disconnected' : room.kind === 'ROOM' ? room.state === 'PAUSED' ? 'Room Paused' : 'Game Menu' : 'Paused' : menu === 'options' ? 'Options' : 'Controls'} onBack={menu === 'pause' ? undefined : () => setMenu(menu === 'controls' ? 'options' : 'pause')}>
       {menu === 'pause' && <>{disconnected ? <><button disabled={pending} onClick={() => { setPending(true); void socket.reconnect().catch(cause => setError(cause.message)).finally(() => setPending(false)); }}>Reconnect</button><button onClick={onHome}>Back to Menu</button></> : <button disabled={pending || (room.state === 'PAUSED' && room.hostPlayerId !== socket.selfId)} onClick={() => { void resume(); }}>{room.kind === 'ROOM' && room.state === 'PAUSED' ? room.hostPlayerId === socket.selfId ? 'Resume Room' : 'Room Paused' : 'Resume'}</button>}<button onClick={() => setMenu('options')}>Options</button><button onClick={() => { runtime.current?.cancel(); input.current?.cancel(); setChatOpen(true); }}>Open Chat</button>
         {room.kind === 'COMMUNITY' && <button disabled={pending || disconnected} onClick={() => { void newGame(); }}>New Game</button>}
-        <button onClick={() => setMenu('inventory')}>Inventory</button>
         {room.kind === 'ROOM' && room.hostPlayerId === socket.selfId && room.state === 'PLAYING' && <button disabled={pending || disconnected} onClick={() => { void command('SET_ROOM_PAUSED', { playId: socket.playContext?.playId, paused: true }); }}>Pause Room</button>}
         {room.kind === 'ROOM' && room.hostPlayerId === socket.selfId && ['PLAYING', 'PAUSED'].includes(room.state) && <button disabled={pending || disconnected} onClick={() => { void command('END_MATCH'); }}>End Match</button>}
         <button disabled={pending || disconnected} onClick={() => { void command('LEAVE_ROOM'); }}>{room.kind === 'COMMUNITY' ? 'Save & Exit' : 'Leave Room'}</button>{room.kind === 'COMMUNITY' && <small role="status">{saveStatus === 'SAVED' ? 'Saved' : saveStatus === 'FAILED' ? 'Save failed' : 'Saving…'}</small>}</>}
@@ -163,12 +159,6 @@ export function OnlineGame({ socket, room, onHome, onResults }: { socket: GameSo
       </form>}
       {menu === 'options' && <OptionsButtons options={options} flyAllowed={flyAllowed} onChange={updateOptions} onControls={() => setMenu('controls')} onError={setError} />}
       {menu === 'controls' && <ControlsHelp flyAllowed={flyAllowed} />}
-      {menu === 'inventory' && <>
-        {Object.entries(inventory?.inventory || {}).filter(([, amount]) => amount > 0).map(([item, amount]) => ADVENTURE.skins.some(skin => skin.item === item)
-          ? <button key={item} disabled={pending || disconnected} role="switch" aria-checked={inventory!.equipped.includes(item)} onClick={() => { void command('EQUIP_ITEM', { itemId: item, equipped: !inventory!.equipped.includes(item) }); }}>{item}: {inventory!.equipped.includes(item) ? 'On' : 'Off'}</button>
-          : <p key={item}>{item}: {amount}</p>)}
-        {!Object.values(inventory?.inventory || {}).some(amount => amount > 0) && <p>No items yet.</p>}
-      </>}
       {error && <p role="alert">{error}</p>}
     </MenuPanel></section>}
     {error && !menu && <p className="save-error" role="alert">{error}</p>}

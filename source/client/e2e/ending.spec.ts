@@ -27,13 +27,13 @@ test('Solo Finish persists once, Skip shows the native picture and History stays
     const storage = '/src/features/solo/storage.ts', { soloRuns } = await import(storage), runs = await soloRuns('guest');
     return { count: runs.length, ticks: runs[0].finishTicks, crown: await new Promise<boolean>((resolve, reject) => {
       const open = indexedDB.open('jumpking'); open.onerror = () => reject(open.error);
-      open.onsuccess = () => { const db = open.result, request = db.transaction('profiles').objectStore('profiles').get('guest'); request.onsuccess = () => { const owned = request.result.wardrobe.includes('Crown'); db.close(); resolve(owned); }; };
+      open.onsuccess = () => { const db = open.result, request = db.transaction('profiles').objectStore('profiles').get('guest'); request.onsuccess = () => { const owned = request.result.crownUnlocked === true; db.close(); resolve(owned); }; };
     }) };
   });
   expect(result).toEqual({ count: 1, ticks: 16957, crown: true }); expect(errors).toEqual([]);
 });
 
-test('complete native ending timeline supports Shoes and Raven without credits or duplicate callbacks', async ({ page }) => {
+test('basic ending timeline runs without credits or duplicate callbacks', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (/Texture .* has no frame/.test(message.text())) errors.push(message.text()); });
   await page.goto('/');
@@ -42,8 +42,8 @@ test('complete native ending timeline supports Shoes and Raven without credits o
     const manifest = await (await fetch('/assets/manifest.json')).json(), parent = document.createElement('div'); document.body.append(parent);
     let ready!: () => void, picture!: () => void, completions = 0;
     const loaded = new Promise<void>(resolve => { ready = resolve; }), completed = new Promise<void>(resolve => { picture = resolve; });
-    const signal = { id: 'ending-test', screen: 42, equipped: ['Shoes', 'Cap'], ravenDone: true };
-    const runtime = { advance() {}, frame: () => ({ self: { id: 'self', nickname: 'Player', color: '#ffffff', state: physics, equipment: ['Shoes', 'Crown'] }, peers: [], ending: signal }) };
+    const signal = { id: 'ending-test', screen: 42 };
+    const runtime = { advance() {}, frame: () => ({ self: { id: 'self', nickname: 'Player', color: '#ffffff', state: physics, crowned: true }, peers: [], ending: signal }) };
     const failures: string[] = [], game = createGame(parent, manifest, runtime, ready, (error: string) => failures.push(error), { onEndingComplete: () => { completions++; picture(); } });
     try {
       await loaded;
@@ -55,6 +55,6 @@ test('complete native ending timeline supports Shoes and Raven without credits o
       return { completions, picture: image.texture.key, camera: scene.cameras.main.scrollY, texts, failures };
     } finally { game.destroy(true); parent.remove(); }
   }, checkpoints.at(-1)!);
-  expect(result.completions).toBe(1); expect(result.picture).toBe('ending/imageshoes'); expect(result.camera).toBe(-42 * 360);
+  expect(result.completions).toBe(1); expect(result.picture).toBe('ending/imagecrown'); expect(result.camera).toBe(-42 * 360);
   expect(result.texts).toEqual(['Player']); expect(result.failures).toEqual([]); expect(errors).toEqual([]);
 });

@@ -25,7 +25,7 @@ class AdventureTest {
         physics = new Physics(mapper.convertValue(shared.physics(), new TypeReference<Map<String, Number>>() {}));
     }
     private JsonNode fixture(String file) throws Exception { try (var input = new ClassPathResource("fixtures/" + file).getInputStream()) { return mapper.readTree(input); } }
-    private Adventure adventure() { return new Adventure(shared.adventure(), map, physics, List.of()); }
+    private Adventure adventure() { return new Adventure(shared.adventure(), map, physics); }
     private void assertJson(JsonNode actual, JsonNode expected, String context) {
         assertThat(actual).as(context).isNotNull();
         if (expected.isNumber()) assertThat(actual.doubleValue()).as(context).isEqualTo(expected.doubleValue());
@@ -65,17 +65,23 @@ class AdventureTest {
             }
         }));
     }
-    @Test void validatesOwnershipLayersAndRestoresAtomically() {
-        var adventure = new Adventure(shared.adventure(), map, physics, List.of("Cap", "Shoes"));
-        assertThat(adventure.equip("Crown", true)).isFalse(); adventure.complete();
-        assertThat(adventure.snapshot().path("equipped").toString()).isEqualTo("[\"Shoes\",\"Crown\"]");
-        assertThat(adventure.equip("Cap", true)).isTrue(); var saved = adventure.snapshot();
-        var invalid = saved.deepCopy(); ((ObjectNode) invalid.path("inventory")).put("GoldRing", -1);
-        assertThatThrownBy(() -> adventure.restore(invalid)).isInstanceOf(IllegalArgumentException.class);
+    @Test void restoresDialogueAtomicallyAndMigratesLegacyItemState() {
+        var adventure = adventure(); adventure.complete(); var saved = adventure.snapshot();
+        assertThat(adventure.completed()).isTrue();
+        var invalidCounters = saved.deepCopy(); ((ObjectNode) invalidCounters.path("dialogue").path("old_man")).put("ticks", -1);
+        assertThatThrownBy(() -> adventure.restore(invalidCounters)).isInstanceOf(IllegalArgumentException.class);
         assertThat(adventure.snapshot()).isEqualTo(saved);
+        var invalidFlags = saved.deepCopy(); invalidFlags.putArray("flags").add("UnknownFlag");
+        assertThatThrownBy(() -> adventure.restore(invalidFlags)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(adventure.snapshot()).isEqualTo(saved);
+        var legacy = saved.deepCopy(); legacy.put("codecVersion", 1);
+        legacy.withArray("flags").add("CHASE_BIRD_PAST_SNOWSTORM");
+        legacy.putObject("inventory").put("Cap", 1); legacy.putArray("equipped").add("Cap");
+        legacy.putArray("collected"); legacy.putObject("birds"); legacy.putObject("merchants");
+        adventure.restore(legacy); assertThat(adventure.snapshot()).isEqualTo(saved);
     }
     @Test void fullGameKeepsPhysicsOracleAndRestoresWorldAndAdventure() throws Exception {
-        var game = new GameSimulation(map, physics, shared.adventure(), false, false, List.of());
+        var game = new GameSimulation(map, physics, shared.adventure(), false, false);
         for (int i = 0; i < 30; i++) game.tick(PlayerInput.NEUTRAL);
         var expected = fixture("main-babe-checkpoints.json"); int index = 0;
         for (JsonNode action : fixture("main-babe-route.json")) {
@@ -90,7 +96,7 @@ class AdventureTest {
             assertJson(mapper.valueToTree(game.physics().snapshot()), expected.get(index), "full game/" + index);
             if (index++ % 17 == 0) game.restore(mapper.readValue(mapper.writeValueAsBytes(game.snapshot()), GameSimulation.Snapshot.class));
         }
-        assertThat(game.finished()).isTrue(); assertThat(game.adventure().has("Crown")).isTrue();
+        assertThat(game.finished()).isTrue(); assertThat(game.adventure().completed()).isTrue();
         assertThat(game.snapshot().world().path("registeredScreens").size()).isEqualTo(43);
         var saved = game.snapshot(); var invalid = (ObjectNode) saved.world().deepCopy(); invalid.put("lastTick", saved.physics().ticks + 1);
         assertThatThrownBy(() -> game.restore(new GameSimulation.Snapshot(1, saved.physics(), saved.adventure(), invalid))).isInstanceOf(IllegalArgumentException.class);

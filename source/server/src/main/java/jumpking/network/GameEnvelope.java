@@ -9,7 +9,7 @@ import jumpking.exception.ApiException;
 public record GameEnvelope(String type, String requestId, JsonNode payload) {
     private static final Set<String> TYPES = Set.of("HEARTBEAT", "JOIN_COMMUNITY", "CREATE_ROOM", "JOIN_ROOM", "LEAVE_ROOM",
         "GET_ROOM_STATE", "UPDATE_ROOM_SETTINGS", "START_GAME", "END_MATCH", "PLAY_AGAIN", "SET_ROOM_PAUSED",
-        "SET_COMMUNITY_PAUSED", "NEW_COMMUNITY_RUN", "EQUIP_ITEM", "CHAT_SEND", "PLAYER_INPUT", "CANCEL_INPUT", "RECONNECT");
+        "SET_COMMUNITY_PAUSED", "NEW_COMMUNITY_RUN", "CHAT_SEND", "PLAYER_INPUT", "CANCEL_INPUT", "RECONNECT");
     public static GameEnvelope parse(ObjectMapper json, String text) {
         try {
             JsonNode root = json.reader().with(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION)

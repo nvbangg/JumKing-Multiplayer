@@ -17,14 +17,14 @@ function snapshot(game: GameSimulation, tick: number, ack: number, generation = 
 test('online ending waits for the private committed notice and matching finished snapshot', () => {
   const socket = new GameSocket(() => {}, () => {}); socket.selfId = 'self'; socket.playContext = { playId: 'run', generation: 1 };
   const game = new GameSimulation(map), runtime = new OnlineRuntime(map, socket, room, () => right, () => {}, false);
-  const notice = { playerId: 'self', playId: 'run', showEnding: true, ending: { screen: 42, equipped: ['Shoes'], ravenDone: true } };
+  const notice = { playerId: 'self', playId: 'run', showEnding: true, ending: { screen: 42 } };
   runtime.receive(snapshot(game, 1, 0) as unknown as Record<string, unknown>);
   runtime.finish({ ...notice, playerId: 'other' }); expect(runtime.frame().ending).toBeUndefined();
   runtime.finish(notice); expect(runtime.frame().ending).toBeUndefined();
   const finished = snapshot(game, 2, 0); finished.self.status = 'FINISHED'; finished.self.paused = true;
   runtime.receive(finished as unknown as Record<string, unknown>);
-  expect(runtime.frame().ending).toEqual({ id: 'run', screen: 42, equipped: ['Shoes'], ravenDone: true });
-  runtime.finish({ ...notice, ending: { ...notice.ending, equipped: ['Crown'] } }); expect(runtime.frame().ending!.equipped).toEqual(['Shoes']);
+  expect(runtime.frame().ending).toEqual({ id: 'run', screen: 42 });
+  runtime.finish(notice); expect(runtime.frame().ending).toEqual({ id: 'run', screen: 42 });
   socket.playContext = { playId: 'next', generation: 2 };
   runtime.receive({ ...snapshot(game, 3, 0, 2), playId: 'next' } as unknown as Record<string, unknown>);
   expect(runtime.frame().ending).toBeUndefined(); runtime.finish(notice); expect(runtime.frame().ending).toBeUndefined();
@@ -83,7 +83,7 @@ test('server Pause discards inputs canceled by the actor so Resume cannot replay
 });
 test('remote interpolation follows server tick spacing and never extrapolates or resurrects removed peers', () => {
   const game = new GameSimulation(map), previous = snapshot(game, 3, 0), current = snapshot(game, 6, 0);
-  const peer = { playerId: 'other', nickname: 'Other', colorSlot: 1, state: game.physics.snapshot(), equipment: [], status: 'ACTIVE' };
+  const peer = { playerId: 'other', nickname: 'Other', colorSlot: 1, state: game.physics.snapshot(), crowned: false, status: 'ACTIVE' };
   previous.peers = [{ ...peer, state: { ...peer.state, x: 100 } }]; current.peers = [{ ...peer, state: { ...peer.state, x: 120 } }];
   const interpolation = new PeerInterpolation(60); interpolation.receive(previous, 0); interpolation.receive(current, 100);
   expect(interpolation.frame(125)[0]!.state.x).toBe(110); expect(interpolation.frame(200)[0]!.state.x).toBe(120);

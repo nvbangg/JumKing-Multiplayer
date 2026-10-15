@@ -12,8 +12,6 @@ grid('normal', 'snatch idle_left idle_right charge walk_left0 walk_left1 walk_le
 ENDING_FRAMES['normal.snatch_smear'] = { x: 128, y: 96, width: 64, height: 32, originX: 0.5, originY: 1 };
 grid('normal', 'dunk parasol fly0 fly1 fly2 upskirt0 upskirt1 upskirt2', '1,1.5 0,1.5 0,2.5 1,2.5 2,2.5 0,3.5 1,3.5 2,3.5', 64, 64, 0, 0, 0.5, 0.5 + 16 / 96);
 grid('cherub', 'deliver0 deliver1 escape0 escape1', '6,0 6,1 6,2 6,3', 32, 32, 0, 0, 0.5, 0.5);
-grid('ravenCrown', '0 1 2', '0,0 1,0 2,0', 56, 48, 0, 0, 0.5, 1 - 16 / 48);
-grid('ravenFly', '0 1 2', '0,0 1,0 2,0', 48, 32, 0, 64);
 export const endingFrameName = (frame: string) => 'ending:' + frame;
 export function jumpStrength(height: number): number {
   let distance = 0, velocity = 0, ticks = 0;

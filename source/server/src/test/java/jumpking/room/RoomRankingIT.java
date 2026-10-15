@@ -67,7 +67,7 @@ class RoomRankingIT {
                     var ending = client.await(message -> message.path("type").asText().equals("PLAYER_FINISHED")).path("payload");
                     assertThat(ending.path("playId").asText()).isEqualTo(game.play); assertThat(ending.path("showEnding").asBoolean()).isTrue();
                     assertThat(ending.path("ending").path("screen").asInt()).isEqualTo(42);
-                    assertThat(ending.path("ending").path("equipped").toString()).isEqualTo(before.adventure().path("equipped").toString());
+                    assertThat(ending.path("ending").has("equipped")).isFalse();
                     client.ok("GET_ROOM_STATE", Map.of());
                     assertThat(client.messages.stream().filter(message -> message.path("type").asText().equals("PLAYER_FINISHED")).count()).isEqualTo(1);
                 }

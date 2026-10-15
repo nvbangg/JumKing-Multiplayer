@@ -24,11 +24,7 @@ export interface AssetManifest {
   fonts: Record<string, { texture: string; data: string; lineHeight: number }>;
   hashes: Record<string, string>;
   npcs: Npc[];
-  skins: { item: string; texture: string; layer: string }[];
-  items: { id: string; item: string; screen: number; x: number; y: number; width: number; height: number; texture: string; displayOnly: boolean }[];
-  itemTextures: Record<string, string>;
-  birds: { name: string; texture: string; sound: string; item: string; positions: { screen: number; x: number; y: number; direction: number; flyDirection: number; treasure: boolean }[] }[];
-  merchants: { name: string; screen: number; intro: string[]; sale: string[]; sell: string[]; noGold: string[]; sold: string[] }[];
+  crown: string;
   messages: { id: string; screen: number; font: string; lines: string[]; anchor: { x: number; y: number }; bubble: { direction: string; width: number; anchor: { X: string; Y: string } } }[];
   walls: { id: string; screen: number; texture: string; position: { X: number; Y: number }; appearSound: string | null; disappearSound: string | null }[];
 }

@@ -10,7 +10,7 @@ test('plays the complete Main Babe input route and renders every reached checkpo
     const [manifest, map] = await Promise.all([fetch('/assets/manifest.json').then(r => r.json()), fetch('/shared/maps/main-babe.json').then(r => r.json())]);
     const state = new GameSimulation(map), parent = document.createElement('div'); parent.style.cssText = 'position:fixed;inset:0;background:black;z-index:100'; document.body.append(parent);
     let ready!: () => void; const loaded = new Promise<void>(resolve => { ready = resolve; }), failures: string[] = [], visited = new Set<number>();
-    const runtime = { advance() {}, frame: () => { const saved = state.snapshot(); return { self: { id: 'self', nickname: 'Route Player', color: '#ffffff', state: saved.physics, equipment: saved.adventure.equipped, adventure: saved.adventure }, peers: [], world: saved.world }; } };
+    const runtime = { advance() {}, frame: () => { const saved = state.snapshot(); return { self: { id: 'self', nickname: 'Route Player', color: '#ffffff', state: saved.physics, crowned: state.adventure.completed, adventure: saved.adventure }, peers: [], world: saved.world }; } };
     const game = createGame(parent, manifest, runtime, ready, (message: string) => failures.push(message));
     const idle = { left: false, right: false, jump: false }, step = (input = idle) => { state.tick(input); visited.add(state.physics.snapshot().screen); };
     await loaded; for (let index = 0; index < 30; index++) step();

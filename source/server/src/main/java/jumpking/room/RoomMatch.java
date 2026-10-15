@@ -50,7 +50,7 @@ final class RoomMatch {
         JsonNode adventure = shared.adventure();
         for (var spec : roster) {
             var input = new InputFrames(limits.inputFrames(), limits.inputTimeoutMs()); input.reset(id, spec.generation);
-            players.put(spec.playerId, new Player(spec, new GameSimulation(map, physics, adventure, flyAllowed, settings.mode().equals("NO_WALK"), List.of()), input));
+            players.put(spec.playerId, new Player(spec, new GameSimulation(map, physics, adventure, flyAllowed, settings.mode().equals("NO_WALK")), input));
         }
     }
     void start(Instant now) { if (startedAt != null) throw new IllegalStateException("Match has already started"); startedAt = millis(now); }
@@ -60,13 +60,12 @@ final class RoomMatch {
         for (var player : players.values()) {
             if (!player.status.equals("ACTIVE")) continue;
             var input = player.input.poll(now); if (input.cancel()) player.game.physics().cancelInput();
-            var beforeEnding = player.game.adventure().snapshot();
             var effect = player.game.tick(input.input(), settings.mode().equals("HARDCORE")); events.add(new Events(player, effect));
             double progress = player.game.physics().progress();
             if (progress > player.maximum) { player.maximum = progress; player.peak = player.game.physics().snapshot().ticks; }
             if (player.game.finished()) {
                 player.status = "FINISHED"; player.finish = ticks;
-                player.ending = Map.of("screen", player.game.physics().snapshot().screen, "equipped", beforeEnding.path("equipped"), "ravenDone", beforeEnding.path("birds").path("raven").path("done").asBoolean());
+                player.ending = Map.of("screen", player.game.physics().snapshot().screen);
             }
         }
         if (players.values().stream().anyMatch(player -> player.finish != null)) finish("FINISH", instant);

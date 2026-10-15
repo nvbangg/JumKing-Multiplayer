@@ -23,8 +23,7 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 
 ## Phase 03 — Tinh giản nội dung
 
-- [ ] Bỏ Inventory/items/mua bán/quest nhận đồ khỏi hai simulation/shared/protocol; giữ NPC/hội thoại phù hợp và save hiện có.
-- [ ] Bỏ UI/trang bị và nhánh ending phụ; giữ một ending cơ bản.
+- [x] Bỏ Inventory/items/mua bán/quest nhận đồ khỏi simulation/common/protocol/UI và nhánh ending phụ; giữ NPC/hội thoại, môi trường, một ending cơ bản và save hiện có.
 - [ ] Thêm crown profile tự mở bằng full Finish, Merge/local/sync; SQL nâng cấp không reset dữ liệu.
 
 ## Phase 04 — Room và map
@@ -69,8 +68,10 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 | Phase 02 — Community | PASS — 51 unit và 9 MySQL integration tests, gồm New Run/Continue, rollback và save failure. Flush lượt cũ trước insert để giữ generated unique ACTIVE; không sửa database cá nhân. |
 | Phase 02 — Room writer | PASS — 51 unit; 14 MySQL integration tests qua hai nhóm, gồm Race/Hardcore/Time Limit/No Walk, Host Pause, rollback/late merge, writer và restart ABORTED. Match và roster cùng transaction JPA; entity không đi vào actor. |
 | Phase 02 — Layer/Read Repository | PASS — clean build, 51 unit tests; 72 MySQL integration tests gồm 71 PASS và 1 load opt-in SKIP, flakes=0; 30 Chrome PASS qua các harness, gồm JAR cùng origin. Frontend build/type-check, 68 links/anchors và diff check PASS. Không còn JdbcTemplate trong production, SQL nằm ở Repository; DTO tách khỏi Controller/Service, tests theo package mới. Không reset database/cấu hình riêng. |
-| Rà soát nền tảng trước Phase 03 | PASS — 51 unit và 7 MySQL integration tests (SchemaIT, JpaPersistenceIT); JDT resource analysis không còn cảnh báo TestDatabase. Container được đóng khi khởi tạo lỗi hoặc JVM kết thúc; IDE bỏ qua các bản sao thử nghiệm. Nhánh Docker chưa chạy thực tế; integration dùng MySQL cô lập. Cảnh báo m2e về shared ngoài backend còn có thể xuất hiện, không làm Maven build lỗi. |
+| Rà soát nền tảng trước Phase 03 | PASS — 51 unit và 7 MySQL integration tests (SchemaIT, JpaPersistenceIT); JDT resource analysis không còn cảnh báo TestDatabase. Container được đóng khi khởi tạo lỗi hoặc JVM kết thúc. Nhánh Docker chưa chạy thực tế; integration dùng MySQL cô lập. Cảnh báo m2e về shared ngoài backend còn có thể xuất hiện, không làm Maven build lỗi. |
 | Cấu trúc theo học phần | PASS — source/client, source/server, source/common; Maven/Vite/scripts và hướng dẫn chạy đã đồng bộ. 68 client unit tests, 51 Java unit tests, 71 MySQL integration PASS và 1 load opt-in SKIP; 57 Chrome PASS (27 client, 30 online/JAR), build và 72 links/anchors PASS. Sơ đồ architecture/protocol đã render kiểm tra; dữ liệu/cấu hình riêng và tài liệu học phần được giữ nguyên. Báo cáo, thực nghiệm mới và nghiệm thu hai thiết bị vẫn thuộc Phase 07. |
+
+| Phase 03 — Bỏ Inventory | PASS — 66 client unit tests, 48 Java unit tests; 71 MySQL integration PASS, 1 load opt-in SKIP; 27 Chrome client PASS (renderer đã chạy lại sau cập nhật assertion) và 30 Chrome online/JAR PASS. Giữ route hợp lệ 43 screen, NPC/readables, save cũ và ending cơ bản/Skip; loại 9 assets không còn dùng, import nội dung lặp lại cho cùng dữ liệu. Build, 72 links/anchors và diff check PASS. Crown profile server/Merge/sync thuộc checkbox tiếp theo; chưa thay schema/database cá nhân. |
 
 ## Lịch sử triển khai trước thay đổi kiến trúc
 

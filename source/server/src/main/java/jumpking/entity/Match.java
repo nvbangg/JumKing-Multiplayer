@@ -17,6 +17,8 @@ public class Match {
     private String roomCode;
     @Column(name = "mode", length = 16)
     private String mode;
+    @Column(name = "map_level", columnDefinition = "smallint", nullable = false)
+    private int mapLevel = 10;
     @Column(name = "time_limit_minutes", columnDefinition = "smallint")
     private Integer timeLimitMinutes;
     @JdbcTypeCode(SqlTypes.TIMESTAMP)
@@ -35,6 +37,8 @@ public class Match {
     public void setId(String value) { id = value; }
     public String getRoomCode() { return roomCode; }
     public void setRoomCode(String value) { roomCode = value; }
+    public int getMapLevel() { return mapLevel; }
+    public void setMapLevel(int value) { mapLevel = value; }
     public String getMode() { return mode; }
     public void setMode(String value) { mode = value; }
     public Integer getTimeLimitMinutes() { return timeLimitMinutes; }

@@ -4,7 +4,7 @@ export interface GameMap {
   tileSize: number;
   progressOriginY: number;
   spawn: { x: number; y: number };
-  finish: { screen: number; minCenterX: number; requiresGrounded: boolean };
+  finish: { screen: number; minCenterX: number; requiresGrounded: boolean; minProgress?: number };
   screens: { tiles: string[]; wind: boolean }[];
 }
 

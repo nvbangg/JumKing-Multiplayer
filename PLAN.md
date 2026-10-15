@@ -29,7 +29,7 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 ## Phase 04 — Room và map
 
 - [x] Triển khai Public/Private và Join Public; kiểm tra state/capacity và Join cạnh tranh.
-- [ ] Cấu hình 10 mốc Finish từ geometry chung, match map_level và kiểm thử tất cả spawn/route hợp lệ.
+- [x] Cấu hình 10 mốc Finish từ geometry chung, match map_level và kiểm thử tất cả spawn/route hợp lệ.
 - [ ] Hoàn thiện Lobby/History/Results/ending và best full-map theo độ dài; SQL nâng cấp giữ dữ liệu.
 
 ## Phase 05 — Chat và xếp hạng
@@ -76,6 +76,8 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 | Phase 03 — Crown profile | PASS — 66 client unit, 48 Java unit; 74 MySQL integration PASS và 1 load opt-in SKIP, flakes=0; 31 Chrome online/JAR, 27 client và 3 Fly dev PASS. Guest mang crown Solo sang Room; Account giữ crown trên thiết bị mới, không chuyển checkpoint. Merge/registration, retry và rollback cùng kết quả đã kiểm chứng. SQL nâng cấp đã áp dụng trên MySQL, giữ dữ liệu; build, links/anchors và diff check PASS. E2E dùng cờ Fly riêng, không sửa cấu hình cá nhân. |
 
 | Phase 04 — Public/Private | PASS — 66 client unit, 50 Java unit; 75 MySQL integration PASS và 1 load opt-in SKIP; Chrome online/JAR và 27 client E2E PASS. Public chỉ liệt kê Lobby còn chỗ; Private vẫn Join bằng ID. Kiểm chứng đổi visibility, quyền Host, Join/Start cạnh tranh và capacity; build/type-check, links và diff check PASS. |
+
+| Phase 04 — Mốc Finish | PASS — 77 client unit, 52 Java unit; 10 MySQL integration PASS. Replay hợp lệ từ spawn chuẩn tới cả 10 đích, không Fly/splat; đồng bộ prediction và server. Map ngắn không cấp crown/Best Finish Time/ending; lưu map_level, retry/conflict/restart và migration giữ dữ liệu đã kiểm chứng. Build/type-check và diff check PASS. Lobby/History hoàn thiện ở mốc tiếp theo; chưa chạy migration trên database cá nhân. |
 
 ## Lịch sử triển khai trước thay đổi kiến trúc
 

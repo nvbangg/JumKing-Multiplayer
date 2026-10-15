@@ -52,7 +52,7 @@ public final class Simulation {
         state.splat = 0; state.knocked = false; state.ice = false; state.snow = false; state.wind = false; cancelInput();
     }
     public double progress() { return Math.max(0, map.progressOriginY() - state.y - p.bodyHeight); }
-    public boolean finished() { return state.screen == map.finish().screen() && state.grounded && state.x + p.bodyWidth / 2.0 >= map.finish().minCenterX(); }
+    public boolean finished() { return state.screen == map.finish().screen() && state.grounded && state.x + p.bodyWidth / 2.0 >= map.finish().minCenterX() && progress() >= map.finish().minProgress(); }
     private int screenAt(double y) { return (int) clamp(-Math.floor(y / map.screenHeight()), 0, map.screens().size() - 1); }
 
     private static final class Contact {

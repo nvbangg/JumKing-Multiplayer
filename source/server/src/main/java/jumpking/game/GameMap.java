@@ -5,7 +5,7 @@ import java.util.List;
 public record GameMap(int width, int screenHeight, int tileSize, double progressOriginY,
     Spawn spawn, Finish finish, List<Screen> screens) {
     public record Spawn(double x, double y) {}
-    public record Finish(int screen, double minCenterX, boolean requiresGrounded) {}
+    public record Finish(int screen, double minCenterX, boolean requiresGrounded, double minProgress) {}
     public record Screen(List<String> tiles, boolean wind) {
         public Screen { tiles = List.copyOf(tiles); }
     }

@@ -7,6 +7,7 @@ import { PRESENTATION } from '../presentation/config';
 import rules from '../../../../common/rules.json';
 import { Prediction } from './Prediction';
 import { PeerInterpolation } from './PeerInterpolation';
+import { roomMap } from '../simulation/roomMaps';
 import { NETWORK } from '../../network/config';
 
 export interface OnlineSnapshot {
@@ -26,7 +27,7 @@ export class OnlineRuntime implements GameRuntime {
   private peers = new PeerInterpolation(PHYSICS.tickRate);
   constructor(map: GameMap, private socket: GameSocket, private room: RoomState, private readInput: () => PlayerInput,
     private changed: (state: PlayerState, snapshot: OnlineSnapshot) => void, flyAllowed: boolean, private failed: (message: string) => void = () => {}) {
-    this.game = new GameSimulation(map, flyAllowed, room.settings?.mode === 'NO_WALK');
+    this.game = new GameSimulation(room.kind === 'ROOM' ? roomMap(map, room.settings?.mapLevel ?? 10) : map, flyAllowed, room.settings?.mode === 'NO_WALK');
     this.prediction = new Prediction(this.game, NETWORK.maxInputFrames, room.settings?.mode === 'HARDCORE');
   }
   updateRoom(room: RoomState): void { this.room = room; }

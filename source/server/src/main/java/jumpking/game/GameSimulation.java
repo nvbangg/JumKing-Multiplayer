@@ -51,7 +51,7 @@ public final class GameSimulation {
         var movement = physics.tick(input);
         if (respawnOnSplat && movement.contains("SPLAT")) physics.respawn();
         var player = physics.snapshot(); var content = adventure.tick(player, input); var events = new ArrayList<WorldEvent>();
-        if (finished()) adventure.complete();
+        if (finished() && map.finish().screen() == map.screens().size() - 1) adventure.complete();
         double phase = player.ticks / (double) p.tickRate * p.windFrequency;
         double force = Math.max(-1, Math.min(1, 2 * Math.sin(phase) + (Math.cos(phase) > 0 ? 1 : -1))) * p.windAcceleration;
         world.put("weatherWind", player.wind ? world.path("weatherWind").asDouble() - force * 2 / 3 : 0).put("lastTick", player.ticks);

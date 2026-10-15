@@ -13,12 +13,22 @@ public class SharedData {
     private final JsonNode physics;
     private final JsonNode rules;
     private final JsonNode adventure;
+    private final java.util.List<RoomMap> roomMaps;
+    public record RoomMap(int level, String name, GameMap.Finish finish) {}
 
     public SharedData(ObjectMapper mapper) throws IOException {
         map = read(mapper, "maps/main-babe.json");
         physics = read(mapper, "physics.json");
         rules = read(mapper, "rules.json");
         adventure = read(mapper, "adventure.json");
+        roomMaps = java.util.List.copyOf(mapper.convertValue(read(mapper, "room-maps.json"), new com.fasterxml.jackson.core.type.TypeReference<java.util.List<RoomMap>>() {}));
+        if (roomMaps.size() != 10) throw new IOException("Expected ten Room lengths");
+        for (int index = 0; index < roomMaps.size(); index++) {
+            var goal = roomMaps.get(index);
+            if (goal.level() != index + 1 || goal.finish().screen() < 0 || goal.finish().screen() >= 43
+                    || !goal.finish().requiresGrounded() || !Double.isFinite(goal.finish().minProgress()) || goal.finish().minProgress() < 0
+                    || index > 0 && goal.finish().screen() <= roomMaps.get(index - 1).finish().screen()) throw new IOException("Invalid Room finish boundary");
+        }
         if (map.path("width").asInt() != 480 || map.path("screenHeight").asInt() != 360 || map.path("tileSize").asInt() != 8
             || map.path("screens").size() != 43 || map.path("finish").path("screen").asInt() != 42) throw new IOException("Invalid Main Babe geometry");
         for (JsonNode screen : map.path("screens")) {
@@ -31,6 +41,12 @@ public class SharedData {
         try (var stream = new ClassPathResource("shared/" + name).getInputStream()) { return mapper.readTree(stream); }
     }
     public JsonNode map() { return map.deepCopy(); }
+    public GameMap roomMap(int level, ObjectMapper mapper) {
+        if (level < 1 || level > roomMaps.size()) throw new IllegalArgumentException("Invalid Room map level");
+        var original = mapper.convertValue(map, GameMap.class);
+        return new GameMap(original.width(), original.screenHeight(), original.tileSize(), original.progressOriginY(), original.spawn(), roomMaps.get(level - 1).finish(), original.screens());
+    }
+    public java.util.List<RoomMap> roomMaps() { return roomMaps; }
     public JsonNode physics() { return physics.deepCopy(); }
     public JsonNode rules() { return rules.deepCopy(); }
     public JsonNode adventure() { return adventure.deepCopy(); }

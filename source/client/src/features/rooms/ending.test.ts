@@ -14,4 +14,6 @@ test('only a finishing winner waits for the committed ending and can return to R
   expect(roomFinishScreen(result, 'winner', 'match')).toBe('results');
   expect(roomFinishScreen({ ...result, reason: 'TIME_LIMIT' }, 'winner', null)).toBe('results');
   expect(roomFinishScreen({ ...result, saveStatus: 'FAILED' }, 'winner', null)).toBe('results');
+  for (let mapLevel = 1; mapLevel < 10; mapLevel++) expect(roomFinishScreen({ ...result, mapLevel }, 'winner', null)).toBe('results');
+  expect(roomFinishScreen({ ...result, mapLevel: 10 }, 'winner', null)).toBe('online');
 });

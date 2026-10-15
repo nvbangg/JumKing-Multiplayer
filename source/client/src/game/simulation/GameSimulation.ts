@@ -31,7 +31,7 @@ export class GameSimulation {
     if (respawnOnSplat && movement.includes('SPLAT')) this.physics.respawn();
     const player = this.physics.snapshot(), events: WorldEvent[] = [];
     const adventure: AdventureEvent[] = this.adventure.tick(player, input);
-    if (this.physics.finished) this.adventure.complete();
+    if (this.physics.finished && this.map.finish.screen === this.map.screens.length - 1) this.adventure.complete();
     const phase = player.ticks / P.tickRate * P.windFrequency;
     const force = Math.max(-1, Math.min(1, 2 * Math.sin(phase) + (Math.cos(phase) > 0 ? 1 : -1))) * P.windAcceleration;
     this.world.weatherWind = player.wind ? this.world.weatherWind - force * 2 / 3 : 0;

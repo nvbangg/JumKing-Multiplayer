@@ -49,7 +49,7 @@ Các path có prefix `/api`. Auth/private responses dùng Cache-Control:no-store
 
 HTTP JSON body tối đa 16 KiB. Register: username 3–32 letters/numbers/_/-, email hợp lệ ≤254 ký tự, password ≥10 Unicode code points và ≤72 UTF-8 bytes. Nickname Room trim, 1–16 letters/marks/numbers/space/_/-, cho phép trùng; playerId phân biệt người chơi.
 
-GameMap={width,screenHeight,tileSize,progressOriginY,spawn,finish,screens}; spawn={x,y}, finish={screen,minCenterX,requiresGrounded}, screen={tiles:string[],wind:boolean}.
+GameMap={width,screenHeight,tileSize,progressOriginY,spawn,finish,screens}; spawn={x,y}, finish={screen,minCenterX,requiresGrounded,minProgress?}, screen={tiles:string[],wind:boolean}. minProgress mặc định 0; Room thay finish theo mapLevel trong shared, không thay geometry.
 
 game-config trả tuning/rules từ shared; appearances=[{colorSlot,color}] ánh xạ slot sang màu hex. features do server quyết định theo cấu hình/profile, không nhận từ client.
 
@@ -110,7 +110,7 @@ Giới hạn mặc định tập trung tại cấu hình network của backend, 
 | JOIN_ROOM | {roomId,nickname?} → vào đúng Community/Room theo ID |
 | LEAVE_ROOM | {} → Community flush checkpoint; Room Leave/DNF |
 | GET_ROOM_STATE | {} → state hiện hành hoặc null khi đã rời |
-| UPDATE_ROOM_SETTINGS | {mode,timeLimitMinutes,mapLevel,visibility?}; Host/WAITING; có thể chỉ đổi visibility |
+| UPDATE_ROOM_SETTINGS | {mode,timeLimitMinutes,mapLevel,visibility?}; Host/WAITING; có thể chỉ đổi visibility hoặc mapLevel |
 | START_GAME / END_MATCH | {}; quyền, roster và lifecycle theo gameplay; kiểm tra khi xử lý command |
 | PLAY_AGAIN | {matchId}; mỗi thành viên xác nhận sau match vừa kết thúc, kể cả khi phòng đã về WAITING |
 | SET_ROOM_PAUSED | {playId,paused:boolean}; Host, PLAYING/PAUSED; sai trận bị từ chối |
@@ -146,7 +146,7 @@ Client nhận diện nhấn đúp khi Fly Mode được bật và gửi freeFlig
 | PLAYER_EFFECTS | {roomId,events:[{eventSeq,playerId,playId,screen,effect,terrain}]} |
 | ADVENTURE_EVENTS | {roomId,playId,events:[{eventSeq,kind,type,id}]}; chỉ owner, kind=ADVENTURE/WORLD, nội dung hiển thị tra tại client |
 | PLAYER_FINISHED | {playerId,playId,result,showEnding,ending:{screen}}; sau commit, riêng người Finish ở Community hoặc winners ở Room; result tương ứng RunSummary/MatchResult |
-| GAME_FINISHED | {playId,reason,durationMs,results,saveStatus}; Room broadcast |
+| GAME_FINISHED | {playId,mapLevel,reason,durationMs,results,saveStatus}; Room broadcast |
 | SAVE_STATUS | {playId,revision,saveStatus}; chỉ owner checkpoint hoặc members của match |
 | CHAT_MESSAGE / CHAT_HISTORY | {roomId,messages:[{id,playerId,nickname,text,sentAt,colorSlot}]}; client bỏ chat từ sảnh cũ |
 | RECONNECT_OK | {roomId,playerId,generation,playId}; sau đó full state |

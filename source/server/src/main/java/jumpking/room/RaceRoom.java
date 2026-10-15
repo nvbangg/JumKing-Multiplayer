@@ -108,13 +108,19 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
                 case "UPDATE_ROOM_SETTINGS" -> {
                     if (!player.id.equals(room.host)) throw new ApiException(403, "FORBIDDEN", "Only the Host can change settings");
                     if (!room.state.equals("WAITING")) throw new ApiException(409, "CONFLICT", "Settings can only change in the Lobby");
-                    GameEnvelope.fields(command.payload(), Set.of("mode", "timeLimitMinutes", "visibility"));
+                    GameEnvelope.fields(command.payload(), Set.of("mode", "timeLimitMinutes", "mapLevel", "visibility"));
                     if (command.payload().isEmpty()) throw GameEnvelope.invalid();
                     var settingsInput = ((ObjectNode) command.payload()).deepCopy(); settingsInput.remove("visibility");
+                    if (!settingsInput.isEmpty()) {
+                        if (!settingsInput.has("mapLevel")) settingsInput.put("mapLevel", room.settings.mapLevel());
+                        if (!settingsInput.has("mode") && !settingsInput.has("timeLimitMinutes")) {
+                            settingsInput.put("mode", room.settings.mode()); settingsInput.set("timeLimitMinutes", json.valueToTree(room.settings.timeLimitMinutes()));
+                        }
+                    }
                     var settings = settingsInput.isEmpty() ? room.settings : RoomSettings.parse(settingsInput, rules);
                     String visibility = command.payload().has("visibility") ? visibility(command.payload()) : room.visibility;
                     room.settings = settings; room.visibility = visibility;
-                    directory.describeRoom(room.id, visibility, settings.mode());
+                    directory.describeRoom(room.id, visibility, settings.mode(), settings.mapLevel());
                     connection.reply(command, "ROOM_STATE", state(room)); broadcast(room);
                 }
                 case "START_GAME" -> { GameEnvelope.fields(command.payload(), Set.of()); start(room, player); connection.reply(command, "ROOM_STATE", state(room)); }
@@ -172,7 +178,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
                     memberships.release(player.identity.owner(), new Memberships.Membership(room.id, player.id)); directory.release(slot);
                     connection.error(command, new ApiException(409, "ROOM_NOT_JOINABLE", "This room is not accepting new players")); return;
                 }
-                if (create) { room.settings = settings; room.visibility = visibility; directory.describeRoom(room.id, visibility, settings.mode()); }
+                if (create) { room.settings = settings; room.visibility = visibility; directory.describeRoom(room.id, visibility, settings.mode(), settings.mapLevel()); }
                 room.players.put(player.id, player); if (!connection.open()) { player.connection = null; player.disconnectedAt = time.nanos(); }
                 chooseHost(room); connection.reply(command, "ROOM_JOINED", joined(room, player)); broadcast(room); chatHistory(room, player);
             }); } catch (RuntimeException error) { memberships.release(player.identity.owner(), new Memberships.Membership(room.id, player.id)); throw error; }

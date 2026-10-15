@@ -63,7 +63,7 @@ export class Simulation {
   get progress(): number { return Math.max(0, this.map.progressOriginY - this.state.y - P.bodyHeight); }
   get finished(): boolean {
     return this.state.screen === this.map.finish.screen && this.state.grounded
-      && this.state.x + P.bodyWidth / 2 >= this.map.finish.minCenterX;
+      && this.state.x + P.bodyWidth / 2 >= this.map.finish.minCenterX && this.progress >= (this.map.finish.minProgress ?? 0);
   }
 
   private screenAt(y: number): number { return clamp(-Math.floor(y / this.map.screenHeight), 0, this.map.screens.length - 1); }

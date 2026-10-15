@@ -17,7 +17,7 @@ public class RoomDirectory {
     public record PublicRoom(String roomId, String mode, int mapLevel, int playerCount, int capacity) {}
     private static class Entry {
         final String kind; final BitSet slots = new BitSet(); boolean joinable = true;
-        String visibility = "PRIVATE", mode = "RACE";
+        String visibility = "PRIVATE", mode = "RACE"; int mapLevel = RoomSettings.FULL_MAP_LEVEL;
         Entry(String kind) { this.kind = kind; }
     }
     private final Map<String, Entry> entries = new HashMap<>();
@@ -34,11 +34,11 @@ public class RoomDirectory {
             var entry = value.getValue();
             return entry.kind.equals("ROOM") && entry.visibility.equals("PUBLIC") && entry.joinable && entry.slots.cardinality() < capacity;
         }).sorted(Map.Entry.comparingByKey()).map(value -> new PublicRoom(value.getKey(), value.getValue().mode,
-            RoomSettings.FULL_MAP_LEVEL, value.getValue().slots.cardinality(), capacity)).toList();
+            value.getValue().mapLevel, value.getValue().slots.cardinality(), capacity)).toList();
     }
-    public synchronized void describeRoom(String id, String visibility, String mode) {
+    public synchronized void describeRoom(String id, String visibility, String mode, int mapLevel) {
         var entry = entries.get(id);
-        if (entry != null && entry.kind.equals("ROOM")) { entry.visibility = visibility; entry.mode = mode; }
+        if (entry != null && entry.kind.equals("ROOM")) { entry.visibility = visibility; entry.mode = mode; entry.mapLevel = mapLevel; }
     }
     public synchronized Slot community(String requested) {
         String id = requested;

@@ -121,7 +121,7 @@ Progress = max(0, originFeetY−feetY); peak là progress cao nhất từng đ�
 
 ### Độ dài Room
 
-Có 10 mốc Finish tăng dần từ chân tháp; map 10 là Main Babe đầy đủ. Dữ liệu mốc theo vùng nằm trong shared, dùng chung geometry; mỗi đích yêu cầu grounded trên nền hợp lệ. Host chọn trước Start, settings giữ khi Play Again. Map 1–9 chỉ Results, map 10 giữ ending. History lưu map của trận; Best Finish Time chỉ tính full map. Mốc chỉ được nghiệm thu sau replay hợp lệ và kiểm tra tất cả spawn.
+Có 10 mốc Finish tăng dần từ chân tháp; map 10 là Main Babe đầy đủ. `source/common/room-maps.json` xác định screen, progress tối thiểu và yêu cầu grounded trên nền của từng vùng; dùng nguyên geometry/spawn. Map 10 giữ đích gốc. Host chọn trước Start, settings giữ khi Play Again. Map 1–9 chỉ Results, map 10 giữ ending. History lưu map của trận; Best Finish Time chỉ tính full map. Kiểm chứng các mốc bằng replay input hợp lệ từ spawn chuẩn ở cả hai simulation.
 
 ## Leave và reconnect online
 

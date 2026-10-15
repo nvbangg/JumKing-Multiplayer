@@ -44,7 +44,7 @@ final class RoomMatch {
         if (roster.size() < shared.rules().path("minimumRoomPlayers").asInt() || roster.size() > shared.rules().path("capacity").asInt()
                 || roster.stream().map(Spec::playerId).distinct().count() != roster.size()) throw new IllegalArgumentException("Invalid Room roster");
         this.roomId = roomId; this.settings = settings;
-        var map = json.convertValue(shared.map(), GameMap.class);
+        var map = shared.roomMap(settings.mapLevel(), json);
         var physics = new Physics(json.convertValue(shared.physics(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Number>>() {})); tickRate = physics.tickRate;
         limitTicks = settings.mode().equals("TIME_LIMIT") ? settings.timeLimitMinutes() * 60L * tickRate : 0;
         JsonNode adventure = shared.adventure();
@@ -65,7 +65,7 @@ final class RoomMatch {
             if (progress > player.maximum) { player.maximum = progress; player.peak = player.game.physics().snapshot().ticks; }
             if (player.game.finished()) {
                 player.status = "FINISHED"; player.finish = ticks;
-                player.ending = Map.of("screen", player.game.physics().snapshot().screen);
+                if (settings.mapLevel() == RoomSettings.FULL_MAP_LEVEL) player.ending = Map.of("screen", player.game.physics().snapshot().screen);
             }
         }
         if (players.values().stream().anyMatch(player -> player.finish != null)) finish("FINISH", instant);
@@ -92,14 +92,14 @@ final class RoomMatch {
             var pose = player.game.physics().snapshot();
             return new RoomRuns.Run(player.runId, player.spec.owner, player.spec.nickname, player.status, pose.ticks, pose.jumps, pose.falls, player.game.physics().progress(), player.maximum, player.peak, player.finish, player.rank, player.winner, player.endedAt);
         }).toList();
-        return new RoomRuns.Write(id, roomId, settings.mode(), settings.timeLimitMinutes(), revision, startedAt, endedAt, ticks, reason, runs);
+        return new RoomRuns.Write(id, roomId, settings.mode(), settings.timeLimitMinutes(), settings.mapLevel(), revision, startedAt, endedAt, ticks, reason, runs);
     }
     Map<String, Object> results() {
         var rows = players.values().stream().sorted(Comparator.comparingInt((Player player) -> player.rank == null ? Integer.MAX_VALUE : player.rank).thenComparing(player -> player.spec.playerId)).map(player -> {
             var row = new LinkedHashMap<String, Object>(); row.put("playerId", player.spec.playerId); row.put("nickname", player.spec.nickname); row.put("status", player.status); row.put("rank", player.rank);
             row.put("currentProgress", player.game.physics().progress()); row.put("maxProgress", player.maximum); row.put("isWinner", player.winner); row.put("finishTimeMs", player.finish == null ? null : ms(player.finish)); return row;
         }).toList();
-        return Map.of("playId", id, "reason", reason, "durationMs", ms(ticks), "results", rows, "saveStatus", saveStatus);
+        return Map.of("playId", id, "reason", reason, "mapLevel", settings.mapLevel(), "durationMs", ms(ticks), "results", rows, "saveStatus", saveStatus);
     }
     long ms(long ticks) { return ticks / tickRate * 1000 + ticks % tickRate * 1000 / tickRate; }
     Long remainingMs() { return limitTicks == 0 ? null : ms(Math.max(0, limitTicks - ticks)); }

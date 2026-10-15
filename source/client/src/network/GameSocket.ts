@@ -24,14 +24,14 @@ export interface RoomMember { playerId: string; nickname: string; username: stri
 export interface RoomState {
   visibility?: 'PRIVATE' | 'PUBLIC';
   roomId: string; kind: 'ROOM' | 'COMMUNITY'; state: 'WAITING' | 'COUNTDOWN' | 'PLAYING' | 'PAUSED' | 'FINISHED';
-  hostPlayerId: string | null; settings: { mode: string; timeLimitMinutes: number | null } | null; members: RoomMember[];
+  hostPlayerId: string | null; settings: { mode: string; timeLimitMinutes: number | null; mapLevel?: number } | null; members: RoomMember[];
   currentPlay: Record<string, unknown> | null; result: unknown; pauseExpiresAt: string | null;
 }
 export interface ResultRow {
   playerId: string; nickname: string; status: string; rank: number; currentProgress: number;
   maxProgress: number; isWinner: boolean; finishTimeMs: number | null;
 }
-export interface MatchResult { playId: string; reason: string; durationMs: number; results: ResultRow[]; saveStatus: 'PENDING' | 'SAVED' | 'FAILED' }
+export interface MatchResult { mapLevel?: number; playId: string; reason: string; durationMs: number; results: ResultRow[]; saveStatus: 'PENDING' | 'SAVED' | 'FAILED' }
 export class GameSocket {
   private socket: WebSocket | null = null;
   private heartbeat: ReturnType<typeof setInterval> | null = null;

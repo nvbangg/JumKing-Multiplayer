@@ -14,8 +14,26 @@ class RoomMatchTest {
     private final SharedData shared;
     RoomMatchTest() throws Exception { shared = new SharedData(json); }
     private RoomMatch match() {
+        return match(RoomSettings.defaults());
+    }
+    private RoomMatch match(RoomSettings settings) {
         var limits = new NetworkSettings(30, 2, 32, 256, 64, 20, 16_384, 120, 120, 64, 240, 4, 8, 5000, 30000, 500, 60, 200, 50, 1000);
-        return new RoomMatch("ABCDEF", RoomSettings.defaults(), List.of(new RoomMatch.Spec("first", 1, "First", 0, 1), new RoomMatch.Spec("second", 2, "Second", 1, 1)), shared, json, limits, false);
+        return new RoomMatch("ABCDEF", settings, List.of(new RoomMatch.Spec("first", 1, "First", 0, 1), new RoomMatch.Spec("second", 2, "Second", 1, 1)), shared, json, limits, false);
+    }
+    @Test void everyLengthFinalizesOnItsOwnLandingAndOnlyFullMapOffersAnEnding() throws Exception {
+        com.fasterxml.jackson.databind.JsonNode checkpoints;
+        try (var input = new org.springframework.core.io.ClassPathResource("fixtures/main-babe-checkpoints.json").getInputStream()) { checkpoints = json.readTree(input); }
+        for (var goal : shared.roomMaps()) {
+            var point = java.util.stream.StreamSupport.stream(checkpoints.spliterator(), false).filter(state -> state.path("grounded").asBoolean()
+                && state.path("screen").asInt() == goal.finish().screen() && 302 - state.path("y").asDouble() >= goal.finish().minProgress()
+                && state.path("x").asDouble() + 9 >= goal.finish().minCenterX()).findFirst().orElseThrow();
+            var match = match(new RoomSettings("RACE", null, goal.level())); var now = Instant.parse("2026-01-01T00:00:00Z"); match.start(now);
+            for (var player : match.players.values()) player.game.physics().restore(json.treeToValue(point, PlayerState.class));
+            match.ticks = point.path("ticks").asLong(); match.tick(1_000_000_000L, now.plusSeconds(300));
+            assertThat(match.reason).as("map %s", goal.level()).isEqualTo("FINISH");
+            assertThat(match.results().get("mapLevel")).isEqualTo(goal.level());
+            for (var player : match.players.values()) assertThat(player.ending != null).isEqualTo(goal.level() == 10);
+        }
     }
     @Test void roomClockAndDisconnectedPhysicsAreAuthoritativeWhileDnfMetricsFreeze() {
         var match = match(); var start = Instant.parse("2026-01-01T00:00:00Z"); match.start(start);

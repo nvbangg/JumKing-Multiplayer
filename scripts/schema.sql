@@ -29,12 +29,14 @@ CREATE TABLE matches (
     id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
     room_code CHAR(6) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
     mode VARCHAR(16) NOT NULL,
+    map_level SMALLINT NOT NULL DEFAULT 10,
     time_limit_minutes SMALLINT NULL,
     started_at DATETIME(3) NOT NULL,
     ended_at DATETIME(3) NULL,
     duration_ticks BIGINT NOT NULL DEFAULT 0,
     end_reason VARCHAR(32) NULL,
     PRIMARY KEY (id),
+    CONSTRAINT ck_matches_map_level CHECK (map_level BETWEEN 1 AND 10),
     CONSTRAINT ck_matches_mode CHECK (
         (mode IN ('RACE', 'HARDCORE', 'NO_WALK') AND time_limit_minutes IS NULL)
         OR (mode = 'TIME_LIMIT' AND time_limit_minutes IS NOT NULL AND time_limit_minutes BETWEEN 1 AND 30)

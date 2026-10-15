@@ -38,10 +38,10 @@ public class RecordsRepository {
     public Statistics statistics(long owner) {
         var row = (Tuple) entityManager.createNativeQuery("""
             SELECT COALESCE(SUM(play_ticks),0) AS ticks,COALESCE(SUM(jumps),0) AS jumps,COALESCE(SUM(falls),0) AS falls,
-              COALESCE(SUM(status='FINISHED'),0) AS finishes,MIN(finish_ticks) AS best,
+              COALESCE(SUM(status='FINISHED'),0) AS finishes,MIN(CASE WHEN kind<>'ROOM' OR m.map_level=10 THEN finish_ticks END) AS best,
               COUNT(DISTINCT CASE WHEN kind='ROOM' THEN match_id END) AS matches,
               COUNT(DISTINCT CASE WHEN kind='ROOM' AND is_winner=TRUE THEN match_id END) AS wins
-            FROM play_runs WHERE user_id=:owner
+            FROM play_runs p LEFT JOIN matches m ON m.id=p.match_id WHERE p.user_id=:owner
             """, Tuple.class).setParameter("owner", owner).getSingleResult();
         var ticks = new BigDecimal(row.get("ticks").toString()).toBigIntegerExact();
         return new Statistics(ticks.multiply(BigInteger.valueOf(1000)).divide(BigInteger.valueOf(tickRate)), number(row, "jumps"), number(row, "falls"), number(row, "finishes"), number(row, "matches"), number(row, "wins"), optionalMs(row, "best"));

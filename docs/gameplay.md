@@ -141,7 +141,7 @@ Chỉ triển khai Main Babe; không mở rộng campaign/DLC khác.
 
 Giữ NPC/hội thoại, bảng/sách/nhật ký và môi trường Main Babe; đọc/hội thoại không trực tiếp yêu cầu Pause. Không có Inventory, nhặt/mua vật phẩm hoặc quest nhận đồ. Loại hội thoại/trigger phụ thuộc đồ đã bỏ; dùng một ending cơ bản không credit.
 
-Hoàn thành full map ở Solo/Community/Room map 10 tự mở vương miện cho các lượt sau. Account lưu server, Guest lưu profile trình duyệt; Merge giữ trạng thái đã mở. Room ngắn không mở vương miện. Solo do client khai báo chỉ cấp ngoại hình, không làm bằng chứng leaderboard. Mỗi phòng tối đa 10 màu khác nhau, giữ khi reconnect; self opacity=1 ở trên peers opacity=0.7, có nickname rõ và hội thoại vẽ trên tên.
+Hoàn thành full map ở Solo/Community/Room map 10 tự mở vương miện cho các lượt sau. Account lưu server, Guest lưu profile trình duyệt; Merge giữ trạng thái đã mở. Room ngắn không mở vương miện. Solo do client khai báo chỉ cấp ngoại hình, không làm bằng chứng leaderboard. Màu của mỗi người nhất quán trên mọi client; bản thân opacity=1 và vẽ trên peers opacity=0.7. Nickname rõ và hội thoại vẽ trên tên.
 
 Ending giữ cảnh/nhạc/ảnh kết thúc và Skip, bỏ credit. Solo Finish phát ending; Community chỉ người Finish xem; Room chỉ winners xem, người khác tới Results. End/timeout chưa có Finish không phát ending. Ending không đổi kết quả/thời gian, xử lý một lần theo runId/matchId và hủy khi chuyển lượt.
 

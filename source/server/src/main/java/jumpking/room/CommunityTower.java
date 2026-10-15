@@ -86,12 +86,8 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
     this.checkpointMs = checkpointMs;
     if (checkpointMs < 1)
       throw new IllegalArgumentException("Checkpoint interval must be positive");
-    map = json.convertValue(shared.map(), GameMap.class);
-    physics =
-        new Physics(
-            json.convertValue(
-                shared.physics(),
-                new com.fasterxml.jackson.core.type.TypeReference<Map<String, Number>>() {}));
+    map = shared.geometry();
+    physics = shared.tuning();
     adventure = shared.adventure();
     rules = shared.rules();
   }

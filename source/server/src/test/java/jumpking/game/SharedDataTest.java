@@ -1,11 +1,28 @@
 package jumpking.game;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 class SharedDataTest {
+  @Test
+  void sharedDefinitionsAreImmutableAndPlayersKeepIndependentState() throws Exception {
+    var data = new SharedData(new ObjectMapper());
+    var map = data.roomMap(1);
+    assertThatThrownBy(() -> map.screens().clear())
+        .isInstanceOf(UnsupportedOperationException.class);
+    assertThatThrownBy(() -> map.screens().getFirst().tiles().clear())
+        .isInstanceOf(UnsupportedOperationException.class);
+    var first = new Simulation(map, data.tuning(), false, false);
+    var second = new Simulation(map, data.tuning(), false, false);
+    var unchanged = second.snapshot();
+    first.tick(new PlayerInput(false, true, false));
+    assertThat(second.snapshot()).usingRecursiveComparison().isEqualTo(unchanged);
+    assertThat(first.snapshot().ticks).isEqualTo(1);
+  }
+
   @Test
   void loadsSharedFromClasspathAndDoesNotExposeMutableDefinitions() throws Exception {
     var data = new SharedData(new ObjectMapper());

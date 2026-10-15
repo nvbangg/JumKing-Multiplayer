@@ -1,7 +1,6 @@
 package jumpking.room;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.*;
 import jumpking.config.NetworkSettings;
@@ -54,7 +53,6 @@ final class RoomMatch {
       RoomSettings settings,
       List<Spec> roster,
       SharedData shared,
-      ObjectMapper json,
       NetworkSettings limits,
       boolean flyAllowed) {
     if (roster.size() < shared.rules().path("minimumRoomPlayers").asInt()
@@ -63,12 +61,8 @@ final class RoomMatch {
       throw new IllegalArgumentException("Invalid Room roster");
     this.roomId = roomId;
     this.settings = settings;
-    var map = shared.roomMap(settings.mapLevel(), json);
-    var physics =
-        new Physics(
-            json.convertValue(
-                shared.physics(),
-                new com.fasterxml.jackson.core.type.TypeReference<Map<String, Number>>() {}));
+    var map = shared.roomMap(settings.mapLevel());
+    var physics = shared.tuning();
     tickRate = physics.tickRate;
     limitTicks =
         settings.mode().equals("TIME_LIMIT") ? settings.timeLimitMinutes() * 60L * tickRate : 0;

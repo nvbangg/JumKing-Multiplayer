@@ -278,8 +278,7 @@ class OnlineWorkloadIT {
                       new RoomMatch.Spec(
                           "player-" + index, index + 1L, "Player " + index, index, 1))
               .toList();
-      var match =
-          new RoomMatch("ABCDEF", RoomSettings.defaults(), roster, shared, json, limits, false);
+      var match = new RoomMatch("ABCDEF", RoomSettings.defaults(), roster, shared, limits, false);
       var instant = Instant.parse("2026-01-01T00:00:00Z");
       match.start(instant);
       var samples = new ArrayList<Double>();

@@ -22,7 +22,7 @@ class RoomMapsTest {
       route = json.readTree(input);
     }
     for (var goal : shared.roomMaps()) {
-      var map = shared.roomMap(goal.level(), json);
+      var map = shared.roomMap(goal.level());
       var game = new GameSimulation(map, physics, shared.adventure(), false, false);
       java.util.function.Consumer<PlayerInput> step =
           input -> {
@@ -60,7 +60,7 @@ class RoomMapsTest {
       game.physics().restore(state);
       assertThat(game.finished()).isFalse();
     }
-    assertThatThrownBy(() -> shared.roomMap(0, json)).isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> shared.roomMap(11, json)).isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> shared.roomMap(0)).isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> shared.roomMap(11)).isInstanceOf(IllegalArgumentException.class);
   }
 }

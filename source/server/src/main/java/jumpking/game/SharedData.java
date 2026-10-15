@@ -3,6 +3,8 @@ package jumpking.game;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
@@ -13,7 +15,10 @@ public class SharedData {
   private final JsonNode physics;
   private final JsonNode rules;
   private final JsonNode adventure;
-  private final java.util.List<RoomMap> roomMaps;
+  private final List<RoomMap> roomMaps;
+  private final GameMap geometry;
+  private final Physics tuning;
+  private final List<GameMap> playableMaps;
 
   public record RoomMap(int level, String name, GameMap.Finish finish) {}
 
@@ -23,10 +28,10 @@ public class SharedData {
     rules = read(mapper, "rules.json");
     adventure = read(mapper, "adventure.json");
     roomMaps =
-        java.util.List.copyOf(
+        List.copyOf(
             mapper.convertValue(
                 read(mapper, "room-maps.json"),
-                new com.fasterxml.jackson.core.type.TypeReference<java.util.List<RoomMap>>() {}));
+                new com.fasterxml.jackson.core.type.TypeReference<List<RoomMap>>() {}));
     if (roomMaps.size() != 10) throw new IOException("Expected ten Room lengths");
     for (int index = 0; index < roomMaps.size(); index++) {
       var goal = roomMaps.get(index);
@@ -61,6 +66,26 @@ public class SharedData {
             || row.textValue().length() != 60
             || !row.textValue().matches("[ #INabcd]+")) throw new IOException("Invalid terrain");
     }
+    geometry = mapper.convertValue(map, GameMap.class);
+    tuning =
+        new Physics(
+            mapper.convertValue(
+                physics,
+                new com.fasterxml.jackson.core.type.TypeReference<Map<String, Number>>() {}));
+    // Định nghĩa bất biến dùng chung; state của mỗi người thuộc simulation riêng.
+    playableMaps =
+        roomMaps.stream()
+            .map(
+                goal ->
+                    new GameMap(
+                        geometry.width(),
+                        geometry.screenHeight(),
+                        geometry.tileSize(),
+                        geometry.progressOriginY(),
+                        geometry.spawn(),
+                        goal.finish(),
+                        geometry.screens()))
+            .toList();
   }
 
   private JsonNode read(ObjectMapper mapper, String name) throws IOException {
@@ -73,21 +98,21 @@ public class SharedData {
     return map.deepCopy();
   }
 
-  public GameMap roomMap(int level, ObjectMapper mapper) {
-    if (level < 1 || level > roomMaps.size())
-      throw new IllegalArgumentException("Invalid Room map level");
-    var original = mapper.convertValue(map, GameMap.class);
-    return new GameMap(
-        original.width(),
-        original.screenHeight(),
-        original.tileSize(),
-        original.progressOriginY(),
-        original.spawn(),
-        roomMaps.get(level - 1).finish(),
-        original.screens());
+  public GameMap geometry() {
+    return geometry;
   }
 
-  public java.util.List<RoomMap> roomMaps() {
+  public Physics tuning() {
+    return tuning;
+  }
+
+  public GameMap roomMap(int level) {
+    if (level < 1 || level > roomMaps.size())
+      throw new IllegalArgumentException("Invalid Room map level");
+    return playableMaps.get(level - 1);
+  }
+
+  public List<RoomMap> roomMaps() {
     return roomMaps;
   }
 

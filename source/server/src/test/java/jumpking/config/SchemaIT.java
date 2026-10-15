@@ -32,7 +32,9 @@ class SchemaIT {
     properties.add("spring.datasource.password", db::getPassword);
   }
 
-  @org.springframework.beans.factory.annotation.Autowired SchemaValidator schema;
+  @org.springframework.beans.factory.annotation.Autowired
+  jumpking.repository.SchemaRepository schema;
+
   private static JdbcTemplate jdbc;
   private static DriverManagerDataSource dataSource;
 

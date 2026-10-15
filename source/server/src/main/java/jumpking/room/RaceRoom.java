@@ -166,7 +166,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
                 }
               },
               0,
-              1_000_000_000L / shared.physics().path("tickRate").asInt(),
+              1_000_000_000L / shared.tuning().tickRate,
               TimeUnit.NANOSECONDS);
     }
   }
@@ -627,8 +627,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
                         player.slot.color(),
                         ++player.generation))
             .toList();
-    room.match =
-        new RoomMatch(room.id, room.settings, specs, shared, json, limits, flags.flyEnabled());
+    room.match = new RoomMatch(room.id, room.settings, specs, shared, limits, flags.flyEnabled());
     room.writer = database.writer(records::save);
     for (var player : roster)
       if (player.crowned) room.match.players.get(player.id).game.adventure().complete();

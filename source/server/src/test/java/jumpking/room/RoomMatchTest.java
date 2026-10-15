@@ -34,7 +34,6 @@ class RoomMatchTest {
             new RoomMatch.Spec("first", 1, "First", 0, 1),
             new RoomMatch.Spec("second", 2, "Second", 1, 1)),
         shared,
-        json,
         limits,
         false);
   }

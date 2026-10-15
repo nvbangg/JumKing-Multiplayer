@@ -21,7 +21,7 @@ public class RecordsRepository {
 
   public RecordsRepository(EntityManager entityManager, SharedData shared) {
     this.entityManager = entityManager;
-    tickRate = shared.physics().path("tickRate").asInt();
+    tickRate = shared.tuning().tickRate;
   }
 
   // Sau Merge, một owner có thể có nhiều lượt cùng match: History chỉ chọn một dòng đại diện.

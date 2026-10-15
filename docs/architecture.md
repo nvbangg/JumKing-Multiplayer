@@ -89,7 +89,7 @@ Frontend nhóm màn hình/hooks theo feature. `game` giữ simulation/input/pres
 
 Phaser tải assets giữ nguyên tên từ `public/assets`; tài nguyên UI được import đặt cạnh component/feature trong `src`.
 
-Dữ liệu common đóng gói vào cả hai build; backend nạp từ classpath, không phụ thuộc source khi chạy JAR. Client online dùng map/config server công bố và luật adventure cùng bản phát hành. Nội dung frontend liên kết bằng ID; common không chứa lời thoại/font/đường dẫn assets. URL/secrets theo [deployment](deployment.md).
+Dữ liệu common đóng gói vào cả hai build; backend nạp và kiểm tra map/tuning bất biến một lần từ classpath, các simulation dùng chung định nghĩa và giữ state riêng. Client online dùng map/config server công bố và luật adventure cùng bản phát hành. Nội dung frontend liên kết bằng ID; common không chứa lời thoại/font/đường dẫn assets. URL/secrets theo [deployment](deployment.md).
 
 Profile web đóng gói frontend vào JAR. Static files được browser lưu và revalidate bằng Last-Modified; API giữ no-store. SPA fallback index.html chỉ áp dụng route UI, không áp dụng API/WS/asset thiếu.
 

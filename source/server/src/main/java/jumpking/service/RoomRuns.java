@@ -37,12 +37,11 @@ public class RoomRuns {
         owners.writeAll(write.runs.stream().map(Run::owner).toList(), ownership -> {
             var next = write.runs.stream().map(run -> run.owned(ownership.get(run.owner))).toList();
             var matchEntity = matchRepository.lockById(write.id).orElse(null);
-            var matches = matchEntity == null ? List.<Match>of() : List.of(matchView(matchEntity));
+            var previous = matchEntity == null ? null : matchView(matchEntity);
             var entities = runRepository.lockByMatchId(write.id);
             var old = stored(entities);
             var desired = new Match(write.roomCode, write.mode, write.minutes, write.mapLevel, write.startedAt, write.endedAt, write.duration, write.reason);
-            if (!matches.isEmpty()) {
-                var previous = matches.getFirst();
+            if (previous != null) {
                 if (!previous.roomCode.equals(write.roomCode) || !previous.mode.equals(write.mode) || !Objects.equals(previous.minutes, write.minutes) || previous.mapLevel != write.mapLevel || !previous.startedAt.equals(write.startedAt) || old.size() != next.size()) throw conflict();
                 var byId = new HashMap<String, Stored>(); old.forEach(value -> byId.put(value.run.id, value));
                 for (var run : next) { var value = byId.get(run.id); if (value == null || value.run.owner != run.owner || !value.run.nickname.equals(run.nickname)) throw conflict(); }

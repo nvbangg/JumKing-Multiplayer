@@ -334,11 +334,10 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         if (match.terminalWrite != null && !match.saveStatus.equals("FAILED")) return;
         var value = match.terminalWrite == null ? match.write(++match.revision) : match.terminalWrite;
         if (match.endedAt != null) match.terminalWrite = value;
-        match.saveStatus = "PENDING"; match.pendingWrites++; room.lastSave = time.nanos();
+        match.saveStatus = "PENDING"; room.lastSave = time.nanos();
         try { room.writer.submit(value, barrier, (outcome, error) -> {
             if (outcome == CheckpointWriter.Outcome.RETRYING) return;
             room.actor.complete(() -> {
-            match.pendingWrites--;
             if (outcome == CheckpointWriter.Outcome.SAVED) match.savedRevision = Math.max(match.savedRevision, value.revision());
             match.saveStatus = outcome == CheckpointWriter.Outcome.FAILED ? "FAILED" : match.savedRevision >= match.revision ? "SAVED" : "PENDING";
             if (match.endedAt != null && match.saveStatus.equals("SAVED")) {
@@ -349,7 +348,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
             for (var player : room.players.values()) if (player.connection != null) player.connection.send("SAVE_STATUS", status);
             if (room.match == match) broadcast(room);
         }); }); } catch (RejectedExecutionException busy) {
-            match.pendingWrites--; match.saveStatus = "FAILED";
+            match.saveStatus = "FAILED";
             for (var player : room.players.values()) if (player.connection != null) player.connection.send("ERROR", Map.of("code", "SAVE_FAILED", "message", "Room results could not be saved"));
         }
     }

@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ChatMessage } from '../../components/ChatPanel';
 import type { GameSocket } from '../../network/GameSocket';
 import { PRESENTATION } from '../../game/presentation/config';
 
 export function useRoomChat(socket: GameSocket, enabled = true, onOpen?: () => void, onClose?: () => void) {
   const [open, setOpen] = useState(false), [preview, setPreview] = useState(false);
   const [focusRequest, setFocusRequest] = useState(0);
-  const [messages, setMessages] = useState(() => socket.chatHistory as unknown as ChatMessage[]);
+  const [messages, setMessages] = useState(() => socket.chatHistory);
   // Listener giữ ổn định; callback luôn đọc trạng thái render mới nhất.
   const opened = useRef(false), callbacks = useRef({ enabled, onOpen, onClose });
   callbacks.current = { enabled, onOpen, onClose };
@@ -26,7 +25,7 @@ export function useRoomChat(socket: GameSocket, enabled = true, onOpen?: () => v
     const unsubscribe = socket.subscribe(type => {
       if (type === 'ROOM_JOINED') { closeChat(); setMessages([]); setPreview(false); clearTimeout(timer); lastId = undefined; return; }
       if (type !== 'CHAT_MESSAGE' && type !== 'CHAT_HISTORY') return;
-      const rows = socket.chatHistory as unknown as ChatMessage[], id = rows.at(-1)?.id;
+      const rows = socket.chatHistory, id = rows.at(-1)?.id;
       setMessages(rows);
       if (type === 'CHAT_MESSAGE' && id && id !== lastId && !opened.current && callbacks.current.enabled) {
         setPreview(true); clearTimeout(timer); timer = setTimeout(() => setPreview(false), PRESENTATION.chatPreviewMs);
@@ -34,7 +33,7 @@ export function useRoomChat(socket: GameSocket, enabled = true, onOpen?: () => v
       lastId = id;
     });
     // History có thể tới giữa render và lúc đăng ký listener, nhất là sau reconnect.
-    setMessages(socket.chatHistory as unknown as ChatMessage[]);
+    setMessages(socket.chatHistory);
     lastId = socket.chatHistory.at(-1)?.id;
     return () => { unsubscribe(); clearTimeout(timer); };
   }, [socket, closeChat]);

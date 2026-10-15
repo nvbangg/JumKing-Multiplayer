@@ -15,12 +15,16 @@ test('renderer draws all 43 screens and keeps self above translucent peers', asy
     parent.style.cssText = 'position:fixed;inset:0;background:black;z-index:100'; document.body.append(parent);
     let state = states[0]!;
     let ownColor = 0;
+    let frameReads = 0;
     const failures: string[] = [];
     let ready!: () => void;
     const loaded = new Promise<void>(resolve => { ready = resolve; });
     const runtime = {
       advance() {},
-      frame: () => ({ self: { id: 'self', nickname: 'You', color: colors[ownColor], state, crowned: state.screen % 2 === 0 }, peers: [{ id: 'peer', nickname: 'Friend', color: colors[(ownColor + 1) % colors.length], state: { ...state, x: state.x + 30 }, crowned: state.screen % 2 === 0 }] }),
+      frame: () => {
+        frameReads++;
+        return { self: { id: 'self', nickname: 'You', color: colors[ownColor], state, crowned: state.screen % 2 === 0 }, peers: [{ id: 'peer', nickname: 'Friend', color: colors[(ownColor + 1) % colors.length], state: { ...state, x: state.x + 30 }, crowned: state.screen % 2 === 0 }] };
+      },
     };
     const game = createGame(parent, manifest, runtime, ready, (error: string) => failures.push(error));
     await loaded;
@@ -30,8 +34,10 @@ test('renderer draws all 43 screens and keeps self above translucent peers', asy
       for (let screen = 0; screen < 43; screen++) {
         state = states.find(candidate => candidate.screen === screen) || { ...states[0]!, screen, x: 231, y: -screen * 360 + 302 };
         ownColor = screen % colors.length;
-        await frames();
         const scene = game.scene.getScene('Tower');
+        const readsBefore = frameReads; scene.update(0, 0);
+        if (frameReads !== readsBefore + 1) failures.push('Repeated frame snapshot ' + screen);
+        await frames();
         const sprites = scene.children.list.filter((child: { type: string; name: string; texture?: { key: string } }) => child.type === 'Sprite' && child.texture?.key === 'king/base' && child.name.startsWith('player:'));
         if (sprites.length !== 2 || !sprites.some((sprite: { alpha: number }) => sprite.alpha === 1) || !sprites.some((sprite: { alpha: number }) => sprite.alpha === 0.7)) failures.push('Avatar opacity ' + screen);
         const self = sprites.find((sprite: { name: string }) => sprite.name === 'player:self');

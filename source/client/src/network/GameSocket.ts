@@ -1,6 +1,7 @@
 import { ApiError, backendOrigin } from './api';
 import { uuid } from './ids';
 import { NETWORK } from './config';
+import type { ChatMessage } from './contracts';
 import { clearReconnect, loadReconnect, saveReconnect } from './reconnect';
 
 interface Message { v: number; type: string; payload: Record<string, unknown>; requestId?: string }
@@ -43,7 +44,7 @@ export class GameSocket {
   lastFinish: Record<string, unknown> | null = null;
   playContext: { playId: string; generation: number } | null = null;
   resumeRequired = false;
-  chatHistory: Record<string, unknown>[] = [];
+  chatHistory: ChatMessage[] = [];
   private roomId: string | null = null;
   private listeners = new Set<(type: string, payload: Record<string, unknown>) => void>();
   private profile: string | null = null;
@@ -128,7 +129,7 @@ export class GameSocket {
       if (message.type === 'CHAT_HISTORY' || message.type === 'CHAT_MESSAGE') {
         if (message.payload.roomId !== this.roomId) return;
         if (!Array.isArray(message.payload.messages)) { this.disconnect(socket, 'Invalid chat history', 1002); return; }
-        const items = message.payload.messages as Record<string, unknown>[];
+        const items = message.payload.messages as ChatMessage[];
         if (items.some(item => !item || typeof item.id !== 'string' || typeof item.playerId !== 'string' || typeof item.nickname !== 'string' || typeof item.text !== 'string'
             || typeof item.sentAt !== 'string' || !Number.isInteger(item.colorSlot))) { this.disconnect(socket, 'Invalid chat message', 1002); return; }
         const merged = new Map((message.type === 'CHAT_HISTORY' ? [] : this.chatHistory).map(item => [item.id, item]));

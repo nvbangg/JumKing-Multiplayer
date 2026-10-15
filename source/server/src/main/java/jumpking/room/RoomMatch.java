@@ -36,7 +36,6 @@ final class RoomMatch {
     Instant startedAt, endedAt;
     long ticks, revision;
     long savedRevision;
-    int pendingWrites;
     RoomRuns.Write terminalWrite;
     final java.util.concurrent.CompletableFuture<Void> durable = new java.util.concurrent.CompletableFuture<>();
     String reason, saveStatus = "PENDING";

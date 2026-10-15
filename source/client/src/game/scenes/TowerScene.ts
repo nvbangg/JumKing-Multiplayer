@@ -3,7 +3,7 @@ import { assetUrl, type AssetManifest, type Npc, type Prop } from '../content/as
 import { PRESENTATION as V, PLAYER_FRAMES } from '../presentation/config';
 import { PHYSICS } from '../simulation/tuning';
 import { playerFrame } from '../presentation/playerFrame';
-import type { GameRuntime, RenderPlayer, PresentationHooks } from '../presentation/types';
+import type { GameRuntime, RenderPlayer, PresentationHooks, WorldFrame } from '../presentation/types';
 import { AdventureVisuals } from '../presentation/AdventureVisuals';
 import { ConversationVisuals } from '../presentation/ConversationVisuals';
 import { MainBabeEnding } from '../presentation/MainBabeEnding';
@@ -16,7 +16,7 @@ export class TowerScene extends Phaser.Scene {
   private background: { sprite: Phaser.GameObjects.TileSprite; speed: number }[] = [];
   private weather: { sprite: Phaser.GameObjects.TileSprite; textures: string[]; fps: number }[] = [];
   private npcSprites: { data: Npc; sprite: Phaser.GameObjects.Sprite }[] = [];
-  private props: { sprite: Phaser.GameObjects.Sprite; data: Prop }[] = [];
+  private props: { sprite: Phaser.GameObjects.Sprite; data: Prop; durations: number[]; duration: number }[] = [];
   private lastTick = 0;
   private weatherWind = 0;
   private screen = -1;
@@ -39,7 +39,7 @@ export class TowerScene extends Phaser.Scene {
     }
     this.adventureVisuals = new AdventureVisuals(this, this.manifest);
     this.conversations = new ConversationVisuals(this, this.manifest);
-    this.ready = true; this.render(); this.onReady();
+    this.ready = true; this.render(this.runtime.frame()); this.onReady();
   }
   update(_time: number, delta: number): void {
     if (!this.ready) return;
@@ -48,9 +48,9 @@ export class TowerScene extends Phaser.Scene {
       this.ending.dispose(); this.ending = undefined; this.endingId = undefined; this.screen = -1;
     }
     this.runtime.advance(delta);
-    this.render();
-    const state = this.runtime.frame().self.state;
-    const world = this.runtime.frame().world;
+    const frame = this.runtime.frame();
+    this.render(frame);
+    const state = frame.self.state, world = frame.world;
     if (world) this.weatherWind = world.weatherWind;
     else for (let tick = this.lastTick + 1; tick <= state.ticks; tick++) {
       const phase = tick / PHYSICS.tickRate * PHYSICS.windFrequency;
@@ -64,12 +64,10 @@ export class TowerScene extends Phaser.Scene {
       weather.sprite.setTexture(weather.textures[Math.floor(seconds * weather.fps) % weather.textures.length]!);
       weather.sprite.tilePositionX = this.weatherWind * this.manifest.textures[weather.textures[0]!]!.width;
     }
-    for (const { sprite, data } of this.props) {
+    for (const { sprite, data, durations, duration } of this.props) {
       const count = data.cells.X * data.cells.Y;
-      if (data.durations.length) {
-        const durations = Array.from({ length: count }, (_, i) => data.durations[i] || 1 / data.fps);
-        const total = durations.reduce((a, b) => a + b, 0);
-        let elapsed = total ? seconds % total : 0;
+      if (durations.length) {
+        let elapsed = duration ? seconds % duration : 0;
         for (let i = 0; i < durations.length; i++) { if (elapsed < durations[i]!) { sprite.setFrame(String(i)); break; } elapsed -= durations[i]!; }
       } else sprite.setFrame(String(Math.floor(seconds * data.fps) % count));
     }
@@ -93,8 +91,7 @@ export class TowerScene extends Phaser.Scene {
     avatar.crown.setPosition(avatar.sprite.x, avatar.sprite.y).setFrame(avatar.sprite.frame.name).setFlipX(avatar.sprite.flipX)
       .setDepth(avatar.sprite.depth + 0.1).setAlpha(avatar.sprite.alpha).setTint(avatar.sprite.tintTopLeft).setVisible(visible && player.crowned);
   }
-  private render(): void {
-    const frame = this.runtime.frame();
+  private render(frame: WorldFrame): void {
     if (frame.self.state.screen !== this.screen) this.drawScreen(frame.self.state.screen);
     const present = new Set([frame.self.id, ...frame.peers.map(peer => peer.id)]);
     for (const [id, avatar] of this.avatars) if (!present.has(id)) { avatar.sprite.destroy(); avatar.name.destroy(); avatar.crown.destroy(); this.avatars.delete(id); }
@@ -120,7 +117,8 @@ export class TowerScene extends Phaser.Scene {
     const key = prop.texture;
     this.addFrames(key, prop.cells.X, prop.cells.Y);
     const sprite = this.add.sprite(prop.Position.X, prop.Position.Y + top, key, '0').setOrigin(0).setDepth(4).setFlipX(!!prop.flipped);
-    this.visuals.push(sprite); this.props.push({ sprite, data: prop });
+    const durations = prop.durations.length ? Array.from({ length: prop.cells.X * prop.cells.Y }, (_, i) => prop.durations[i] || 1 / prop.fps) : [];
+    this.visuals.push(sprite); this.props.push({ sprite, data: prop, durations, duration: durations.reduce((sum, value) => sum + value, 0) });
   }
   private drawScreen(index: number): void {
     for (const visual of this.visuals) visual.destroy();
@@ -153,7 +151,7 @@ export class TowerScene extends Phaser.Scene {
       const sprite = this.add.sprite(npc.position.X, top + npc.position.Y, npc.texture, '0').setOrigin(0.5, 1).setDepth(9).setFlipX(npc.bubble.direction === 'Left');
       this.visuals.push(sprite); this.npcSprites.push({ data: npc, sprite });
     }
-    if (index === this.runtime.frame().self.state.screen && index === this.manifest.screens.length - 1) {
+    if (index === this.manifest.screens.length - 1) {
       const frame = ENDING_FRAMES['babe.idle0']!, texture = this.textures.get('king/base'), name = endingFrameName('babe.idle0');
       if (!texture.has(name)) texture.add(name, 0, frame.x, frame.y, frame.width, frame.height);
       this.babe = this.add.sprite(348, top + 138, 'king/base', name).setDepth(9); this.visuals.push(this.babe);

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NETWORK } from '../network/config';
+import type { ChatMessage } from '../network/contracts';
 
-export interface ChatMessage { id: string; playerId: string; nickname: string; text: string; sentAt: string; colorSlot: number }
 export function ChatMessages({ messages, colors }: { messages: ChatMessage[]; colors: readonly string[] }) {
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => { if (list.current) list.current.scrollTop = list.current.scrollHeight; }, [messages]);

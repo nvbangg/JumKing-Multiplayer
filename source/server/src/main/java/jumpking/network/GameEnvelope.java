@@ -2,7 +2,6 @@ package jumpking.network;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.HashSet;
 import java.util.Set;
 import jumpking.exception.ApiException;
 
@@ -31,8 +30,8 @@ public record GameEnvelope(String type, String requestId, JsonNode payload) {
     }
     public static void fields(JsonNode node, Set<String> allowed) {
         if (node == null || !node.isObject()) throw invalid();
-        var names = new HashSet<String>(); node.fieldNames().forEachRemaining(names::add);
-        if (!allowed.containsAll(names)) throw invalid();
+        var names = node.fieldNames();
+        while (names.hasNext()) if (!allowed.contains(names.next())) throw invalid();
     }
     public static String text(JsonNode payload, String field) {
         var value = payload.path(field);

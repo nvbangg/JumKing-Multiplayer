@@ -43,6 +43,17 @@ test('parallel connects share one handshake and stale sockets cannot affect the 
   const pending = game.command('GET_ROOM_STATE'); const request = JSON.parse(next.sent[0]!);
   next.receive({ v: 1, type: 'ROOM_STATE', requestId: request.requestId, payload: {} }); await expect(pending).resolves.toMatchObject({ type: 'ROOM_STATE' }); game.close();
 });
+
+test('malformed chat cannot enter the typed history or reach subscribers', async () => {
+  const valid = { id: 'm', playerId: 'peer', nickname: 'Peer', text: 'Hello', sentAt: '2026-01-01T00:00:00Z', colorSlot: 1 };
+  for (const messages of [null, {}, [null], [{ ...valid, text: 42 }], [{ ...valid, colorSlot: '1' }]]) {
+    const received = vi.fn(), disconnected = vi.fn(), game = new GameSocket(received, disconnected), socket = await open(game);
+    socket.receive({ v: 1, type: 'ROOM_JOINED', payload: { roomId: 'ABCDEF', playerId: 'self' } }); received.mockClear();
+    socket.receive({ v: 1, type: 'CHAT_MESSAGE', payload: { roomId: 'ABCDEF', messages } });
+    expect(socket.closeCode).toBe(1002); expect(disconnected).toHaveBeenCalledOnce();
+    expect(game.chatHistory).toEqual([]); expect(received).not.toHaveBeenCalled();
+  }
+});
 test('closing during handshake rejects immediately and does not start a stale heartbeat', async () => {
   const game = new GameSocket(vi.fn(), vi.fn()), ready = game.connect(); const rejected = expect(ready).rejects.toMatchObject({ code: 'CONNECTION_FAILED' });
   const old = Socket.instances[0]!; game.close(); await rejected; old.open(); vi.advanceTimersByTime(NETWORK.heartbeatMs * 2); expect(old.sent).toEqual([]);

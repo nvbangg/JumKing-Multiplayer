@@ -36,7 +36,7 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 
 - [x] Chat chung Enter/Esc/focus/tin mới 10 giây và touch; nghiệm thu vấn đề #5.
 - [x] Players ranking từ server RAM ở Room/Community, bảng thu gọn.
-- [ ] Leaderboard Community trong trận, refresh giới hạn; nghiệm thu vấn đề #10.
+- [x] Leaderboard Community trong trận, refresh giới hạn; nghiệm thu vấn đề #10.
 
 ## Phase 06 — Rà soát và triển khai
 
@@ -84,6 +84,8 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 | Phase 05 — Chat | PASS — 77 client unit; build/type-check; Chrome hai identities với cảm ứng giả lập và backend/MySQL thật. Enter mở/focus/gửi, Esc đóng, preview hết 10 giây không lấy focus; chat thủ công giữ mở. Mở chat khi giữ Space hủy charge, không launch và Room clock vẫn chạy. Tin lịch sử/ID lặp không mở preview; cleanup timer/listener khi đổi phòng. Diff check PASS. |
 
 | Phase 05 — Players | PASS — 77 client unit, 54 Java unit; 8 MySQL integration và 6 Chrome online; 27 client E2E. Snapshot mang thứ hạng từ RAM, giữ đồng hạng và loại người đã Leave; Community chỉ so current height. Bảng thu gọn hỗ trợ Enter/Space, không tạo jump; canvas nhận lại focus khi click. Hồi quy reconnect giữ chat History, Community Pause/Continue và capacity 10. Build/type-check và diff check PASS. |
+
+| Phase 05 — Leaderboard trong trận | PASS — 77 client unit, 54 Java unit; 2 MySQL integration và Chrome poll trực tiếp. Bảng Community thu gọn dùng dữ liệu đã commit; mở mới tải, mỗi request cách ít nhất 10 giây, không poll khi đóng/ẩn tab hoặc gửi chồng. Đóng/mở nhanh giữ giới hạn; timer/listener dọn khi unmount. Đã xem ảnh hai bảng trong trận; build/type-check và diff check PASS. |
 
 ## Lịch sử triển khai trước thay đổi kiến trúc
 

@@ -17,6 +17,7 @@ import { useRoomChat } from '../rooms/useRoomChat';
 import { ChatOverlay } from '../rooms/ChatOverlay';
 import { PlayersPanel } from '../rooms/PlayersPanel';
 import type { PlayerStanding } from '../../network/contracts';
+import { InGameLeaderboard } from './InGameLeaderboard';
 import rules from '../../../../common/rules.json';
 import { FlightToggle } from '../../game/input/FlightToggle';
 import { AdventureEffects } from '../../game/netcode/AdventureEffects';
@@ -151,7 +152,7 @@ export function OnlineGame({ socket, room, onHome, onResults }: { socket: GameSo
       ? <button disabled={!pictureReady} onClick={onResults}>View Results</button>
       : <button disabled={!pictureReady || pending} onClick={() => { void newGame(); }}>New Game</button>}<button disabled={!pictureReady || pending || disconnected} onClick={() => { void command('LEAVE_ROOM'); }}>Back to Menu</button></>}</div>}
     {ready && !ending && <ChatOverlay chat={chat} socket={socket} />}
-    {ready && !ending && <aside className="in-game-panels"><PlayersPanel players={players} selfId={socket.selfId} /></aside>}
+    {ready && !ending && <aside className="in-game-panels"><PlayersPanel players={players} selfId={socket.selfId} />{room.kind === 'COMMUNITY' && <InGameLeaderboard />}</aside>}
     {menu && <section className="game-overlay" aria-label="Game menu"><MenuPanel title={menu === 'pause' ? disconnected ? 'Disconnected' : room.kind === 'ROOM' ? room.state === 'PAUSED' ? 'Room Paused' : 'Game Menu' : 'Paused' : menu === 'options' ? 'Options' : 'Controls'} onBack={menu === 'pause' ? undefined : () => setMenu(menu === 'controls' ? 'options' : 'pause')}>
       {menu === 'pause' && <>{disconnected ? <><button disabled={pending} onClick={() => { setPending(true); void socket.reconnect().catch(cause => setError(cause.message)).finally(() => setPending(false)); }}>Reconnect</button><button onClick={onHome}>Back to Menu</button></> : <button disabled={pending || (room.state === 'PAUSED' && room.hostPlayerId !== socket.selfId)} onClick={() => { void resume(); }}>{room.kind === 'ROOM' && room.state === 'PAUSED' ? room.hostPlayerId === socket.selfId ? 'Resume Room' : 'Room Paused' : 'Resume'}</button>}<button onClick={() => setMenu('options')}>Options</button><button aria-keyshortcuts="Enter" onClick={chat.openChat}>Open Chat</button>
         {room.kind === 'COMMUNITY' && <button disabled={pending || disconnected} onClick={() => { void newGame(); }}>New Game</button>}

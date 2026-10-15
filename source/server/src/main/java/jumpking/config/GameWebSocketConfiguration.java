@@ -47,18 +47,12 @@ public class GameWebSocketConfiguration implements WebSocketConfigurer {
                   if (!security.acceptsOrigin(servlet.getHeader("Origin")))
                     throw new ApiException(403, "ORIGIN_DENIED", "Origin is not allowed");
                   var account = identities.account();
-                  Long owner =
-                      account == null ? identities.owner(servlet) : Long.valueOf(account.id());
-                  if (owner == null)
-                    throw new ApiException(
-                        401, "AUTH_REQUIRED", "Create a Guest or sign in to connect");
+                  if (account == null)
+                    throw new ApiException(401, "AUTH_REQUIRED", "Sign in to connect");
                   var session = servlet.getSession(false);
                   var identity =
                       new GameConnection.Identity(
-                          owner,
-                          account == null ? null : account.username(),
-                          account == null ? null : session.getId(),
-                          ip);
+                          Long.parseLong(account.id()), account.username(), session.getId(), ip);
                   attributes.put(GameTransport.IDENTITY, identity);
                   attributes.put("reservation", transport.reserve(identity));
                   return true;

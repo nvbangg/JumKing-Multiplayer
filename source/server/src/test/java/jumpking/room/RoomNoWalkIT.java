@@ -64,16 +64,16 @@ class RoomNoWalkIT {
   void groundIntentCannotWalkButJumpVelocityAndAirborneWallBounceRemainNative() throws Exception {
     try (var a = new GameClient(port);
         var b = new GameClient(port)) {
-      a.guest();
-      b.guest();
+      a.register();
+      b.register();
       a.connect();
       b.connect();
       var settings = new java.util.HashMap<String, Object>();
       settings.put("mode", "NO_WALK");
       settings.put("timeLimitMinutes", null);
-      var host = a.ok("CREATE_ROOM", Map.of("nickname", "Host", "settings", settings));
+      var host = a.ok("CREATE_ROOM", Map.of("settings", settings));
       String roomId = host.path("roomId").asText();
-      b.ok("JOIN_ROOM", Map.of("roomId", roomId, "nickname", "Peer"));
+      b.ok("JOIN_ROOM", Map.of("roomId", roomId));
       a.ok("START_GAME", Map.of());
       String play =
           a.await(message -> message.path("type").asText().equals("GAME_STARTED"))

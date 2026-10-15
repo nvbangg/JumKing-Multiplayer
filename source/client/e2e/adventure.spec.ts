@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import checkpoints from "../../common/fixtures/main-babe-checkpoints.json" with {
 	type: "json",
 };
+import { soloJumps } from "./support/solo";
 
 test("legacy item save retains run, dialogue and earned crown without Inventory", async ({
 	page,
@@ -160,7 +161,7 @@ test("IndexedDB upgrades physics-only saves without deleting run identity or tot
 	await page
 		.getByRole("button", { name: "Continue Solo", exact: true })
 		.click();
-	await expect(page.getByText("Jumps: 1", { exact: true })).toBeVisible();
+	await expect.poll(() => soloJumps(page)).toBe(1);
 	await page.getByRole("button", { name: "Menu", exact: true }).click();
 	await page.getByRole("button", { name: "Save & Exit", exact: true }).click();
 	const restored = await page.evaluate(async () => {

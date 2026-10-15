@@ -2,11 +2,11 @@
 
 ## Schema
 
-Database `jumpking`, MySQL/InnoDB, utf8mb4, timestamps UTC. Schema tạo bằng `scripts/schema.sql`; Hibernate chỉ validate mapping khi start; SQL giữ constraints và indexes. Khởi tạo/reset theo [deployment](deployment.md#mysql).
+Database `jumpking`, MySQL/InnoDB, utf8mb4, timestamps UTC. Schema tạo bằng `source/database/schema.sql`; Hibernate chỉ validate mapping khi start; SQL giữ constraints và indexes. Khởi tạo/reset theo [deployment](deployment.md#mysql).
 
 | Bảng | Trách nhiệm |
 | --- | --- |
-| users | Định danh Account/Guest, credentials, vương miện và liên kết Merge |
+| users | Account, password hash và vương miện |
 | play_runs | Một lượt của một người: metrics, kết quả Room và checkpoint Community |
 | matches | Thông tin chung của một trận Room |
 
@@ -16,16 +16,12 @@ Solo/Community có lượt cá nhân; Room có match chung. Phạm vi save/thàn
 erDiagram
     users ||--o{ play_runs : owns
     matches o|--|{ play_runs : groups
-    users o|--o{ users : merged_into
 
     users {
         BIGINT id PK
-        VARCHAR(16) type
+        VARCHAR(16) type "ACCOUNT; GUEST chỉ dữ liệu lịch sử"
         VARCHAR(32) username UK "nullable"
-        VARCHAR(254) email UK "nullable"
         VARCHAR(255) password_hash "nullable"
-        CHAR(64) guest_token_hash UK "nullable"
-        BIGINT merged_into_user_id FK "nullable"
         BOOLEAN crown_unlocked
         DATETIME(3) created_at
     }
@@ -42,7 +38,7 @@ erDiagram
         DOUBLE max_progress
         BIGINT peak_reached_ticks
         BIGINT finish_ticks "nullable"
-        VARCHAR(16) nickname "nullable; ROOM"
+        VARCHAR(32) nickname "nullable; ROOM"
         TINYINT rank "nullable; ROOM"
         BOOLEAN is_winner
         JSON snapshot "nullable; COMMUNITY ACTIVE"
@@ -65,7 +61,7 @@ erDiagram
     }
 ```
 
-users.id tự tăng; lượt online/match dùng UUID server, Solo dùng UUID local. UUID/hash/room code dùng ascii_bin, username/email dùng utf8mb4_0900_ai_ci. FK dùng RESTRICT để giữ dữ liệu thống kê.
+users.id tự tăng; lượt online/match dùng UUID server, Solo dùng UUID local. UUID/hash/room code dùng ascii_bin, username dùng utf8mb4_0900_ai_ci. FK dùng RESTRICT để giữ dữ liệu thống kê.
 
 | Trường trong play_runs | Ý nghĩa |
 | --- | --- |
@@ -92,7 +88,7 @@ Ticks theo [architecture](architecture.md#xử-lý-đồng-thời); API đổi t
 
 Chỉ ACTIVE có ended_at=NULL; trạng thái khác có ended_at≥started_at. Chỉ FINISHED có finish_ticks khác NULL. Solo/Community không dùng UNFINISHED/DNF; Room không dùng ABANDONED. snapshot là JSON object chỉ khi kind=COMMUNITY và status=ACTIVE; còn lại NULL. match_id/nickname chỉ có ở ROOM; rank NULL đến khi finalize, sau đó trong [1,10]. Ngoài ROOM, rank=NULL và is_winner=false. Winner chỉ khi FINISHED, rank=1.
 
-Indexes: unique username/email/guest_token_hash/active_community_user_id; play_runs(user_id,ended_at,id), play_runs(match_id), play_runs(kind,status) cho Profile/History/detail/leaderboard. Không unique(match_id,user_id): sau Merge một Account có thể sở hữu nhiều lượt cùng trận.
+Indexes: unique username/active_community_user_id; play_runs(user_id,ended_at,id), play_runs(match_id), play_runs(kind,status) cho Profile/History/detail/leaderboard. Không unique(match_id,user_id) để bảo toàn các lượt lịch sử đã thuộc cùng owner.
 
 ```sql
 active_community_user_id BIGINT GENERATED ALWAYS AS
@@ -105,13 +101,7 @@ Cột generated tự tính, chỉ lượt Community ACTIVE có user_id; các lư
 
 ## Identity và ownership
 
-CHECK yêu cầu ACCOUNT đủ credentials, không token/pointer; GUEST không credentials, có token hoặc merge pointer nhưng không đồng thời cả hai. Email lowercase. Service kiểm tra đích Merge là ACCOUNT khác bản thân; hashing/cookie theo [protocol](protocol.md#identity-và-security).
-
-MySQL giữ Room của Guest và cả ba kiểu chơi của Account. Solo Guest giữ local, không import qua Register/Login/Merge.
-
-Register nâng Guest thành Account, giữ ID/Room History. Merge sang Account có sẵn khóa users theo thứ tự ID, chuyển ownership lượt Room, lưu pointer và thu hồi token trong một transaction. Writer đến sau khóa/resolve owner trước khi ghi. Merge không tạo lượt hoặc cộng counter; lặp cùng đích là no-op, không đổi sang đích khác.
-
-Owner online chốt khi Join, không đổi theo cookie. Nickname Room giữ lúc Join; Community/leaderboard dùng username hiện tại. Đổi identity khi có membership theo protocol.
+Account đăng ký bằng username/password; server lưu password hash, không lưu email hoặc cấp Guest identity online. Solo Guest chỉ có profile local, không import khi đăng ký/đăng nhập. Mọi thao tác online lấy owner từ session. Tên player lấy từ username, kết quả Room giữ snapshot tên lúc Join. Thay đổi mật khẩu cần mật khẩu hiện tại và thu hồi các phiên sau commit theo [protocol](protocol.md#identity-và-security).
 
 ## Ghi lượt và đồng bộ Solo
 
@@ -123,7 +113,7 @@ Reload/lỗi mạng giữ hàng chờ; chỉ xác nhận sync sau commit. New Ga
 
 ## Community checkpoint
 
-Continue tìm COMMUNITY/ACTIVE theo Account; chưa có thì tạo spawn snapshot, revision=1. Save thuộc lượt, không gắn room code. Chuyển sảnh/Save & Exit/AFK giữ lượt.
+Continue tìm COMMUNITY/ACTIVE theo Account; chưa có thì tạo spawn snapshot, revision=1. Save thuộc lượt, không gắn room code. Save & Exit/Continue/AFK giữ lượt, không gắn lượt với một sảnh cố định.
 
 Snapshot do server tạo: physics (freeFlight/phasingFall), hội thoại theo ID, screen events/hidden walls/pha gió và codec version. Không chứa định nghĩa shared hoặc nội dung hiển thị. Backend validate codec/metrics khi restore; xử lý quyền bay theo [gameplay](gameplay.md#fly-mode).
 
@@ -133,9 +123,9 @@ New Run khóa users rồi lượt bằng SELECT ... FOR UPDATE, kiểm tra expec
 
 ## Kết quả Room
 
-Room bắt đầu gameplay tạo match và lượt ROOM của roster trong một transaction bằng IDs chốt khi Start; Lobby/countdown hủy không ghi. started_at là hết countdown. Mode/settings/map_level nằm ở matches theo [gameplay](gameplay.md#room-và-xếp-hạng); time_limit_minutes chỉ khác NULL ở TIME_LIMIT. end_reason: FINISH/TIME_LIMIT/HOST_ENDED/PAUSE_TIMEOUT/ALL_DISCONNECTED/ABORTED.
+Room bắt đầu gameplay tạo match và lượt ROOM của roster trong một transaction bằng IDs chốt khi Start; Lobby/countdown hủy không ghi. started_at là hết countdown. Mode/settings/map_level nằm ở matches theo [gameplay](gameplay.md#room-và-xếp-hạng); time_limit_minutes chỉ khác NULL ở TIME_LIMIT. end_reason: FINISH/TIME_LIMIT/HOST_ENDED/ALL_DISCONNECTED/ABORTED.
 
-Writer lưu duration_ticks/metrics định kỳ theo deployment và flush khi Host Pause; không lưu snapshot Room. Pause/Resume không kết thúc trận hoặc tạo lượt mới; PAUSE_TIMEOUT chốt người còn tham gia UNFINISHED, không winner. Leave/hết hạn reconnect chốt DNF; finalize chốt người còn lại UNFINISHED/FINISHED. play_ticks≤duration_ticks; xếp hạng dùng clock chung theo gameplay.
+Writer lưu duration_ticks/metrics định kỳ theo deployment và flush khi kết thúc; không lưu snapshot Room. Leave/hết hạn reconnect chốt DNF; finalize chốt người còn lại UNFINISHED/FINISHED. play_ticks≤duration_ticks; xếp hạng dùng clock chung theo gameplay.
 
 Finalize ghi match và metrics/rank/winner trong một transaction, tăng revision/updated_at; giữ metrics/ended_at đã chốt của DNF. Match đang chơi có ended_at/end_reason cùng NULL, kết thúc cùng khác NULL và ended_at≥started_at. Service kiểm tra roster 2–10, đúng match/kind, rank≤số người và comparator. Retry giữ UUID: cùng kết quả no-op, khác kết quả đã chốt báo lỗi.
 
@@ -153,11 +143,11 @@ Restart chốt match còn mở ABORTED, lượt ROOM ACTIVE thành DNF. Dùng me
 | Số trận/thắng Room | COUNT DISTINCT match_id, riêng thắng lọc is_winner=true |
 | Leaderboard | Chỉ play_runs COMMUNITY; một best run mỗi Account theo [gameplay](gameplay.md#community-tower) |
 
-Account History gộp Solo/Community theo run ID và Room theo match ID, mới nhất trước theo ended_at rồi kind/id. Chỉ owner đọc được lượt cá nhân; owner của ít nhất một lượt đọc được match. Sau Merge, summary Room chọn lượt tốt nhất của owner, detail giữ đủ các lượt. Contract theo [protocol](protocol.md#http).
+Account History gộp Solo/Community theo run ID và Room theo match ID, mới nhất trước theo ended_at rồi kind/id. Chỉ owner đọc được lượt cá nhân; owner của ít nhất một lượt đọc được match. Summary Room chọn lượt tốt nhất của owner, detail giữ đủ các lượt. Contract theo [protocol](protocol.md#http).
 
 Solo Guest dùng summaries local, không gửi MySQL. Solo Account chưa sync giữ summary local ở trạng thái chờ; khi server đã lưu, thay bằng cùng kind/ID, không tạo mục thứ hai. Lượt Community ACTIVE và Room chưa finalize chưa vào History.
 
-Thống kê Account lấy tổng đã commit của cả ba kiểu chơi. Guest cộng Solo local với Room của identity Guest; không đưa Solo Guest vào tổng Account khi Login/Register. Solo Account đã sync không cộng lại từ local; số liệu chưa sync giữ riêng đến khi commit. Không có bộ lọc kind/mode cho thống kê tổng.
+Thống kê Account lấy tổng đã commit của cả ba kiểu chơi. Guest chỉ có thống kê Solo local; không đưa Solo Guest vào tổng Account khi Login/Register. Solo Account đã sync không cộng lại từ local; số liệu chưa sync giữ riêng đến khi commit. Không có bộ lọc kind/mode cho thống kê tổng.
 
 Leaderboard lấy metrics Community đã commit; chọn best bằng ROW_NUMBER rồi tính RANK trước LIMIT. ID chỉ ổn định lựa chọn/hiển thị, không phá đồng hạng. Comparator/eligibility theo [gameplay](gameplay.md#community-tower). [MySQL window functions](https://dev.mysql.com/doc/refman/8.4/en/window-function-descriptions.html).
 
@@ -167,9 +157,9 @@ Persistence online dùng PENDING/SAVED/FAILED; SAVED chỉ sau commit. Solo tác
 
 ## JPA
 
-User, PlayRun và Match ánh xạ ba bảng; Service sở hữu transaction, Repository sở hữu truy vấn. Không serialize Entity. Chỉ đọc snapshot khi Continue/save, dùng projection cho Stats/History/leaderboard. `revision` giữ thứ tự payload và chống retry khác nội dung, không thay bằng optimistic version của ORM. Các thao tác merge/New Run/writer khóa owner theo thứ tự rồi khóa lượt trong transaction.
+User, PlayRun và Match ánh xạ ba bảng; Service sở hữu transaction, Repository sở hữu truy vấn. Không serialize Entity. Chỉ đọc snapshot khi Continue/save, dùng projection cho Stats/History/leaderboard. `revision` giữ thứ tự payload và chống retry khác nội dung, không thay bằng optimistic version của ORM. New Run và writer khóa owner theo thứ tự rồi khóa lượt trong transaction.
 
-`users.crown_unlocked` chỉ chuyển false → true khi có full Finish, hoặc Merge từ Guest đã mở. Guest Solo gửi riêng quyền crown khi vào Room; đây là ngoại hình tự khai báo, không gửi save/history/metrics hoặc ảnh hưởng leaderboard. Guest nhận crown online lưu lại trong profile trình duyệt.
+`users.crown_unlocked` chỉ chuyển false → true khi Account hoàn thành full map. Solo Account đồng bộ quyền ngoại hình cùng metrics; Solo Guest chỉ giữ crown trên thiết bị và không chuyển sang Account hoặc Room.
 
 `matches.map_level` trong [1,10], mặc định 10 (full map); Public/Private là metadata phòng RAM, không cần lưu khi match kết thúc. Best Finish Time bỏ Room map_level<10; counters/Finishes/Room Wins vẫn tính.
 

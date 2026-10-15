@@ -46,21 +46,17 @@ class RoomTimeLimitIT {
   private record Started(String room, String play) {}
 
   private Started start(GameClient a, GameClient b, int minutes) throws Exception {
-    a.guest();
-    b.guest();
+    a.register();
+    b.register();
     a.connect();
     b.connect();
     String room =
         a.ok(
                 "CREATE_ROOM",
-                Map.of(
-                    "nickname",
-                    "Host",
-                    "settings",
-                    Map.of("mode", "TIME_LIMIT", "timeLimitMinutes", minutes)))
+                Map.of("settings", Map.of("mode", "TIME_LIMIT", "timeLimitMinutes", minutes)))
             .path("roomId")
             .asText();
-    b.ok("JOIN_ROOM", Map.of("roomId", room, "nickname", "Peer"));
+    b.ok("JOIN_ROOM", Map.of("roomId", room));
     a.ok("START_GAME", Map.of());
     String play =
         a.await(message -> message.path("type").asText().equals("GAME_STARTED"))

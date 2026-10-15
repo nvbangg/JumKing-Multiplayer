@@ -43,7 +43,7 @@ export function ChatPanel({
 	messages: ChatMessage[];
 	colors: readonly string[];
 	onSend: (text: string) => Promise<void>;
-	onClose: () => void;
+	onClose?: () => void;
 	focusRequest?: number;
 }) {
 	const [text, setText] = useState(""),
@@ -52,14 +52,14 @@ export function ChatPanel({
 	const input = useRef<HTMLInputElement>(null);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: Mỗi focusRequest yêu cầu focus lại cùng ô nhập.
 	useEffect(() => {
-		input.current?.focus();
+		if (focusRequest > 0) input.current?.focus();
 	}, [focusRequest]);
 	return (
 		<section
 			className="chat-panel"
 			aria-label="Room chat"
 			onKeyDown={(event) => {
-				if (event.key === "Escape") {
+				if (event.key === "Escape" && onClose) {
 					event.preventDefault();
 					event.stopPropagation();
 					onClose();
@@ -68,9 +68,11 @@ export function ChatPanel({
 		>
 			<header>
 				<span>Chat</span>
-				<button type="button" onClick={onClose} aria-label="Close chat">
-					×
-				</button>
+				{onClose && (
+					<button type="button" onClick={onClose} aria-label="Close chat">
+						×
+					</button>
+				)}
 			</header>
 			<ChatMessages messages={messages} colors={colors} />
 			<form

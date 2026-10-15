@@ -13,7 +13,6 @@ import jumpking.JumpKingApplication;
 import jumpking.config.NetworkSettings;
 import jumpking.game.SharedData;
 import jumpking.network.GameEnvelope;
-import jumpking.security.GuestIdentity;
 import jumpking.support.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -79,24 +78,9 @@ class OnlineWorkloadIT {
     }
   }
 
-  private GameClient guestFixture() {
+  private GameClient accountFixture() throws Exception {
     var client = new GameClient(port);
-    byte[] secret = new byte[32];
-    new java.security.SecureRandom().nextBytes(secret);
-    String token = Base64.getUrlEncoder().withoutPadding().encodeToString(secret);
-    var jdbc = TestDatabase.get().jdbc;
-    String hash = GuestIdentity.hash(token);
-    jdbc.update(
-        "INSERT INTO users(type,guest_token_hash,created_at) VALUES ('GUEST',?,UTC_TIMESTAMP(3))",
-        hash);
-    client.owner =
-        jdbc.queryForObject("SELECT id FROM users WHERE guest_token_hash=?", Long.class, hash);
-    var cookie = new HttpCookie("JK_GUEST", token);
-    cookie.setVersion(0);
-    cookie.setPath("/");
-    ((CookieManager) client.http.cookieHandler().orElseThrow())
-        .getCookieStore()
-        .add(URI.create("http://127.0.0.1:" + port), cookie);
+    client.register();
     return client;
   }
 
@@ -138,7 +122,7 @@ class OnlineWorkloadIT {
       for (int group = 0; group < rooms; group++) {
         String roomId = null;
         for (int index = 0; index < playersPerRoom; index++) {
-          var client = community ? new GameClient(port) : guestFixture();
+          var client = community ? new GameClient(port) : accountFixture();
           clients.add(client);
           var probe = new Probe();
           probes.add(probe);
@@ -151,10 +135,10 @@ class OnlineWorkloadIT {
                 client
                     .ok(
                         community ? "JOIN_COMMUNITY" : "CREATE_ROOM",
-                        community ? Map.of() : Map.of("nickname", "Player 0"))
+                        community ? Map.of() : Map.of())
                     .path("roomId")
                     .asText();
-          } else client.ok("JOIN_ROOM", Map.of("roomId", roomId, "nickname", "Player " + index));
+          } else client.ok("JOIN_ROOM", Map.of("roomId", roomId + index));
         }
       }
       if (!community) for (var host : hosts) host.ok("START_GAME", Map.of());

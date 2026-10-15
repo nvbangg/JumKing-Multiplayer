@@ -46,9 +46,9 @@ class RoomLifecycleIT {
   private Started start(GameClient a, GameClient b) throws Exception {
     a.connect();
     b.connect();
-    var first = a.ok("CREATE_ROOM", Map.of("nickname", "Host"));
+    var first = a.ok("CREATE_ROOM", Map.of());
     String room = first.path("roomId").asText();
-    var second = b.ok("JOIN_ROOM", Map.of("roomId", room, "nickname", "Peer"));
+    var second = b.ok("JOIN_ROOM", Map.of("roomId", room));
     a.ok("START_GAME", Map.of());
     String play =
         a.await(message -> message.path("type").asText().equals("GAME_STARTED"))
@@ -96,8 +96,8 @@ class RoomLifecycleIT {
       throws Exception {
     try (var a = new GameClient(port);
         var b = new GameClient(port)) {
-      a.guest();
-      b.guest();
+      a.register();
+      b.register();
       var game = start(a, b);
       a.disconnect();
       b.await(
@@ -171,8 +171,8 @@ class RoomLifecycleIT {
   void everyPlayerOfflineFreezesTheClockThenFinalizesOnceAtTheLastDeadline() throws Exception {
     try (var a = new GameClient(port);
         var b = new GameClient(port)) {
-      a.guest();
-      b.guest();
+      a.register();
+      b.register();
       var game = start(a, b);
       a.disconnect();
       b.disconnect();
@@ -240,8 +240,9 @@ class RoomLifecycleIT {
     try (var a = new GameClient(port);
         var b = new GameClient(port)) {
       a.register();
-      b.guest();
-      String email = a.request("/auth/me", "GET", null).path("account").path("email").asText();
+      b.register();
+      String username =
+          a.request("/auth/me", "GET", null).path("account").path("username").asText();
       var game = start(a, b);
       var cookies = (CookieManager) a.http.cookieHandler().orElseThrow();
       String sessionId =
@@ -260,7 +261,7 @@ class RoomLifecycleIT {
                       .asText()
                       .equals(game.second.path("playerId").asText()));
       a.disconnect();
-      a.login(email, "A secure server integration password");
+      a.login(username, "A secure server integration password");
       a.connect();
       assertThat(a.ok("RECONNECT", reconnect(game, game.first)).path("playId").asText())
           .isEqualTo(game.play);

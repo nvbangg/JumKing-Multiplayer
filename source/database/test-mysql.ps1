@@ -6,7 +6,7 @@ param(
     [string]$IntegrationTest
 )
 $ErrorActionPreference = 'Stop'
-$workspace = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$workspace = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 if (-not $MySqlHome) {
     if ($env:MYSQL_HOME -and (Test-Path $env:MYSQL_HOME)) {
         $MySqlHome = $env:MYSQL_HOME

@@ -17,7 +17,6 @@ class RoomRunsIT {
     properties.add("spring.datasource.password", db::getPassword);
   }
 
-  @org.springframework.beans.factory.annotation.Autowired GuestHistoryService merge;
   @org.springframework.beans.factory.annotation.Autowired RoomRuns records;
   @org.springframework.beans.factory.annotation.Autowired RecordsService history;
 
@@ -29,13 +28,7 @@ class RoomRunsIT {
       String match = UUID.randomUUID().toString();
       try {
         for (int i = 0; i < 2; i++) {
-          String hash = UUID.randomUUID().toString().replace("-", "").repeat(2);
-          jdbc.update(
-              "INSERT INTO users(type,guest_token_hash,created_at) VALUES ('GUEST',?,UTC_TIMESTAMP(3))",
-              hash);
-          owners.add(
-              jdbc.queryForObject(
-                  "SELECT id FROM users WHERE guest_token_hash=?", Long.class, hash));
+          owners.add(TestDatabase.get().historicalGuest());
         }
         Instant started = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS),
             ended = started.plusSeconds(10);
@@ -124,8 +117,7 @@ class RoomRunsIT {
   }
 
   @Test
-  void wholeRosterCommitsAtomicallyAndLateWritesResolveMergedGuestsWithoutDuplicates()
-      throws Exception {
+  void wholeRosterCommitsAtomicallyAndStaleWritesDoNotOverwriteFinalResults() throws Exception {
     var db = TestDatabase.get();
     var jdbc = db.jdbc;
     var users = new ArrayList<Long>();
@@ -135,18 +127,12 @@ class RoomRunsIT {
     String trigger = "room_rollback_" + UUID.randomUUID().toString().replace("-", "");
     try {
       for (int index = 0; index < 2; index++) {
-        String hash = UUID.randomUUID().toString().replace("-", "").repeat(2);
-        jdbc.update(
-            "INSERT INTO users(type,guest_token_hash,created_at) VALUES ('GUEST',?,UTC_TIMESTAMP(3))",
-            hash);
-        users.add(
-            jdbc.queryForObject("SELECT id FROM users WHERE guest_token_hash=?", Long.class, hash));
+        users.add(TestDatabase.get().historicalGuest());
       }
       String name = "writer_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
       jdbc.update(
-          "INSERT INTO users(type,username,email,password_hash,created_at) VALUES ('ACCOUNT',?,?,'test-hash',UTC_TIMESTAMP(3))",
-          name,
-          name + "@example.test");
+          "INSERT INTO users(type,username,password_hash,created_at) VALUES ('ACCOUNT',?,'test-hash',UTC_TIMESTAMP(3))",
+          name);
       users.add(jdbc.queryForObject("SELECT id FROM users WHERE username=?", Long.class, name));
       Instant started = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS),
           ended = started.plusSeconds(2);
@@ -206,7 +192,6 @@ class RoomRunsIT {
                       null)));
       records.save(update);
       records.save(start);
-      merge.merge(users.get(0), users.get(2));
       var finish =
           new RoomRuns.Write(
               match,
@@ -274,14 +259,14 @@ class RoomRunsIT {
           .isEqualTo(1);
       assertThat(
               jdbc.queryForObject(
-                  "SELECT crown_unlocked FROM users WHERE id=?", Boolean.class, users.get(2)))
+                  "SELECT crown_unlocked FROM users WHERE id=?", Boolean.class, users.get(0)))
           .isFalse();
       records.save(finish);
       records.save(finish);
       records.save(update);
       assertThat(
               jdbc.queryForObject(
-                  "SELECT crown_unlocked FROM users WHERE id=?", Boolean.class, users.get(2)))
+                  "SELECT crown_unlocked FROM users WHERE id=?", Boolean.class, users.get(0)))
           .isTrue();
       assertThat(
               jdbc.queryForObject(
@@ -292,11 +277,11 @@ class RoomRunsIT {
                   "SELECT COUNT(*) FROM play_runs WHERE match_id=?", Integer.class, match))
           .isEqualTo(2);
       assertThat(jdbc.queryForObject("SELECT user_id FROM play_runs WHERE id=?", Long.class, a))
-          .isEqualTo(users.get(2));
+          .isEqualTo(users.get(0));
       assertThat(jdbc.queryForObject("SELECT jumps FROM play_runs WHERE id=?", Integer.class, a))
           .isEqualTo(2);
-      assertThat(history.statistics(users.get(2)).wins()).isEqualTo(1);
-      assertThat(history.detail(users.get(2), "ROOM", match).path("participants").size())
+      assertThat(history.statistics(users.get(0)).wins()).isEqualTo(1);
+      assertThat(history.detail(users.get(0), "ROOM", match).path("participants").size())
           .isEqualTo(2);
       assertThatThrownBy(
               () ->

@@ -69,16 +69,104 @@ class RoomRaceIT {
   }
 
   @Test
+  void loadingWaitsForTheRosterAndOnlyOneServerCountdownStarts() throws Exception {
+    try (var a = new GameClient(port);
+        var b = new GameClient(port)) {
+      a.autoReady = b.autoReady = false;
+      for (var client : List.of(a, b)) {
+        client.register();
+        client.connect();
+      }
+      String room = a.ok("CREATE_ROOM", Map.of()).path("roomId").asText();
+      b.ok("JOIN_ROOM", Map.of("roomId", room));
+      a.ok("START_GAME", Map.of());
+      var started = a.await(m -> m.path("type").asText().equals("GAME_STARTED")).path("payload");
+      String play = started.path("playId").asText();
+      var ready = Map.of("playId", play, "generation", 1);
+      a.ok("GAME_READY", ready);
+      time.advance(5000);
+      var loading = a.ok("GET_ROOM_STATE", Map.of());
+      assertThat(loading.path("state").asText()).isEqualTo("COUNTDOWN");
+      assertThat(loading.path("currentPlay").path("elapsedTimeMs").asLong()).isZero();
+      assertThat(loading.path("currentPlay").path("countdownRemainingMs").asLong()).isZero();
+      assertThat(a.messages.stream().anyMatch(m -> m.path("type").asText().equals("GAME_SNAPSHOT")))
+          .isFalse();
+      assertThat(
+              b.command("GAME_READY", Map.of("playId", play, "generation", 99))
+                  .path("payload")
+                  .path("code")
+                  .asText())
+          .isEqualTo("STALE_PLAY");
+      b.ok("GAME_READY", ready);
+      time.advance(1000);
+      a.ok("GAME_READY", ready);
+      assertThat(
+              a.ok("GET_ROOM_STATE", Map.of())
+                  .path("currentPlay")
+                  .path("countdownRemainingMs")
+                  .asLong())
+          .isEqualTo(2000);
+      time.advance(2000);
+      a.await(m -> m.path("type").asText().equals("GAME_SNAPSHOT"));
+      assertThat(a.ok("GET_ROOM_STATE", Map.of()).path("state").asText()).isEqualTo("PLAYING");
+      a.socket
+          .sendText(
+              json.writeValueAsString(
+                  Map.of("v", 1, "type", "SET_ROOM_PAUSED", "payload", Map.of("paused", true))),
+              true)
+          .join();
+      a.await(
+          m ->
+              m.path("type").asText().equals("ERROR")
+                  && m.path("payload").path("code").asText().equals("INVALID_MESSAGE"));
+      step(a, 100);
+      a.ok("END_MATCH", Map.of());
+      a.ok("LEAVE_ROOM", Map.of());
+      b.ok("LEAVE_ROOM", Map.of());
+    }
+  }
+
+  @Test
+  void rendererTimeoutReturnsToLobbyWithoutWritingAMatch() throws Exception {
+    try (var a = new GameClient(port);
+        var b = new GameClient(port)) {
+      a.autoReady = b.autoReady = false;
+      for (var client : List.of(a, b)) {
+        client.register();
+        client.connect();
+      }
+      String room = a.ok("CREATE_ROOM", Map.of()).path("roomId").asText();
+      b.ok("JOIN_ROOM", Map.of("roomId", room));
+      a.ok("START_GAME", Map.of());
+      a.messages.clear();
+      time.advance(shared.rules().path("roomLoadTimeoutMs").asLong());
+      a.await(
+          m ->
+              m.path("type").asText().equals("ROOM_STATE")
+                  && m.path("payload").path("state").asText().equals("WAITING")
+                  && m.path("payload").path("currentPlay").isNull());
+      assertThat(
+              TestDatabase.get()
+                  .jdbc
+                  .queryForObject(
+                      "SELECT COUNT(*) FROM matches WHERE room_code=?", Integer.class, room))
+          .isZero();
+      a.ok("LEAVE_ROOM", Map.of());
+      b.ok("LEAVE_ROOM", Map.of());
+    }
+  }
+
+  @Test
   void staleInputDisconnectsOnlyTheAffectedPlayerAndReconnectCancelsCharge() throws Exception {
     try (var a = new GameClient(port);
         var b = new GameClient(port)) {
-      a.guest();
-      b.guest();
+      a.register();
+      b.register();
       a.connect();
       b.connect();
-      var join = a.ok("CREATE_ROOM", Map.of("nickname", "Host"));
+      var join = a.ok("CREATE_ROOM", Map.of());
       String id = join.path("roomId").asText();
-      b.ok("JOIN_ROOM", Map.of("roomId", id, "nickname", "Peer"));
+      b.ok("JOIN_ROOM", Map.of("roomId", id));
       a.ok("START_GAME", Map.of());
       time.advance(3000);
       String play =
@@ -154,13 +242,12 @@ class RoomRaceIT {
   void distantPlayersRemainRankedWithoutBroadcastingTheirPose() throws Exception {
     try (var a = new GameClient(port);
         var b = new GameClient(port)) {
-      a.guest();
-      b.guest();
+      a.register();
+      b.register();
       a.connect();
       b.connect();
-      String id = a.ok("CREATE_ROOM", Map.of("nickname", "Host")).path("roomId").asText();
-      String peer =
-          b.ok("JOIN_ROOM", Map.of("roomId", id, "nickname", "Peer")).path("playerId").asText();
+      String id = a.ok("CREATE_ROOM", Map.of()).path("roomId").asText();
+      String peer = b.ok("JOIN_ROOM", Map.of("roomId", id)).path("playerId").asText();
       a.ok("START_GAME", Map.of());
       time.advance(3000);
       a.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT"));
@@ -210,19 +297,19 @@ class RoomRaceIT {
         var b = new GameClient(port);
         var extra = new GameClient(port)) {
       for (var client : List.of(a, b, extra)) {
-        client.guest();
+        client.register();
         client.connect();
       }
-      String id = a.ok("CREATE_ROOM", Map.of("nickname", "Host")).path("roomId").asText();
+      String id = a.ok("CREATE_ROOM", Map.of()).path("roomId").asText();
       assertThat(a.command("START_GAME", Map.of()).path("payload").path("code").asText())
           .isEqualTo("NOT_ENOUGH_PLAYERS");
-      b.ok("JOIN_ROOM", Map.of("roomId", id, "nickname", "Peer"));
+      b.ok("JOIN_ROOM", Map.of("roomId", id));
       assertThat(b.command("START_GAME", Map.of()).path("payload").path("code").asText())
           .isEqualTo("FORBIDDEN");
       assertThat(a.ok("START_GAME", Map.of()).path("state").asText()).isEqualTo("COUNTDOWN");
       assertThat(
               extra
-                  .command("JOIN_ROOM", Map.of("roomId", id, "nickname", "Late"))
+                  .command("JOIN_ROOM", Map.of("roomId", id))
                   .path("payload")
                   .path("code")
                   .asText())
@@ -247,15 +334,15 @@ class RoomRaceIT {
   }
 
   @Test
-  void twoRealClientsJumpAndEndTheMatchWithCommittedGuestAndAccountHistory() throws Exception {
+  void twoAccountsJumpAndEndTheMatchWithCommittedHistory() throws Exception {
     try (var a = new GameClient(port);
         var b = new GameClient(port)) {
-      a.guest();
+      a.register();
       b.register();
       a.connect();
       b.connect();
-      String room = a.ok("CREATE_ROOM", Map.of("nickname", "Guest")).path("roomId").asText();
-      b.ok("JOIN_ROOM", Map.of("roomId", room, "nickname", "Account"));
+      String room = a.ok("CREATE_ROOM", Map.of()).path("roomId").asText();
+      b.ok("JOIN_ROOM", Map.of("roomId", room));
       a.ok("START_GAME", Map.of());
       String play =
           a.await(message -> message.path("type").asText().equals("GAME_STARTED"))
@@ -358,12 +445,12 @@ class RoomRaceIT {
   void nativeRouteCheckpointFinishesBothPlayersInOneServerTickAndFinalizesOnce() throws Exception {
     try (var a = new GameClient(port);
         var b = new GameClient(port)) {
-      a.guest();
-      b.guest();
+      a.register();
+      b.register();
       a.connect();
       b.connect();
-      String id = a.ok("CREATE_ROOM", Map.of("nickname", "First")).path("roomId").asText();
-      b.ok("JOIN_ROOM", Map.of("roomId", id, "nickname", "Second"));
+      String id = a.ok("CREATE_ROOM", Map.of()).path("roomId").asText();
+      b.ok("JOIN_ROOM", Map.of("roomId", id));
       a.ok("START_GAME", Map.of());
       time.advance(3000);
       a.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT"));
@@ -437,11 +524,11 @@ class RoomRaceIT {
         var peer = new GameClient(port);
         var extra = new GameClient(port)) {
       for (var client : List.of(host, peer, extra)) {
-        client.guest();
+        client.register();
         client.connect();
       }
-      String id = host.ok("CREATE_ROOM", Map.of("nickname", "Host")).path("roomId").asText();
-      peer.ok("JOIN_ROOM", Map.of("roomId", id, "nickname", "Peer"));
+      String id = host.ok("CREATE_ROOM", Map.of()).path("roomId").asText();
+      peer.ok("JOIN_ROOM", Map.of("roomId", id));
       assertThat(host.request("/rooms", "GET", null).path("rooms").findValuesAsText("roomId"))
           .doesNotContain(id);
       assertThat(
@@ -472,9 +559,7 @@ class RoomRaceIT {
         assertThat(entry.has(secret)).isFalse();
       try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
         var start = pool.submit(() -> host.ok("START_GAME", Map.of()));
-        var join =
-            pool.submit(
-                () -> extra.command("JOIN_ROOM", Map.of("roomId", id, "nickname", "Extra")));
+        var join = pool.submit(() -> extra.command("JOIN_ROOM", Map.of("roomId", id)));
         assertThat(start.get().path("state").asText()).isEqualTo("COUNTDOWN");
         var joined = join.get();
         if (joined.path("type").asText().equals("ERROR"))

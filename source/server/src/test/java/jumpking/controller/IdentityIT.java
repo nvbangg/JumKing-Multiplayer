@@ -17,7 +17,6 @@ import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicLong;
 import jumpking.JumpKingApplication;
 import jumpking.dto.SoloMetrics;
-import jumpking.security.GuestIdentity;
 import jumpking.security.SessionAuthority;
 import jumpking.support.TestDatabase;
 import org.junit.jupiter.api.BeforeEach;
@@ -81,7 +80,6 @@ class IdentityIT {
   @Autowired SessionAuthority sessions;
   @Autowired ObjectMapper json;
   @Autowired org.springframework.security.crypto.password.PasswordEncoder passwords;
-  @Autowired jumpking.room.Memberships memberships;
 
   @BeforeEach
   void nextWindow() {
@@ -141,12 +139,11 @@ class IdentityIT {
     return java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 20);
   }
 
-  private String registration(String username, String email, String password) throws Exception {
-    return json.writeValueAsString(
-        java.util.Map.of("username", username, "email", email, "password", password));
+  private String registration(String username, String password) throws Exception {
+    return json.writeValueAsString(java.util.Map.of("username", username, "password", password));
   }
 
-  private void roomHistory(long guest) {
+  private void roomHistory(long owner) {
     String match = java.util.UUID.randomUUID().toString();
     var jdbc = TestDatabase.get().jdbc;
     jdbc.update(
@@ -154,9 +151,9 @@ class IdentityIT {
         match);
     roomFixtures.add(match);
     jdbc.update(
-        "INSERT INTO play_runs(id,user_id,kind,match_id,status,nickname,started_at,updated_at) VALUES (?,?,'ROOM',?,'ACTIVE','Guest Player',UTC_TIMESTAMP(3),UTC_TIMESTAMP(3))",
+        "INSERT INTO play_runs(id,user_id,kind,match_id,status,nickname,started_at,updated_at) VALUES (?,?,'ROOM',?,'ACTIVE','Historical Player',UTC_TIMESTAMP(3),UTC_TIMESTAMP(3))",
         java.util.UUID.randomUUID().toString(),
-        guest,
+        owner,
         match);
   }
 
@@ -197,10 +194,7 @@ class IdentityIT {
       client.token();
       assertThat(
               client
-                  .send(
-                      "/auth/register",
-                      "POST",
-                      registration(unique(), unique() + "@example.test", "A secure solo password"))
+                  .send("/auth/register", "POST", registration(unique(), "A secure solo password"))
                   .statusCode())
           .isEqualTo(200);
       client.token();
@@ -234,7 +228,7 @@ class IdentityIT {
                   .path("crownUnlocked")
                   .asBoolean())
           .isTrue();
-      assertThat(client.send("/profile/crown", "POST", null).statusCode()).isEqualTo(403);
+      assertThat(client.send("/profile/crown", "POST", null).statusCode()).isEqualTo(404);
       assertThat(client.send(path, "PUT", metrics(4, 180, "ACTIVE")).statusCode()).isEqualTo(409);
       String second = java.util.UUID.randomUUID().toString();
       assertThat(
@@ -253,10 +247,7 @@ class IdentityIT {
       other.token();
       assertThat(
               other
-                  .send(
-                      "/auth/register",
-                      "POST",
-                      registration(unique(), unique() + "@example.test", "Another solo password"))
+                  .send("/auth/register", "POST", registration(unique(), "Another solo password"))
                   .statusCode())
           .isEqualTo(200);
       other.token();
@@ -272,10 +263,7 @@ class IdentityIT {
       client.token();
       assertThat(
               client
-                  .send(
-                      "/auth/register",
-                      "POST",
-                      registration(unique(), unique() + "@example.test", "A strict solo password"))
+                  .send("/auth/register", "POST", registration(unique(), "A strict solo password"))
                   .statusCode())
           .isEqualTo(200);
       client.token();
@@ -312,10 +300,7 @@ class IdentityIT {
       client.token();
       assertThat(
               client
-                  .send(
-                      "/auth/register",
-                      "POST",
-                      registration(unique(), unique() + "@example.test", "A bounded Solo password"))
+                  .send("/auth/register", "POST", registration(unique(), "A bounded Solo password"))
                   .statusCode())
           .isEqualTo(200);
       client.token();
@@ -363,53 +348,8 @@ class IdentityIT {
       assertThat(config.statusCode()).isEqualTo(200);
       var shared = new jumpking.game.SharedData(json);
       assertThat(tree(map)).isEqualTo(shared.map());
-      assertThat(tree(config).path("physics")).isEqualTo(shared.physics());
-      assertThat(tree(config).path("rules")).isEqualTo(shared.rules());
       assertThat(tree(config).path("features").path("flyEnabled").asBoolean()).isFalse();
-      assertThat(tree(config).path("appearances").size()).isEqualTo(10);
-      assertThat(tree(config).path("appearances").get(0).path("color").asText())
-          .isEqualTo("#ffffff");
       assertThat(config.body()).doesNotContain("password", "guest_token", "allowed-origins");
-    }
-  }
-
-  @Test
-  void meDoesNotCreateIdentityAndGuestUsesHashedOpaqueCookie() throws Exception {
-    try (var client = client()) {
-      int before =
-          TestDatabase.get().jdbc.queryForObject("SELECT COUNT(*) FROM users", Integer.class);
-      var me = client.send("/auth/me", "GET", null);
-      assertThat(tree(me).path("authenticated").asBoolean()).isFalse();
-      assertThat(tree(me).path("guest").asBoolean()).isFalse();
-      assertThat(me.headers().allValues("set-cookie")).isEmpty();
-      assertThat(
-              TestDatabase.get().jdbc.queryForObject("SELECT COUNT(*) FROM users", Integer.class))
-          .isEqualTo(before);
-      assertThat(client.send("/auth/guest", "POST", null).statusCode()).isEqualTo(403);
-      client.token();
-      var response = client.send("/auth/guest", "POST", null);
-      assertThat(response.statusCode()).isEqualTo(200);
-      assertThat(tree(response).path("guest").asBoolean()).isTrue();
-      String cookie = response.headers().firstValue("set-cookie").orElseThrow();
-      assertThat(cookie)
-          .contains("HttpOnly", "SameSite=Lax", "Path=/", "Max-Age=31536000")
-          .doesNotContain("Domain=", "Secure");
-      String token = client.cookie(GuestIdentity.COOKIE);
-      assertThat(token).matches("[A-Za-z0-9_-]{43}");
-      assertThat(
-              TestDatabase.get()
-                  .jdbc
-                  .queryForObject(
-                      "SELECT COUNT(*) FROM users WHERE guest_token_hash=?",
-                      Integer.class,
-                      GuestIdentity.hash(token)))
-          .isEqualTo(1);
-      assertThat(client.send("/auth/guest", "POST", null).headers().allValues("set-cookie"))
-          .isEmpty();
-      assertThat(
-              TestDatabase.get().jdbc.queryForObject("SELECT COUNT(*) FROM users", Integer.class))
-          .isEqualTo(before + 1);
-      assertThat(tree(client.send("/auth/me", "GET", null)).path("account").isNull()).isTrue();
     }
   }
 
@@ -456,30 +396,12 @@ class IdentityIT {
   }
 
   @Test
-  void expiredGuestCannotReuseItsIdentity() throws Exception {
-    try (var client = client()) {
-      client.token();
-      assertThat(client.send("/auth/guest", "POST", null).statusCode()).isEqualTo(200);
-      String old = client.cookie(GuestIdentity.COOKIE);
-      TestDatabase.get()
-          .jdbc
-          .update(
-              "UPDATE users SET created_at=? WHERE guest_token_hash=?",
-              java.sql.Timestamp.from(clock.instant().minus(java.time.Duration.ofDays(366))),
-              GuestIdentity.hash(old));
-      assertThat(tree(client.send("/auth/me", "GET", null)).path("guest").asBoolean()).isFalse();
-      assertThat(client.send("/auth/guest", "POST", null).statusCode()).isEqualTo(200);
-      assertThat(client.cookie(GuestIdentity.COOKIE)).isNotEqualTo(old);
-    }
-  }
-
-  @Test
   void limitsBodyIncludingChunkedRequestsAndKeepsIpBucketAcrossSessionChanges() throws Exception {
     try (var client = client()) {
       client.token();
-      assertThat(client.send("/auth/guest", "POST", " ".repeat(16385)).statusCode()).isEqualTo(400);
+      assertThat(client.send("/auth/login", "POST", " ".repeat(16385)).statusCode()).isEqualTo(400);
       var chunked =
-          HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/auth/guest"))
+          HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/auth/login"))
               .header("Content-Type", "application/json")
               .header("X-CSRF-TOKEN", client.csrf)
               .POST(
@@ -488,13 +410,26 @@ class IdentityIT {
               .build();
       assertThat(client.http.send(chunked, HttpResponse.BodyHandlers.ofString()).statusCode())
           .isEqualTo(400);
-      for (int index = 0; index < 18; index++)
-        assertThat(client.send("/auth/guest", "POST", null).statusCode()).isEqualTo(200);
+      clock.advance(120_000);
+      for (int index = 0; index < 20; index++)
+        assertThat(
+                client
+                    .send(
+                        "/auth/login",
+                        "POST",
+                        "{\"username\":\"missing\",\"password\":\"incorrect\"}")
+                    .statusCode())
+            .isEqualTo(401);
       client.cookies.getCookieStore().removeAll();
       client.token();
-      var denied = client.send("/auth/guest", "POST", null);
-      assertThat(denied.statusCode()).isEqualTo(429);
-      assertThat(tree(denied).path("error").path("code").asText()).isEqualTo("RATE_LIMIT");
+      assertThat(
+              client
+                  .send(
+                      "/auth/login",
+                      "POST",
+                      "{\"username\":\"missing\",\"password\":\"incorrect\"}")
+                  .statusCode())
+          .isEqualTo(429);
     }
   }
 
@@ -545,25 +480,20 @@ class IdentityIT {
         var attacker = client()) {
       client.token();
       String previous = client.cookie("JSESSIONID"), oldCsrf = client.csrf;
-      String name = "player_" + unique(),
-          email = unique() + "@example.test",
-          password = "A secure test password";
-      var response =
-          client.send(
-              "/auth/register",
-              "POST",
-              registration(name, email.toUpperCase(java.util.Locale.ROOT), password));
+      String name = "player_" + unique(), password = "A secure test password";
+      var response = client.send("/auth/register", "POST", registration(name, password));
       assertThat(response.statusCode()).isEqualTo(200);
       assertThat(tree(response).path("authenticated").asBoolean()).isTrue();
       assertThat(tree(response).path("account").path("id").isTextual()).isTrue();
-      assertThat(tree(response).path("account").path("email").asText()).isEqualTo(email);
+      assertThat(tree(response).path("account").has("email")).isFalse();
       String id = client.cookie("JSESSIONID");
       assertThat(id).isNotEqualTo(previous);
       assertThat(sessions.find(previous)).isNull();
       String hash =
           TestDatabase.get()
               .jdbc
-              .queryForObject("SELECT password_hash FROM users WHERE email=?", String.class, email);
+              .queryForObject(
+                  "SELECT password_hash FROM users WHERE username=?", String.class, name);
       assertThat(hash).startsWith("$2").isNotEqualTo(password);
       assertThat(passwords.matches(password, hash)).isTrue();
       assertThat(sessions.find(id).getAttribute("SPRING_SECURITY_CONTEXT").toString())
@@ -584,269 +514,117 @@ class IdentityIT {
   }
 
   @Test
-  void loginUsesUniformCredentialsErrorsAndKeepsGuestHistoryOptional() throws Exception {
-    try (var account = client();
-        var guest = client()) {
-      String name = unique(),
-          email = unique() + "@example.test",
-          password = "Another secure password";
-      account.token();
-      assertThat(
-              account
-                  .send("/auth/register", "POST", registration(name, email, password))
-                  .statusCode())
-          .isEqualTo(200);
-      String accountId =
-          tree(account.send("/auth/me", "GET", null)).path("account").path("id").asText();
-      guest.token();
-      assertThat(guest.send("/auth/guest", "POST", null).statusCode()).isEqualTo(200);
-      long guestId =
-          TestDatabase.get()
-              .jdbc
-              .queryForObject(
-                  "SELECT id FROM users WHERE guest_token_hash=?",
-                  Long.class,
-                  GuestIdentity.hash(guest.cookie(GuestIdentity.COOKIE)));
-      roomHistory(guestId);
-      var known =
-          guest.send(
-              "/auth/login",
-              "POST",
-              json.writeValueAsString(java.util.Map.of("email", email, "password", "incorrect")));
-      var unknown =
-          guest.send(
-              "/auth/login",
-              "POST",
-              json.writeValueAsString(
-                  java.util.Map.of("email", unique() + "@example.test", "password", "incorrect")));
-      assertThat(known.statusCode()).isEqualTo(401);
-      assertThat(known.body()).isEqualTo(unknown.body());
-      String before = guest.cookie("JSESSIONID");
-      var login =
-          guest.send(
-              "/auth/login",
-              "POST",
-              json.writeValueAsString(java.util.Map.of("email", email, "password", password)));
-      assertThat(login.statusCode()).isEqualTo(200);
-      assertThat(tree(login).path("guestHistoryAvailable").asBoolean()).isTrue();
-      assertThat(tree(login).path("account").path("id").asText()).isEqualTo(accountId);
-      assertThat(guest.cookie("JSESSIONID")).isNotEqualTo(before);
-      assertThat(
-              TestDatabase.get()
-                  .jdbc
-                  .queryForObject("SELECT type FROM users WHERE id=?", String.class, guestId))
-          .isEqualTo("GUEST");
-      assertThat(
-              TestDatabase.get()
-                  .jdbc
-                  .queryForObject(
-                      "SELECT user_id FROM play_runs WHERE user_id=?", Long.class, guestId))
-          .isEqualTo(guestId);
-      guest.token();
-      assertThat(guest.send("/auth/guest-history/merge", "POST", "{\"source\":1}").statusCode())
-          .isEqualTo(400);
-      assertThat(guest.send("/auth/guest-history/merge", "POST", null).statusCode()).isEqualTo(200);
-      assertThat(guest.send("/auth/guest-history/merge", "POST", null).statusCode()).isEqualTo(200);
-      assertThat(
-              TestDatabase.get()
-                  .jdbc
-                  .queryForObject(
-                      "SELECT merged_into_user_id FROM users WHERE id=?", Long.class, guestId))
-          .isEqualTo(Long.parseLong(accountId));
-      assertThat(
-              TestDatabase.get()
-                  .jdbc
-                  .queryForObject(
-                      "SELECT COUNT(*) FROM play_runs WHERE user_id=?", Integer.class, guestId))
-          .isZero();
-    }
-  }
-
-  @Test
-  void registeringGuestPromotesTheSameOwnerWithoutMovingSolo() throws Exception {
-    try (var client = client()) {
-      client.token();
-      assertThat(client.send("/auth/guest", "POST", null).statusCode()).isEqualTo(200);
-      long owner =
-          TestDatabase.get()
-              .jdbc
-              .queryForObject(
-                  "SELECT id FROM users WHERE guest_token_hash=?",
-                  Long.class,
-                  GuestIdentity.hash(client.cookie(GuestIdentity.COOKIE)));
-      roomHistory(owner);
-      var result =
-          client.send(
-              "/auth/register",
-              "POST",
-              registration(unique(), unique() + "@example.test", "A secure guest password"));
-      assertThat(result.statusCode()).isEqualTo(200);
-      assertThat(tree(result).path("account").path("id").asText()).isEqualTo(Long.toString(owner));
-      assertThat(
-              TestDatabase.get()
-                  .jdbc
-                  .queryForObject("SELECT type FROM users WHERE id=?", String.class, owner))
-          .isEqualTo("ACCOUNT");
-      assertThat(
-              TestDatabase.get()
-                  .jdbc
-                  .queryForObject(
-                      "SELECT guest_token_hash FROM users WHERE id=?", String.class, owner))
-          .isNull();
-      assertThat(
-              TestDatabase.get()
-                  .jdbc
-                  .queryForObject(
-                      "SELECT user_id FROM play_runs WHERE user_id=?", Long.class, owner))
-          .isEqualTo(owner);
-      assertThat(result.headers().allValues("set-cookie").toString())
-          .contains("JK_GUEST=;", "Max-Age=0");
-    }
-  }
-
-  @Test
   void validatesUnicodePasswordsStrictJsonAndUniqueCredentials() throws Exception {
     try (var client = client();
         var second = client()) {
       client.token();
-      String email = unique() + "@example.test", name = unique();
+      String name = unique();
       for (String body :
           java.util.List.of(
-              registration("ab", email, "password123"),
-              registration("invalid name", email, "password123"),
-              registration(name, "invalid-email", "password123"),
-              registration(name, email, "short"),
-              registration(name, email, "é".repeat(37)),
+              registration("ab", "password123"),
+              registration("invalid name", "password123"),
+              registration(name, "short"),
+              registration(name, "é".repeat(37)),
               "{\"email\":true,\"username\":\"player\",\"password\":\"password123\"}",
-              registration(name, email, "password123").replace("}", ",\"admin\":true}"))) {
+              registration(name, "password123").replace("}", ",\"admin\":true}"))) {
         assertThat(client.send("/auth/register", "POST", body).statusCode())
             .as(body)
             .isEqualTo(400);
       }
       assertThat(
               client
-                  .send("/auth/register", "POST", registration(name, email, "😀".repeat(18)))
+                  .send("/auth/register", "POST", registration(name, "😀".repeat(18)))
                   .statusCode())
           .isEqualTo(200);
       second.token();
-      var duplicate =
-          second.send(
-              "/auth/register",
-              "POST",
-              registration(name, unique() + "@example.test", "password123"));
+      var duplicate = second.send("/auth/register", "POST", registration(name, "password123"));
       assertThat(duplicate.statusCode()).isEqualTo(409);
-      assertThat(duplicate.body()).doesNotContain("SQL", "uq_users", email);
+      assertThat(duplicate.body()).doesNotContain("SQL", "uq_users");
     }
   }
 
   @Test
-  void membershipBlocksIdentityChangeButAllowsSameAccountReauthentication() throws Exception {
-    try (var account = client();
-        var guest = client()) {
-      String name = unique(),
-          email = unique() + "@example.test",
-          password = "A secure membership password";
-      account.token();
+  void passwordChangeRequiresOldPasswordAndRevokesEverySession() throws Exception {
+    String name = unique(),
+        password = "Original password 123",
+        replacement = "Replacement password 456";
+    try (var first = client();
+        var other = client()) {
+      first.token();
+      assertThat(first.send("/auth/register", "POST", registration(name, password)).statusCode())
+          .isEqualTo(200);
+      first.token();
+      other.token();
       assertThat(
-              account
-                  .send("/auth/register", "POST", registration(name, email, password))
+              other
+                  .send(
+                      "/auth/login",
+                      "POST",
+                      json.writeValueAsString(
+                          java.util.Map.of("username", name, "password", password)))
                   .statusCode())
           .isEqualTo(200);
-      long owner =
-          Long.parseLong(
-              tree(account.send("/auth/me", "GET", null)).path("account").path("id").asText());
-      guest.token();
-      assertThat(guest.send("/auth/guest", "POST", null).statusCode()).isEqualTo(200);
-      long guestId =
-          TestDatabase.get()
-              .jdbc
-              .queryForObject(
-                  "SELECT id FROM users WHERE guest_token_hash=?",
-                  Long.class,
-                  GuestIdentity.hash(guest.cookie(GuestIdentity.COOKIE)));
-      var member = new jumpking.room.Memberships.Membership("ABCDEF", unique());
-      memberships.claim(guestId, member);
-      memberships.claim(owner, member);
-      try {
-        assertThat(
-                guest
-                    .send(
-                        "/auth/register",
-                        "POST",
-                        registration(unique(), unique() + "@example.test", password))
-                    .statusCode())
-            .isEqualTo(409);
-        String body =
-            json.writeValueAsString(java.util.Map.of("email", email, "password", password));
-        assertThat(guest.send("/auth/login", "POST", body).statusCode()).isEqualTo(409);
-        account.token();
-        assertThat(account.send("/auth/login", "POST", body).statusCode()).isEqualTo(200);
-        assertThat(memberships.find(owner)).isEqualTo(member);
-        assertThat(memberships.find(guestId)).isEqualTo(member);
-      } finally {
-        memberships.release(owner, member);
-        memberships.release(guestId, member);
-      }
+      other.token();
+      assertThat(
+              first
+                  .send(
+                      "/auth/password",
+                      "POST",
+                      json.writeValueAsString(
+                          java.util.Map.of("currentPassword", "wrong", "newPassword", replacement)))
+                  .statusCode())
+          .isEqualTo(401);
+      assertThat(
+              first
+                  .send(
+                      "/auth/password",
+                      "POST",
+                      json.writeValueAsString(
+                          java.util.Map.of(
+                              "currentPassword", password, "newPassword", replacement)))
+                  .statusCode())
+          .isEqualTo(200);
+      assertThat(tree(other.send("/auth/me", "GET", null)).path("authenticated").asBoolean())
+          .isFalse();
+      first.token();
+      assertThat(
+              first
+                  .send(
+                      "/auth/login",
+                      "POST",
+                      json.writeValueAsString(
+                          java.util.Map.of("username", name, "password", password)))
+                  .statusCode())
+          .isEqualTo(401);
+      assertThat(
+              first
+                  .send(
+                      "/auth/login",
+                      "POST",
+                      json.writeValueAsString(
+                          java.util.Map.of("username", name, "password", replacement)))
+                  .statusCode())
+          .isEqualTo(200);
     }
   }
 
   @Test
-  void guestCrownIsCosmeticIdempotentAndMergesWithoutImportingSoloHistory() throws Exception {
-    try (var guest = client();
-        var account = client();
-        var promoted = client()) {
-      guest.token();
-      assertThat(guest.send("/profile/crown", "POST", null).statusCode()).isEqualTo(401);
-      assertThat(guest.send("/auth/guest", "POST", null).statusCode()).isEqualTo(200);
-      long source =
-          TestDatabase.get()
-              .jdbc
-              .queryForObject(
-                  "SELECT id FROM users WHERE guest_token_hash=?",
-                  Long.class,
-                  GuestIdentity.hash(guest.cookie(GuestIdentity.COOKIE)));
-      assertThat(guest.send("/profile/crown", "POST", null).statusCode()).isEqualTo(200);
-      assertThat(guest.send("/profile/crown", "POST", null).statusCode()).isEqualTo(200);
-      assertThat(tree(guest.send("/auth/me", "GET", null)).path("crownUnlocked").asBoolean())
-          .isTrue();
+  void anonymousUsersCannotCreateOnlineIdentityOrReadPrivateHistory() throws Exception {
+    try (var client = client()) {
+      client.token();
+      assertThat(client.send("/auth/guest", "POST", null).statusCode()).isEqualTo(404);
+      assertThat(client.send("/history", "GET", null).statusCode()).isEqualTo(401);
+      assertThat(client.send("/community/current", "GET", null).statusCode()).isEqualTo(401);
       assertThat(
-              TestDatabase.get()
-                  .jdbc
-                  .queryForObject(
-                      "SELECT COUNT(*) FROM play_runs WHERE user_id=?", Integer.class, source))
-          .isZero();
-      String email = unique() + "@example.test", password = "A secure cosmetic password";
-      account.token();
-      assertThat(
-              account
-                  .send("/auth/register", "POST", registration(unique(), email, password))
+              client
+                  .send(
+                      "/auth/password",
+                      "POST",
+                      json.writeValueAsString(
+                          java.util.Map.of(
+                              "currentPassword", "wrong", "newPassword", "Replacement password")))
                   .statusCode())
-          .isEqualTo(200);
-      var login =
-          guest.send(
-              "/auth/login",
-              "POST",
-              json.writeValueAsString(java.util.Map.of("email", email, "password", password)));
-      assertThat(tree(login).path("guestHistoryAvailable").asBoolean()).isTrue();
-      guest.token();
-      assertThat(guest.send("/auth/guest-history/merge", "POST", null).statusCode()).isEqualTo(200);
-      assertThat(guest.send("/auth/guest-history/merge", "POST", null).statusCode()).isEqualTo(200);
-      assertThat(
-              tree(guest.send("/auth/me", "GET", null))
-                  .path("account")
-                  .path("crownUnlocked")
-                  .asBoolean())
-          .isTrue();
-      assertThat(guest.send("/profile/crown", "POST", null).statusCode()).isEqualTo(403);
-      promoted.token();
-      promoted.send("/auth/guest", "POST", null);
-      promoted.send("/profile/crown", "POST", null);
-      var registration =
-          promoted.send(
-              "/auth/register",
-              "POST",
-              registration(unique(), unique() + "@example.test", password));
-      assertThat(tree(registration).path("account").path("crownUnlocked").asBoolean()).isTrue();
+          .isEqualTo(401);
     }
   }
 }

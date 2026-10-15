@@ -12,14 +12,12 @@ test.beforeEach(async ({ page }) => {
 });
 const password = "A secure Solo sync password";
 async function register(page: Page, prefix = "sync") {
-	const username = prefix + "_" + Date.now(),
-		email = username + "@example.test";
+	const username = prefix + "_" + Date.now();
 	await page.goto("/");
 	await page
 		.getByRole("button", { name: "Create Account", exact: true })
 		.click();
 	await page.getByLabel("Username", { exact: true }).fill(username);
-	await page.getByLabel("Email", { exact: true }).fill(email);
 	await page.getByLabel("Password", { exact: true }).fill(password);
 	await page
 		.getByRole("button", { name: "Create Account", exact: true })
@@ -28,7 +26,7 @@ async function register(page: Page, prefix = "sync") {
 		page.getByRole("button", { name: username, exact: true }),
 	).toBeVisible();
 	const me = await (await page.request.get("/api/auth/me")).json();
-	return { username, email, id: me.account.id as string };
+	return { username, id: me.account.id as string };
 }
 async function playAndSave(page: Page) {
 	await page
@@ -148,7 +146,7 @@ test("one Account on two devices creates separate Solo UUIDs and totals both exa
 		const other = await second.newPage();
 		await other.goto("/");
 		await other.getByRole("button", { name: "Sign In", exact: true }).click();
-		await other.getByLabel("Email", { exact: true }).fill(account.email);
+		await other.getByLabel("Username", { exact: true }).fill(account.username);
 		await other.getByLabel("Password", { exact: true }).fill(password);
 		await other.getByRole("button", { name: "Sign In", exact: true }).click();
 		await expect(

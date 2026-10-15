@@ -1,15 +1,24 @@
+import { useEffect, useState } from "react";
+import rules from "../../../../common/rules.json";
+import { ChatPanel } from "../../components/ChatPanel";
 import type { GameSocket } from "../../network/GameSocket";
-import { ChatOverlay } from "./ChatOverlay";
-import { useRoomChat } from "./useRoomChat";
-
 export function RoomChat({ socket }: { socket: GameSocket }) {
-	const chat = useRoomChat(socket);
+	const [messages, setMessages] = useState(() => socket.chatHistory);
+	useEffect(() => {
+		const unsubscribe = socket.subscribe((type) => {
+			if (type === "CHAT_MESSAGE" || type === "CHAT_HISTORY")
+				setMessages(socket.chatHistory);
+		});
+		setMessages(socket.chatHistory);
+		return unsubscribe;
+	}, [socket]);
 	return (
-		<>
-			<button type="button" aria-keyshortcuts="Enter" onClick={chat.openChat}>
-				Chat
-			</button>
-			<ChatOverlay chat={chat} socket={socket} />
-		</>
+		<ChatPanel
+			messages={messages}
+			colors={rules.appearanceColors}
+			onSend={async (text) => {
+				await socket.command("CHAT_SEND", { text });
+			}}
+		/>
 	);
 }

@@ -14,7 +14,6 @@ import java.util.concurrent.TimeUnit;
 import jumpking.config.NetworkSettings;
 import jumpking.exception.ApiException;
 import jumpking.security.SessionAuthority;
-import jumpking.service.GuestHistoryService;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -221,8 +220,8 @@ public class GameTransport extends TextWebSocketHandler implements AutoCloseable
             command, "PONG", Map.of("nonce", GameEnvelope.text(command.payload(), "nonce")));
         return;
       }
-      if (Set.of("CREATE_ROOM", "JOIN_ROOM", "JOIN_COMMUNITY", "NEW_COMMUNITY_RUN")
-          .contains(command.type())) joinAttempt(connection);
+      if (Set.of("CREATE_ROOM", "JOIN_ROOM", "JOIN_COMMUNITY").contains(command.type()))
+        joinAttempt(connection);
       var handler =
           handlers.stream()
               .filter(candidate -> candidate.supports(connection, command))
@@ -240,14 +239,8 @@ public class GameTransport extends TextWebSocketHandler implements AutoCloseable
           var empty = json.createObjectNode();
           for (String field :
               List.of(
-                  "roomId",
-                  "kind",
-                  "state",
-                  "hostPlayerId",
-                  "settings",
-                  "currentPlay",
-                  "result",
-                  "pauseExpiresAt")) empty.putNull(field);
+                  "roomId", "kind", "state", "hostPlayerId", "settings", "currentPlay", "result"))
+            empty.putNull(field);
           empty.putArray("members");
           connection.reply(command, "ROOM_STATE", empty);
         }
@@ -293,13 +286,6 @@ public class GameTransport extends TextWebSocketHandler implements AutoCloseable
   public void revoked(SessionAuthority.Revoked event) {
     connections.values().stream()
         .filter(connection -> event.sessionId().equals(connection.identity().sessionId()))
-        .forEach(connection -> connection.close(CloseStatus.POLICY_VIOLATION));
-  }
-
-  @EventListener
-  public void merged(GuestHistoryService.Merged event) {
-    connections.values().stream()
-        .filter(connection -> event.source() == connection.identity().owner())
         .forEach(connection -> connection.close(CloseStatus.POLICY_VIOLATION));
   }
 

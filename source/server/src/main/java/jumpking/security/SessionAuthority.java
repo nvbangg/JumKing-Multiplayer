@@ -85,6 +85,22 @@ public class SessionAuthority implements HttpSessionListener, HttpSessionIdListe
     return entry != null && valid(entry.session, false) ? entry.session : null;
   }
 
+  public void revokeAccount(String username) {
+    for (var entry : java.util.List.copyOf(sessions.values())) {
+      try {
+        Object value =
+            entry.session.getAttribute(
+                org.springframework.security.web.context.HttpSessionSecurityContextRepository
+                    .SPRING_SECURITY_CONTEXT_KEY);
+        if (value instanceof org.springframework.security.core.context.SecurityContext context
+            && context.getAuthentication() != null
+            && username.equals(context.getAuthentication().getName())) entry.session.invalidate();
+      } catch (IllegalStateException expired) {
+        /* Phiên đã hết hạn trong lúc duyệt. */
+      }
+    }
+  }
+
   @Scheduled(fixedDelay = 60_000)
   public void expire() {
     sessions.values().forEach(entry -> valid(entry.session, false));

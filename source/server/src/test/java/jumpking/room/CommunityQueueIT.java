@@ -67,7 +67,7 @@ class CommunityQueueIT {
       } catch (RejectedExecutionException full) {
         /* Đã lấp đúng hạn queue của cấu hình test. */
       }
-      var rejected = b.command("JOIN_ROOM", Map.of("roomId", roomId));
+      var rejected = b.command("JOIN_COMMUNITY", Map.of());
       assertThat(rejected.path("payload").path("code").asText()).isEqualTo("RATE_LIMITED");
       assertThat(memberships.find(b.owner)).isNull();
       release.countDown();
@@ -83,7 +83,7 @@ class CommunityQueueIT {
         }
       }
       drained.get(3, TimeUnit.SECONDS);
-      b.ok("JOIN_ROOM", Map.of("roomId", roomId));
+      b.ok("JOIN_COMMUNITY", Map.of());
       var joined =
           b.await(message -> message.path("type").asText().equals("ROOM_JOINED")).path("payload");
       assertThat(b.ok("GET_ROOM_STATE", Map.of()).path("members").size()).isEqualTo(2);

@@ -1,6 +1,7 @@
 package jumpking.service;
 
 import java.util.function.Function;
+import java.util.function.Supplier;
 import jumpking.exception.ApiException;
 import jumpking.repository.UserRepository;
 import org.springframework.stereotype.Component;
@@ -8,9 +9,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Component
 public class RunOwners {
-  public record Owner(long id, String type, Long mergedInto) {}
-
-  private static class OwnerChanged extends RuntimeException {}
+  public record Owner(long id, String type) {}
 
   private final UserRepository users;
   private final TransactionTemplate transactions;
@@ -23,53 +22,24 @@ public class RunOwners {
   public Owner read(long id) {
     return users
         .findById(id)
-        .map(user -> new Owner(user.getId(), user.getType(), user.getMergedIntoUserId()))
-        .orElseThrow(() -> new ApiException(404, "NOT_FOUND", "Identity not found"));
+        .map(u -> new Owner(u.getId(), u.getType()))
+        .orElseThrow(() -> new ApiException(404, "NOT_FOUND", "Account not found"));
   }
 
-  public void lockPair(long first, long second) {
-    lock(Math.min(first, second));
-    if (first != second) lock(Math.max(first, second));
+  public <T> T write(long id, Function<Long, T> writer) {
+    return writeAll(java.util.List.of(id), () -> writer.apply(id));
   }
 
-  private void lock(long id) {
-    users.lockById(id).orElseThrow(() -> new ApiException(404, "NOT_FOUND", "Identity not found"));
-  }
-
-  public <T> T write(long source, Function<Long, T> writer) {
-    return writeAll(java.util.List.of(source), owners -> writer.apply(owners.get(source)));
-  }
-
-  public <T> T writeAll(
-      java.util.Collection<Long> sources, Function<java.util.Map<Long, Long>, T> writer) {
-    var unique = new java.util.TreeSet<>(sources);
-    for (int attempt = 0; attempt <= unique.size(); attempt++) {
-      var targets = new java.util.LinkedHashMap<Long, Long>();
-      var locks = new java.util.TreeSet<>(unique);
-      for (long source : unique) {
-        var owner = read(source);
-        long target = owner.mergedInto == null ? source : owner.mergedInto;
-        targets.put(source, target);
-        locks.add(target);
-      }
-      try {
-        return transactions.execute(
-            status -> {
-              locks.forEach(this::lock);
-              for (long source : unique) {
-                var owner = read(source);
-                long current = owner.mergedInto == null ? source : owner.mergedInto;
-                // Pointer đổi trước khi lấy lock: rollback rồi khóa lại toàn bộ theo thứ tự ID.
-                if (current != targets.get(source)) throw new OwnerChanged();
-                if (current != source && !"ACCOUNT".equals(read(current).type))
-                  throw new IllegalStateException("Invalid merge target");
-              }
-              return writer.apply(java.util.Map.copyOf(targets));
-            });
-      } catch (OwnerChanged retry) {
-        /* Pointer chỉ được thiết lập một lần. */
-      }
-    }
-    throw new ApiException(409, "CONFLICT", "History ownership changed; retry the write");
+  public <T> T writeAll(java.util.Collection<Long> sources, Supplier<T> writer) {
+    return transactions.execute(
+        status -> {
+          // Thứ tự khóa cố định tránh deadlock khi ghi kết quả nhiều người.
+          for (long id : new java.util.TreeSet<>(sources)) {
+            users
+                .lockById(id)
+                .orElseThrow(() -> new ApiException(404, "NOT_FOUND", "Account not found"));
+          }
+          return writer.get();
+        });
   }
 }

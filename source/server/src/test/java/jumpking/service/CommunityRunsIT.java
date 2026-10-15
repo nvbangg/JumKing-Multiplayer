@@ -7,7 +7,6 @@ import java.util.*;
 import java.util.concurrent.*;
 import jumpking.exception.ApiException;
 import jumpking.game.*;
-import jumpking.security.GuestIdentity;
 import jumpking.support.TestDatabase;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -38,9 +37,8 @@ class CommunityRunsIT {
   long account() {
     String name = "checkpoint_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
     jdbc.update(
-        "INSERT INTO users(type,username,email,password_hash,created_at) VALUES ('ACCOUNT',?,?,'unused-test-hash',UTC_TIMESTAMP(3))",
-        name,
-        name + "@example.test");
+        "INSERT INTO users(type,username,password_hash,created_at) VALUES ('ACCOUNT',?,'unused-test-hash',UTC_TIMESTAMP(3))",
+        name);
     return jdbc.queryForObject("SELECT id FROM users WHERE username=?", Long.class, name);
   }
 
@@ -96,12 +94,7 @@ class CommunityRunsIT {
                 Integer.class,
                 owner))
         .isEqualTo(1);
-    String hash = GuestIdentity.hash(UUID.randomUUID().toString());
-    jdbc.update(
-        "INSERT INTO users(type,guest_token_hash,created_at) VALUES ('GUEST',?,UTC_TIMESTAMP(3))",
-        hash);
-    long guest =
-        jdbc.queryForObject("SELECT id FROM users WHERE guest_token_hash=?", Long.class, hash);
+    long guest = TestDatabase.get().historicalGuest();
     assertThatThrownBy(() -> records.open(guest, false, null, spawn))
         .isInstanceOf(ApiException.class);
   }

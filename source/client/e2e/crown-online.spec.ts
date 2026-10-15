@@ -17,14 +17,12 @@ test("Solo crown syncs to the Account and a new device without importing the che
 		const a = await first.newPage(),
 			b = await second.newPage();
 		const username = "crown_" + Date.now(),
-			email = username + "@example.test",
 			password = "A secure crown password";
 		await a.goto("/");
 		await a
 			.getByRole("button", { name: "Create Account", exact: true })
 			.click();
 		await a.getByLabel("Username", { exact: true }).fill(username);
-		await a.getByLabel("Email", { exact: true }).fill(email);
 		await a.getByLabel("Password", { exact: true }).fill(password);
 		await a
 			.getByRole("button", { name: "Create Account", exact: true })
@@ -63,7 +61,7 @@ test("Solo crown syncs to the Account and a new device without importing the che
 			.toBe(true);
 		await b.goto("/");
 		await b.getByRole("button", { name: "Sign In", exact: true }).click();
-		await b.getByLabel("Email", { exact: true }).fill(email);
+		await b.getByLabel("Username", { exact: true }).fill(username);
 		await b.getByLabel("Password", { exact: true }).fill(password);
 		await b.getByRole("button", { name: "Sign In", exact: true }).click();
 		await expect(

@@ -28,17 +28,20 @@ class RoomLobbyIT {
   @LocalServerPort int port;
 
   @Test
-  void guestRoomCapacitySettingsPermissionsAndHostTransferUseRealConnections() throws Exception {
+  void accountRoomCapacitySettingsPermissionsAndHostTransferUseRealConnections() throws Exception {
     var clients = new ArrayList<GameClient>();
     try {
       for (int index = 0; index < 11; index++) {
         var client = new GameClient(port);
         clients.add(client);
-        client.guest();
+        if (index == 0)
+          client.register(
+              "player_" + UUID.randomUUID().toString().replace("-", "").substring(0, 25));
+        else client.register();
         client.connect();
       }
       var host = clients.getFirst();
-      var joined = host.ok("CREATE_ROOM", Map.of("nickname", "Host"));
+      var joined = host.ok("CREATE_ROOM", Map.of());
       String room = joined.path("roomId").asText();
       assertThat(host.request("/rooms/" + room, "GET", null).path("joinable").asBoolean()).isTrue();
       host.ok("UPDATE_ROOM_SETTINGS", Map.of("mode", "TIME_LIMIT", "timeLimitMinutes", 2));
@@ -50,10 +53,12 @@ class RoomLobbyIT {
       assertThat(host.ok("GET_ROOM_STATE", Map.of()).path("settings").path("mode").asText())
           .isEqualTo("TIME_LIMIT");
       for (int index = 1; index < 10; index++)
-        clients.get(index).ok("JOIN_ROOM", Map.of("roomId", room, "nickname", "Player " + index));
+        clients.get(index).ok("JOIN_ROOM", Map.of("roomId", room));
       var chat = host.ok("CHAT_SEND", Map.of("text", "Room chat"));
       assertThat(chat.path("roomId").asText()).isEqualTo(room);
-      assertThat(chat.path("messages").get(0).path("nickname").asText()).isEqualTo("Host");
+      assertThat(chat.path("messages").get(0).path("nickname").asText())
+          .isEqualTo(
+              host.request("/auth/me", "GET", null).path("account").path("username").asText());
       clients
           .get(1)
           .await(
@@ -63,7 +68,7 @@ class RoomLobbyIT {
       assertThat(
               clients
                   .get(10)
-                  .command("JOIN_ROOM", Map.of("roomId", room, "nickname", "Overflow"))
+                  .command("JOIN_ROOM", Map.of("roomId", room))
                   .path("payload")
                   .path("code")
                   .asText())
@@ -92,7 +97,7 @@ class RoomLobbyIT {
       assertThat(next.path("hostPlayerId").asText())
           .isEqualTo(next.path("members").get(0).path("playerId").asText());
       assertThat(next.path("settings").path("timeLimitMinutes").asInt()).isEqualTo(2);
-      clients.get(10).ok("JOIN_ROOM", Map.of("roomId", room, "nickname", "Replacement"));
+      clients.get(10).ok("JOIN_ROOM", Map.of("roomId", room));
       assertThat(
               clients
                   .get(10)

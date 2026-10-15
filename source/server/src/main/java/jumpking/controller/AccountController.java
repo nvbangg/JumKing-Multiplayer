@@ -10,10 +10,8 @@ import java.util.Map;
 import jumpking.dto.AccountCredentials;
 import jumpking.dto.AccountDto;
 import jumpking.exception.ApiException;
-import jumpking.security.GuestIdentity;
 import jumpking.security.IdentityContext;
 import jumpking.service.AccountService;
-import jumpking.service.GuestHistoryService;
 import org.springframework.boot.autoconfigure.web.ServerProperties;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -32,24 +30,24 @@ import org.springframework.web.bind.annotation.RestController;
 public class AccountController {
   private final AccountService accounts;
   private final IdentityContext identity;
-  private final GuestIdentity guests;
   private final HttpSessionSecurityContextRepository contexts;
   private final HttpSessionCsrfTokenRepository csrf;
   private final ServerProperties server;
+  private final jumpking.security.SessionAuthority authority;
 
   public AccountController(
       AccountService accounts,
       IdentityContext identity,
-      GuestIdentity guests,
       HttpSessionSecurityContextRepository contexts,
       HttpSessionCsrfTokenRepository csrf,
-      ServerProperties server) {
+      ServerProperties server,
+      jumpking.security.SessionAuthority authority) {
     this.accounts = accounts;
     this.identity = identity;
-    this.guests = guests;
     this.contexts = contexts;
     this.csrf = csrf;
     this.server = server;
+    this.authority = authority;
   }
 
   @PostMapping("/register")
@@ -59,32 +57,26 @@ public class AccountController {
       HttpServletResponse response) {
     if (identity.account() != null)
       throw new ApiException(409, "CONFLICT", "Sign out before creating another account");
-    var account =
-        accounts.register(form, guests.resolve(request), value -> signIn(value, request, response));
-    guests.clear(response);
-    return new AccountDto.Me(true, false, account, account.crownUnlocked());
+    var account = accounts.register(form, value -> signIn(value, request, response));
+    return new AccountDto.Me(true, account, account.crownUnlocked());
   }
 
   @PostMapping("/login")
-  public LoginResponse login(
+  public AccountDto.Me login(
       @Valid @RequestBody AccountCredentials.Login form,
       HttpServletRequest request,
       HttpServletResponse response) {
-    Long guest = guests.resolve(request);
-    boolean history = accounts.guestHistory(guest);
-    var account =
-        accounts.login(form, identity.owner(request), value -> signIn(value, request, response));
-    long target = Long.parseLong(account.id());
-    var session = request.getSession(false);
-    if (guest != null)
-      session.setAttribute(
-          GuestHistoryService.CANDIDATE, new GuestHistoryService.Candidate(guest, target));
-    else if (!(session.getAttribute(GuestHistoryService.CANDIDATE)
-            instanceof GuestHistoryService.Candidate candidate)
-        || candidate.target() != target) {
-      session.removeAttribute(GuestHistoryService.CANDIDATE);
-    }
-    return new LoginResponse(true, false, account, history);
+    var account = accounts.login(form, identity.owner(), value -> signIn(value, request, response));
+    return new AccountDto.Me(true, account, account.crownUnlocked());
+  }
+
+  @PostMapping("/password")
+  public Map<String, Boolean> password(@Valid @RequestBody AccountCredentials.PasswordChange form) {
+    var account = identity.requireAccount();
+    accounts.changePassword(Long.parseLong(account.id()), form);
+    authority.revokeAccount(account.username());
+    SecurityContextHolder.clearContext();
+    return Map.of("ok", true);
   }
 
   @PostMapping("/logout")
@@ -114,7 +106,7 @@ public class AccountController {
     var context = SecurityContextHolder.createEmptyContext();
     context.setAuthentication(
         UsernamePasswordAuthenticationToken.authenticated(
-            account.email(), null, List.of(new SimpleGrantedAuthority("ROLE_ACCOUNT"))));
+            account.username(), null, List.of(new SimpleGrantedAuthority("ROLE_ACCOUNT"))));
     SecurityContextHolder.setContext(context);
     contexts.saveContext(context, request, response);
     csrf.saveToken(null, request, response);

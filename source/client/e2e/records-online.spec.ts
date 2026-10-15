@@ -19,9 +19,6 @@ async function register(page: Page) {
 		.click();
 	await page.getByLabel("Username", { exact: true }).fill(username);
 	await page
-		.getByLabel("Email", { exact: true })
-		.fill(username + "@example.test");
-	await page
 		.getByLabel("Password", { exact: true })
 		.fill("A secure records test password");
 	await page

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { soloJumps } from "./support/solo";
 
 test("Solo renders Main Babe, accepts charged jump and resumes from menu", async ({
 	page,
@@ -16,7 +17,7 @@ test("Solo renders Main Babe, accepts charged jump and resumes from menu", async
 	)
 		await page.getByRole("button", { name: "Resume", exact: true }).click();
 	await page.keyboard.down("Space");
-	await expect(page.getByText("Jumps: 1", { exact: true })).toBeVisible();
+	await expect.poll(() => soloJumps(page)).toBe(1);
 	await page.keyboard.up("Space");
 	await page.getByRole("button", { name: "Menu", exact: true }).click();
 	await expect(

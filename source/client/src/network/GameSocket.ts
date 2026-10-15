@@ -93,7 +93,7 @@ export interface RoomState {
 	visibility?: "PRIVATE" | "PUBLIC";
 	roomId: string;
 	kind: "ROOM" | "COMMUNITY";
-	state: "WAITING" | "COUNTDOWN" | "PLAYING" | "PAUSED" | "FINISHED";
+	state: "WAITING" | "COUNTDOWN" | "PLAYING" | "FINISHED";
 	hostPlayerId: string | null;
 	settings: {
 		mode: string;
@@ -103,7 +103,6 @@ export interface RoomState {
 	members: RoomMember[];
 	currentPlay: Record<string, unknown> | null;
 	result: unknown;
-	pauseExpiresAt: string | null;
 }
 export interface ResultRow {
 	playerId: string;

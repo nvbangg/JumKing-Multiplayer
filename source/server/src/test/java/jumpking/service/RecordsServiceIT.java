@@ -26,9 +26,8 @@ class RecordsServiceIT {
     String name = "totals_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12),
         match = UUID.randomUUID().toString();
     jdbc.update(
-        "INSERT INTO users(type,username,email,password_hash,created_at) VALUES ('ACCOUNT',?,?,'test-hash',UTC_TIMESTAMP(3))",
-        name,
-        name + "@example.test");
+        "INSERT INTO users(type,username,password_hash,created_at) VALUES ('ACCOUNT',?,'test-hash',UTC_TIMESTAMP(3))",
+        name);
     long owner = jdbc.queryForObject("SELECT id FROM users WHERE username=?", Long.class, name);
     try {
       jdbc.update(

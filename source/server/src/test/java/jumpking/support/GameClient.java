@@ -36,6 +36,7 @@ public final class GameClient implements AutoCloseable {
   private volatile Integer closeCode;
   private volatile String closeReason;
   public long owner;
+  public boolean autoReady = true;
   private String csrf;
 
   public GameClient(int port) {
@@ -62,48 +63,26 @@ public final class GameClient implements AutoCloseable {
   }
 
   public void register() throws Exception {
+    register("online_" + UUID.randomUUID().toString().replace("-", "").substring(0, 14));
+  }
+
+  public void register(String name) throws Exception {
     csrf = request("/auth/csrf", "GET", null).path("token").asText();
-    String name = "online_" + UUID.randomUUID().toString().replace("-", "").substring(0, 14);
     owner =
         request(
                 "/auth/register",
                 "POST",
-                Map.of(
-                    "username",
-                    name,
-                    "email",
-                    name + "@example.test",
-                    "password",
-                    "A secure server integration password"))
+                Map.of("username", name, "password", "A secure server integration password"))
             .path("account")
             .path("id")
             .asLong();
     csrf = request("/auth/csrf", "GET", null).path("token").asText();
   }
 
-  public void guest() throws Exception {
-    csrf = request("/auth/csrf", "GET", null).path("token").asText();
-    request("/auth/guest", "POST", null);
-    var cookies = (CookieManager) http.cookieHandler().orElseThrow();
-    String token =
-        cookies.getCookieStore().getCookies().stream()
-            .filter(cookie -> cookie.getName().equals("JK_GUEST"))
-            .findFirst()
-            .orElseThrow()
-            .getValue();
-    owner =
-        TestDatabase.get()
-            .jdbc
-            .queryForObject(
-                "SELECT id FROM users WHERE guest_token_hash=?",
-                Long.class,
-                jumpking.security.GuestIdentity.hash(token));
-  }
-
-  public void login(String email, String password) throws Exception {
+  public void login(String username, String password) throws Exception {
     csrf = request("/auth/csrf", "GET", null).path("token").asText();
     owner =
-        request("/auth/login", "POST", Map.of("email", email, "password", password))
+        request("/auth/login", "POST", Map.of("username", username, "password", password))
             .path("account")
             .path("id")
             .asLong();
@@ -158,6 +137,21 @@ public final class GameClient implements AutoCloseable {
                               System.nanoTime(),
                               text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length);
                         messages.add(message);
+                        if (autoReady && message.path("type").asText().equals("GAME_STARTED")) {
+                          var payload = message.path("payload");
+                          var ready =
+                              json.createObjectNode()
+                                  .put("v", 1)
+                                  .put("type", "GAME_READY")
+                                  .put("requestId", UUID.randomUUID().toString());
+                          ready
+                              .putObject("payload")
+                              .put("playId", payload.path("playId").asText())
+                              .put("generation", payload.path("generation").asLong());
+                          synchronized (sendLock) {
+                            socket.sendText(ready.toString(), true);
+                          }
+                        }
                       } catch (Exception error) {
                         throw new IllegalStateException(error);
                       }
@@ -180,6 +174,19 @@ public final class GameClient implements AutoCloseable {
   public JsonNode ok(String type, Map<String, ?> payload) throws Exception {
     var result = command(type, payload);
     assertThat(result.path("type").asText()).as(result.toString()).isNotEqualTo("ERROR");
+    if (autoReady && type.equals("START_GAME")) {
+      String playId = result.path("payload").path("currentPlay").path("id").asText();
+      await(
+          message ->
+              message.path("type").asText().equals("ROOM_STATE")
+                  && message.path("payload").path("currentPlay").path("id").asText().equals(playId)
+                  && message
+                          .path("payload")
+                          .path("currentPlay")
+                          .path("countdownRemainingMs")
+                          .asLong()
+                      > 0);
+    }
     return result.path("payload");
   }
 

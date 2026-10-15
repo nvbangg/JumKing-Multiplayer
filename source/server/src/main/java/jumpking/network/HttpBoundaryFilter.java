@@ -18,18 +18,12 @@ import jumpking.config.SecuritySettings;
 import jumpking.exception.ApiErrors;
 import jumpking.exception.ApiException;
 import jumpking.security.AuthRateLimiter;
-import jumpking.security.GuestIdentity;
 import jumpking.security.SessionAuthority;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public class HttpBoundaryFilter extends OncePerRequestFilter {
   private static final Set<String> AUTH_MUTATIONS =
-      Set.of(
-          "/api/profile/crown",
-          "/api/auth/guest",
-          "/api/auth/register",
-          "/api/auth/login",
-          "/api/auth/guest-history/merge");
+      Set.of("/api/auth/register", "/api/auth/login", "/api/auth/password");
   private final SecuritySettings settings;
   private final SessionAuthority sessions;
   private final AuthRateLimiter limits;
@@ -71,12 +65,7 @@ public class HttpBoundaryFilter extends OncePerRequestFilter {
           && "PUT".equals(request.getMethod())
           && request.getRequestURI().startsWith("/api/solo/runs/")) limits.solo(account);
       if ("POST".equals(request.getMethod()) && AUTH_MUTATIONS.contains(request.getRequestURI())) {
-        String guest = GuestIdentity.token(request);
-        String identity =
-            account != null
-                ? "account:" + account
-                : guest == null ? null : "guest:" + GuestIdentity.hash(guest);
-        limits.check(request.getRemoteAddr(), identity);
+        limits.check(request.getRemoteAddr(), account == null ? null : "account:" + account);
       }
       if (!Set.of("GET", "HEAD", "OPTIONS").contains(request.getMethod())) {
         if (request.getContentLengthLong() > settings.httpBodyLimit())

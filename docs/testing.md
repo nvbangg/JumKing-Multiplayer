@@ -86,16 +86,16 @@ Với `-Web` và `E2E_BROWSER_PATH`, `SchemaIT` còn chạy Chrome trực tiếp
 | Fly Mode | Gate mặc định/dev/build/prod cho mọi kiểu chơi; nhấn đúp/repeat/cancel không launch thừa; keyboard/touch, biên world, thoát solid/đáy world/restore; save và thành tích đúng [gameplay](gameplay.md#fly-mode) |
 | Nội dung/ending | Main Babe đủ NPC/readables/môi trường/audio; không Inventory/items/merchant/quest nhận đồ; ending/Skip đúng người, không credit hoặc phát trùng; build đúng scope |
 | Adventure boundary | Hai simulation cùng luật/ID, frontend tra cứu đúng nội dung; Java/snapshot không chứa presentation; hội thoại/crown không nhân đôi qua restore/replay/input giả |
-| Community | Account bắt buộc; tự ghép/tạo sảnh, tra/Join ID/full, transfer; lookup không lộ members/token hoặc vượt kiểm tra Join; một lượt/Account, giữ state/time và không nhân đôi membership |
-| Checkpoint | Restore đủ physics/adventure/world; metrics/snapshot/revision atomic; New Run đồng thời và rollback; transfer/Finish/Abandon không mất save hoặc bị writer cũ phục hồi; một Community ACTIVE không khóa Solo |
+| Community | Account bắt buộc; tự ghép/tạo sảnh, không Join bằng ID; lookup không lộ members/token; một lượt/Account, giữ state/time và không nhân đôi membership |
+| Checkpoint | Restore đủ physics/adventure/world; metrics/snapshot/revision atomic; New Run đồng thời và rollback; Finish/Abandon không mất save hoặc bị writer cũ phục hồi; một Community ACTIVE không khóa Solo |
 | Pause/AFK | Hidden/blur và biên AFK theo gameplay; neutral frames/giữ phím/heartbeat/chat không reset AFK, input thật reset; Community đang rơi phải settle, hết hạn lưu/release slot; Room mở menu lâu không tự out hoặc dừng trận |
 | Room | 1 người không Start được; 2/max clients, countdown/permissions; Join mới chỉ WAITING, reconnect đúng roster; Leave/Host transfer/End; Play Again từng người giữ code/settings/History, không kéo người chưa xác nhận vào match mới |
-| Host Pause | State/clock/Time Limit/adventure đóng băng, chat/heartbeat/deadlines vẫn chạy; Resume không bù ticks/input cũ; Pause lặp không gia hạn, hết hạn finalize PAUSE_TIMEOUT đúng một lần; Host đóng tab/chuyển quyền, mọi người offline/quay lại, Leave hết và restart theo thiết kế |
+| Room lifecycle | Menu không dừng trận/Time Limit; không có Host Pause; all-offline giữ reconnect 5 phút rồi finalize một lần. Renderer sẵn sàng trước countdown 3 giây; load lỗi/timeout/rời quay lại Lobby |
 | Modes/rank | Race first Finish; Hardcore splat respawn giữ clock/peak/falls; Time Limit biên phút/deadline; No Walk không tạo vận tốc đi bộ; comparator, DNF và đồng hạng theo gameplay |
 | Leaderboard | Chỉ Community; best của một lượt/Account, không ghép peak/time khác lượt, không nhận Room/Solo hoặc client score |
-| Identity/data | Schema/FK/CHECK/unique theo [data](data.md); Register/Login/Logout/Merge/Skip, session rotation/ownership/ID enumeration; rollback/revision/save status; Solo không sửa lượt online |
-| Stats/History | Tổng cả ba kiểu chơi; Guest local/Room và Account đã sync không cộng trùng; History theo kind/run/match, chỉ terminal/finalized; pending Solo thay cùng ID, Merge không nhân mục; ownership/pagination/best/wins đúng data |
-| Identity/chat | Ngoại hình không trùng; Community username và Room nickname đúng identity; adventure/effects không lặp qua replay; chat plain text, cooldown/history/focus |
+| Identity/data | Schema/FK/CHECK/unique theo [data](data.md); Register/Login/Logout/Change Password, session rotation/ownership/ID enumeration; rollback/revision/save status; Solo không sửa lượt online |
+| Stats/History | Tổng cả ba kiểu chơi; Guest Solo local và Account đã sync không cộng trùng; History theo kind/run/match, chỉ terminal/finalized; pending Solo thay cùng ID, login không import Guest; ownership/pagination/best/wins đúng data |
+| Identity/chat | Ngoại hình không trùng; username cả Room/Community đúng identity; adventure/effects không lặp qua replay; chat plain text, cooldown/history/focus |
 | Mobile/browser | Multi-touch/cancel/capture, xoay màn hình, keyboard/gamepad fallback, viewport/menu, storage/audio bị chặn; refresh UI đúng route, API/asset thiếu giữ đúng lỗi |
 | Assets | Manifest đủ file sử dụng, nguồn/tình trạng giấy phép rõ; artifact/Git đúng phạm vi và không chứa dữ liệu/công cụ riêng tư |
 
@@ -109,16 +109,16 @@ Chơi toàn tuyến bằng input hợp lệ để nghiệm thu platform/charge/c
 - Snapshot đến muộn/dồn: peers đi đều không giật tại thời điểm nhận packet; bộ đệm có giới hạn, không extrapolate hoặc phục hồi peer đã rời. Chuyển screen/respawn/reconnect không kéo nhân vật qua map. Pose chỉ gửi trong screen hiện tại/liền kề; Players vẫn đủ toàn phòng.
 - Input FIFO giữ cạnh nhấn/thả và chỉ ACK khi consume. Input mới không che backlog quá hạn: socket bị đóng/resync, charge bị hủy an toàn và generation đổi khi reconnect; input timeout thông thường vẫn cancel. Restore lỗi ở bất kỳ phần physics/adventure/world không được sửa state đang chạy.
 - Community đang rơi vẫn chịu physics trước Pause; Resume không mất velocity/buffers hoặc tăng peak giả. Room disconnect không tạo release-jump hoặc reset đồng hồ.
-- Trì hoãn/lặp/đảo callbacks của checkpoint/Room writer và Solo sync: revision cũ, Finish/New Run/transfer/Leave/Merge không phục hồi lượt đã kết thúc, ghi sai owner hoặc tạo thêm rows. Cùng revision khác nội dung phải CONFLICT; UUID của identity/kind khác bị từ chối.
+- Trì hoãn/lặp/đảo callbacks của checkpoint/Room writer và Solo sync: revision cũ, Finish/New Run/Leave không phục hồi lượt đã kết thúc, ghi sai owner hoặc tạo thêm rows. Cùng revision khác nội dung phải CONFLICT; UUID của identity/kind khác bị từ chối.
 - Tắt MySQL trong instance test: Room tick không block, Community báo lỗi/tạm dừng, không phát SAVED trước commit; retry có giới hạn và transaction atomic.
 - Gửi sai payload/protocol version/mode/input, position/clock online giả, input bay khi cờ tắt, cross-origin, CSRF thiếu và request vượt giới hạn; không làm dừng phòng khác hoặc lộ secrets. Solo metrics tự khai báo không được trở thành Community hoặc đóng góp leaderboard.
-- Kiểm tra cùng origin và khác origin nhưng cùng site: credentials, preflight, CSRF, WS Origin và cookies; idle/absolute expiry đóng WS, đăng nhập lại đúng Account reconnect Room PAUSED, sai owner/token bị từ chối. Internet phải nghiệm thu riêng khi deploy.
-- Thử handshake/Create/Join/New Run flooding và connection/phòng hết quota, kể cả phòng PAUSED; từ chối trước cấp phát, không làm treo phòng khác.
+- Kiểm tra cùng origin và khác origin nhưng cùng site: credentials, preflight, CSRF, WS Origin và cookies; idle/absolute expiry đóng WS, đăng nhập lại đúng Account reconnect Room còn hạn reconnect, sai owner/token bị từ chối. Internet phải nghiệm thu riêng khi deploy.
+- Thử handshake/Create/Join/New Run flooding và connection/phòng hết quota; từ chối trước cấp phát, không làm treo phòng khác.
 - Chặn storage/quota/autoplay/gamepad; báo đúng giới hạn, không đánh mất input hoặc báo lưu thành công giả.
 
 ## Thực nghiệm và bàn giao
 
-Theo [yêu cầu học phần](final-project/final-project/Instruction.md), mỗi thực nghiệm có giả thuyết, baseline, workload, môi trường, số mẫu và phân tích giới hạn.
+Theo [yêu cầu học phần](final-project/Instruction.md), mỗi thực nghiệm có giả thuyết, baseline, workload, môi trường, số mẫu và phân tích giới hạn.
 
 So sánh snapshot-only với prediction/reconciliation bằng cùng map/tuning và workload. Đo input-to-display latency, correction magnitude/frequency, snapshot jitter, tick time/overrun, messages/bytes, CPU/RAM và độ trễ/lỗi persistence. Dùng 1/2/max clients, thêm nhiều phòng để tìm giới hạn; báo p50/p95/p99 khi phù hợp. Không có clock synchronization thì đo RTT, không suy one-way latency.
 
@@ -144,7 +144,7 @@ Báo cáo giải thích networking/concurrency/protocol, đóng góp có số đ
 
 ## Nghiệm thu thay đổi persistence và Room
 
-- JPA mapping chạy trên MySQL, transaction/lock/rollback, generated unique Community, Merge và writer đến muộn; không dùng H2 thay MySQL.
+- JPA mapping chạy trên MySQL, transaction/lock/rollback, generated unique Community và writer đến muộn; không dùng H2 thay MySQL.
 - Schema hiện tại tạo đủ ba bảng, CHECK/unique/FK; test setup không thực thi lệnh reset database thật.
 - Không còn SQL/JdbcTemplate trong Controller/Service; API không trả Entity hoặc truy vấn snapshot cho bảng tổng hợp.
 - Room Public/Private: list chỉ WAITING còn chỗ, Join/Start cạnh tranh không vượt capacity, map không đổi giữa trận.

@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 import type { OnlineSnapshot } from "../src/game/netcode/OnlineRuntime";
-import { leaveOnline } from "./support/online";
+import {
+	createRoom,
+	joinRoom,
+	leaveOnline,
+	registerOnline,
+	startRoom,
+} from "./support/online";
 
 test.skip(
 	process.env.E2E_ROOM_FLY !== "true",
@@ -34,23 +40,15 @@ test("short Room finish shows Results and History without ending or full-map rew
 				if (message.type === "PLAYER_FINISHED") finishes.push(message.payload);
 			}),
 		);
-		await a.goto("/");
-		await a
-			.getByRole("button", { name: "Play with Friends", exact: true })
-			.click();
-		await a.getByLabel("Nickname", { exact: true }).fill("Short Host");
-		await a.getByRole("button", { name: "Create Room", exact: true }).click();
+		const hostName = await registerOnline(a, "fly_host");
+		await registerOnline(b, "fly_peer");
+		await createRoom(a);
 		await a.getByLabel("Map", { exact: true }).selectOption("1");
 		await expect(a.getByLabel("Map", { exact: true })).toHaveValue("1");
 		const id = await a.locator(".room-code code").innerText();
-		await b.goto("/");
-		await b.getByRole("button", { name: "Join by ID", exact: true }).click();
-		await b.getByLabel("Room ID", { exact: true }).fill(id);
-		await b.getByRole("button", { name: "Join", exact: true }).click();
-		await b.getByLabel("Nickname", { exact: true }).fill("Peer");
-		await b.getByRole("button", { name: "Join", exact: true }).click();
+		await joinRoom(b, id);
 		await a.bringToFront();
-		await a.getByRole("button", { name: "Start", exact: true }).click();
+		await startRoom(a, b);
 		await expect(
 			a.getByRole("button", { name: "Menu", exact: true }),
 		).toBeVisible({ timeout: 15_000 });
@@ -91,7 +89,7 @@ test("short Room finish shows Results and History without ending or full-map rew
 		await expect(
 			a.getByRole("button", { name: "Play Again", exact: true }),
 		).toBeEnabled({ timeout: 10_000 });
-		await expect(a.locator(".winner")).toContainText("Short Host");
+		await expect(a.locator(".winner")).toContainText(hostName);
 		await expect(
 			a.getByText("Map 1 · Redcrown Woods", { exact: true }),
 		).toBeVisible();
@@ -156,22 +154,14 @@ for (const mode of ["RACE", "HARDCORE", "TIME_LIMIT", "NO_WALK"])
 					if (message.type === "ERROR") errors.push(message.payload);
 				}),
 			);
-			await a.goto("/");
-			await a
-				.getByRole("button", { name: "Play with Friends", exact: true })
-				.click();
-			await a.getByLabel("Nickname", { exact: true }).fill("Flying Host");
-			await a.getByRole("button", { name: "Create Room", exact: true }).click();
+			await registerOnline(a, "fly_host");
+			await registerOnline(b, "fly_peer");
+			await createRoom(a);
 			await a.getByLabel("Mode", { exact: true }).selectOption(mode);
 			const room = await a.locator(".room-code code").innerText();
-			await b.goto("/");
-			await b.getByRole("button", { name: "Join by ID", exact: true }).click();
-			await b.getByLabel("Room ID", { exact: true }).fill(room);
-			await b.getByRole("button", { name: "Join", exact: true }).click();
-			await b.getByLabel("Nickname", { exact: true }).fill("Peer");
-			await b.getByRole("button", { name: "Join", exact: true }).click();
+			await joinRoom(b, room);
 			await a.bringToFront();
-			await a.getByRole("button", { name: "Start", exact: true }).click();
+			await startRoom(a, b);
 			await expect(
 				a.getByRole("button", { name: "Menu", exact: true }),
 			).toBeVisible({ timeout: 15_000 });

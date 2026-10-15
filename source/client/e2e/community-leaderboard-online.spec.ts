@@ -5,7 +5,7 @@ test.skip(
 	process.env.E2E_AUTH_ONLINE !== "true",
 	"Requires the isolated backend/MySQL integration harness",
 );
-test("Community records refresh only while expanded and never more than once per ten seconds", async ({
+test("Community records load on open and Refresh, never poll", async ({
 	page,
 }, info) => {
 	test.setTimeout(60_000);
@@ -30,9 +30,6 @@ test("Community records refresh only while expanded and never more than once per
 			.getByRole("button", { name: "Create Account", exact: true })
 			.click();
 		await page.getByLabel("Username", { exact: true }).fill(name);
-		await page
-			.getByLabel("Email", { exact: true })
-			.fill(name + "@example.test");
 		await page
 			.getByLabel("Password", { exact: true })
 			.fill("A secure leaderboard test password");
@@ -61,11 +58,13 @@ test("Community records refresh only while expanded and never more than once per
 			.filter({ hasText: /^Players$/ })
 			.click();
 		await page.screenshot({ path: info.outputPath("community-boards.png") });
-		await summary.click();
-		await summary.click();
+		await page.waitForTimeout(10500);
 		expect(requests).toHaveLength(1);
-		await expect.poll(() => requests.length, { timeout: 12_000 }).toBe(2);
-		expect(requests[1]! - requests[0]!).toBeGreaterThanOrEqual(9900);
+		await page.getByRole("button", { name: "Refresh", exact: true }).click();
+		await expect.poll(() => requests.length).toBe(2);
+		await summary.click();
+		await summary.click();
+		await expect.poll(() => requests.length).toBe(3);
 		await summary.click();
 		const closedCount = requests.length;
 		await page.waitForTimeout(10_500);

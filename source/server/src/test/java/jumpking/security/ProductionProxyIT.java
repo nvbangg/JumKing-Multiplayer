@@ -54,19 +54,19 @@ class ProductionProxyIT {
       // Thiếu CSRF bị từ chối nhưng vẫn tiêu thụ quota xác thực của IP.
       assertThat(
               http.send(
-                      request("/auth/guest", "192.0.2.10", true),
+                      request("/auth/login", "192.0.2.10", true),
                       HttpResponse.BodyHandlers.discarding())
                   .statusCode())
           .isEqualTo(403);
       assertThat(
               http.send(
-                      request("/auth/guest", "192.0.2.10", true),
+                      request("/auth/login", "192.0.2.10", true),
                       HttpResponse.BodyHandlers.discarding())
                   .statusCode())
           .isEqualTo(429);
       assertThat(
               http.send(
-                      request("/auth/guest", "192.0.2.11", true),
+                      request("/auth/login", "192.0.2.11", true),
                       HttpResponse.BodyHandlers.discarding())
                   .statusCode())
           .isEqualTo(403);
@@ -82,13 +82,13 @@ class ProductionProxyIT {
             .build()) {
       assertThat(
               http.send(
-                      request("/auth/guest", "192.0.2.20", true),
+                      request("/auth/login", "192.0.2.20", true),
                       HttpResponse.BodyHandlers.discarding())
                   .statusCode())
           .isEqualTo(403);
       assertThat(
               http.send(
-                      request("/auth/guest", "192.0.2.21", true),
+                      request("/auth/login", "192.0.2.21", true),
                       HttpResponse.BodyHandlers.discarding())
                   .statusCode())
           .isEqualTo(429);

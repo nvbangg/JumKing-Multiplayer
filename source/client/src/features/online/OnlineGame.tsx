@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import rules from "../../../../common/rules.json";
+import { ControlsHelp } from "../../components/ControlsHelp";
 import { MenuPanel } from "../../components/MenuPanel";
 import { loadManifest } from "../../game/content/assets";
 import { FlightToggle } from "../../game/input/FlightToggle";
@@ -14,13 +15,13 @@ import { parseMap } from "../../game/simulation/map";
 import { api } from "../../network/api";
 import type { PlayerStanding } from "../../network/contracts";
 import type { GameSocket, RoomState } from "../../network/GameSocket";
+import { InGameLeaderboard } from "../community/InGameLeaderboard";
 import { duration } from "../records/format";
 import { ChatOverlay } from "../rooms/ChatOverlay";
 import { PlayersPanel } from "../rooms/PlayersPanel";
 import { useRoomChat } from "../rooms/useRoomChat";
-import { ControlsHelp, OptionsButtons } from "../solo/OptionsPanel";
-import { type Options, readOptions, saveOptions } from "../solo/options";
-import { InGameLeaderboard } from "./InGameLeaderboard";
+import { OptionsButtons } from "../settings/OptionsPanel";
+import { type Options, readOptions, saveOptions } from "../settings/options";
 
 export function OnlineGame({
 	socket,
@@ -37,18 +38,19 @@ export function OnlineGame({
 		runtime = useRef<OnlineRuntime | null>(null),
 		input = useRef<InputController | null>(null),
 		audio = useRef<AudioBus | null>(null);
+	const [countdown, setCountdown] = useState<number | null>(null);
 	const [ready, setReady] = useState(false),
-		[menu, setMenu] = useState<"pause" | "options" | "controls" | null>(null);
+		[menu, setMenu] = useState<"pause" | "options" | null>(null);
 	const flight = useRef<FlightToggle | null>(null);
 	const [flying, setFlying] = useState(false);
 	const [options, setOptions] = useState(readOptions),
 		[flyAllowed, setFlyAllowed] = useState(false);
+	const optionsRef = useRef(options);
+	optionsRef.current = options;
 	const [error, setError] = useState(""),
 		[pending, setPending] = useState(false),
 		[elapsed, setElapsed] = useState(0),
-		[jumps, setJumps] = useState(0),
 		[saveStatus, setSaveStatus] = useState("SAVED");
-	const [transferId, setTransferId] = useState("");
 	const [remaining, setRemaining] = useState<number | null>(null);
 	const [players, setPlayers] = useState<PlayerStanding[]>([]);
 	const [disconnected, setDisconnected] = useState(false);
@@ -102,8 +104,24 @@ export function OnlineGame({
 	pauseRef.current = pause;
 	useEffect(() => {
 		runtime.current?.updateRoom(room);
-		if (room.kind === "ROOM" && room.state === "PAUSED") pauseRef.current();
 	}, [room]);
+	useEffect(() => {
+		if (room.kind !== "ROOM" || room.state !== "COUNTDOWN") {
+			setCountdown(null);
+			return;
+		}
+		const remaining = Number(room.currentPlay?.countdownRemainingMs || 0);
+		if (remaining <= 0) {
+			setCountdown(null);
+			return;
+		}
+		const end = performance.now() + remaining;
+		const update = () =>
+			setCountdown(Math.max(1, Math.ceil((end - performance.now()) / 1000)));
+		update();
+		const timer = setInterval(update, 100);
+		return () => clearInterval(timer);
+	}, [room.kind, room.state, room.currentPlay]);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: Đổi membership/socket phải đóng chat dù callback không đổi.
 	useEffect(() => {
 		chat.closeChat();
@@ -232,11 +250,11 @@ export function OnlineGame({
 				(state, snapshot) => {
 					setElapsed(snapshot.elapsedTimeMs);
 					setRemaining(snapshot.remainingTimeMs);
-					setJumps(state.jumps);
 					setFlying(state.freeFlight);
 					setPlayers(snapshot.players || []);
 					audio.current?.setScreen(state.screen);
-					if (!readOptions().fly && state.freeFlight) session.setFlight(false);
+					if (!optionsRef.current.fly && state.freeFlight)
+						session.setFlight(false);
 					if (snapshot.self.paused && !session.menu) {
 						session.menu = true;
 						controls.cancel();
@@ -275,6 +293,15 @@ export function OnlineGame({
 				session,
 				() => {
 					setReady(true);
+					const current = latestRoom.current;
+					if (
+						current.kind === "ROOM" &&
+						current.state === "COUNTDOWN" &&
+						socket.playContext
+					)
+						void socket
+							.command("GAME_READY", socket.playContext)
+							.catch((cause) => setError(cause.message));
 					if (document.hidden || !document.hasFocus()) pauseRef.current();
 				},
 				setError,
@@ -333,21 +360,6 @@ export function OnlineGame({
 		}
 	};
 	const resume = async () => {
-		if (room.kind === "ROOM" && room.state === "PAUSED") {
-			if (room.hostPlayerId !== socket.selfId) return;
-			setPending(true);
-			try {
-				await socket.command("SET_ROOM_PAUSED", {
-					playId: socket.playContext?.playId,
-					paused: false,
-				});
-			} catch (cause) {
-				setError(cause instanceof Error ? cause.message : "Resume failed");
-				return;
-			} finally {
-				setPending(false);
-			}
-		}
 		if (room.kind === "COMMUNITY") {
 			setPending(true);
 			try {
@@ -376,31 +388,6 @@ export function OnlineGame({
 			setError("Options could not be saved on this device");
 		}
 	};
-	const newGame = async () => {
-		if (pending) return;
-		const finished = runtime.current?.latest?.self.status === "FINISHED";
-		if (!finished && !window.confirm("Replace your unfinished Community game?"))
-			return;
-		setPending(true);
-		setError("");
-		try {
-			await socket.command("NEW_COMMUNITY_RUN", {
-				expectedRunId: finished ? null : runtime.current?.latest?.playId,
-			});
-			endingActive.current = false;
-			skipEnding.current = null;
-			setEnding(null);
-			setPictureReady(false);
-			if (runtime.current) runtime.current.menu = false;
-			input.current?.resume();
-			audio.current?.pause(false);
-			setMenu(null);
-		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : "New Game failed");
-		} finally {
-			setPending(false);
-		}
-	};
 	return (
 		<main className="play-page">
 			<section
@@ -408,29 +395,47 @@ export function OnlineGame({
 				ref={container}
 				aria-label="Online Main Babe game"
 			/>
-			{!ready && (
+			{!ready && !error && (
 				<p className="game-message" role="status">
 					Loading…
+				</p>
+			)}
+			{!ready && error && (
+				<div className="game-message">
+					<p role="alert">{error}</p>
+					<button
+						type="button"
+						disabled={pending}
+						onClick={() => void command("LEAVE_ROOM")}
+					>
+						Leave
+					</button>
+				</div>
+			)}
+			{ready && room.kind === "ROOM" && room.state === "COUNTDOWN" && (
+				<p className="game-message" role="status">
+					{countdown ?? "Waiting for players…"}
 				</p>
 			)}
 			{ready && !ending && (
 				<div className="game-hud">
 					<span>
-						Jumps: {jumps}
-						{options.displayTimer && (
+						{
 							<span className="timer" role="timer" aria-label="Play time">
 								{duration(elapsed)}
 							</span>
-						)}
+						}
 						{remaining !== null && (
 							<span className="timer" role="timer" aria-label="Time left">
 								Time Left: {duration(Math.ceil(remaining / 1000) * 1000)}
 							</span>
 						)}
 					</span>
-					<output className="room-code" aria-label="Room ID">
-						{room.roomId}
-					</output>
+					{room.kind === "ROOM" && (
+						<output className="room-code" aria-label="Room ID">
+							{room.roomId}
+						</output>
+					)}
 					<span>
 						<button
 							type="button"
@@ -464,17 +469,7 @@ export function OnlineGame({
 								>
 									View Results
 								</button>
-							) : (
-								<button
-									type="button"
-									disabled={!pictureReady || pending}
-									onClick={() => {
-										void newGame();
-									}}
-								>
-									New Game
-								</button>
-							)}
+							) : null}
 							<button
 								type="button"
 								disabled={!pictureReady || pending || disconnected}
@@ -499,26 +494,19 @@ export function OnlineGame({
 				<section className="game-overlay" aria-label="Game menu">
 					<MenuPanel
 						title={
-							menu === "pause"
-								? disconnected
+							menu === "options"
+								? "Options"
+								: disconnected
 									? "Disconnected"
 									: room.kind === "ROOM"
-										? room.state === "PAUSED"
-											? "Room Paused"
-											: "Game Menu"
+										? "Game Menu"
 										: "Paused"
-								: menu === "options"
-									? "Options"
-									: "Controls"
 						}
-						onBack={
-							menu === "pause"
-								? undefined
-								: () => setMenu(menu === "controls" ? "options" : "pause")
-						}
+						onBack={menu === "options" ? () => setMenu("pause") : undefined}
 					>
-						{menu === "pause" && (
+						{menu === "pause" ? (
 							<>
+								<ControlsHelp />
 								{disconnected ? (
 									<>
 										<button
@@ -541,68 +529,25 @@ export function OnlineGame({
 								) : (
 									<button
 										type="button"
-										disabled={
-											pending ||
-											(room.state === "PAUSED" &&
-												room.hostPlayerId !== socket.selfId)
-										}
-										onClick={() => {
-											void resume();
-										}}
+										disabled={pending}
+										onClick={() => void resume()}
 									>
-										{room.kind === "ROOM" && room.state === "PAUSED"
-											? room.hostPlayerId === socket.selfId
-												? "Resume Room"
-												: "Room Paused"
-											: "Resume"}
+										Resume
 									</button>
 								)}
 								<button type="button" onClick={() => setMenu("options")}>
 									Options
 								</button>
-								<button
-									type="button"
-									aria-keyshortcuts="Enter"
-									onClick={chat.openChat}
-								>
+								<button type="button" onClick={chat.openChat}>
 									Open Chat
 								</button>
-								{room.kind === "COMMUNITY" && (
-									<button
-										type="button"
-										disabled={pending || disconnected}
-										onClick={() => {
-											void newGame();
-										}}
-									>
-										New Game
-									</button>
-								)}
 								{room.kind === "ROOM" &&
 									room.hostPlayerId === socket.selfId &&
 									room.state === "PLAYING" && (
 										<button
 											type="button"
 											disabled={pending || disconnected}
-											onClick={() => {
-												void command("SET_ROOM_PAUSED", {
-													playId: socket.playContext?.playId,
-													paused: true,
-												});
-											}}
-										>
-											Pause Room
-										</button>
-									)}
-								{room.kind === "ROOM" &&
-									room.hostPlayerId === socket.selfId &&
-									["PLAYING", "PAUSED"].includes(room.state) && (
-										<button
-											type="button"
-											disabled={pending || disconnected}
-											onClick={() => {
-												void command("END_MATCH");
-											}}
+											onClick={() => void command("END_MATCH")}
 										>
 											End Match
 										</button>
@@ -610,9 +555,7 @@ export function OnlineGame({
 								<button
 									type="button"
 									disabled={pending || disconnected}
-									onClick={() => {
-										void command("LEAVE_ROOM");
-									}}
+									onClick={() => void command("LEAVE_ROOM")}
 								>
 									{room.kind === "COMMUNITY" ? "Save & Exit" : "Leave Room"}
 								</button>
@@ -626,43 +569,14 @@ export function OnlineGame({
 									</small>
 								)}
 							</>
-						)}
-						{menu === "pause" && room.kind === "COMMUNITY" && (
-							<form
-								className="menu-form"
-								onSubmit={(event) => {
-									event.preventDefault();
-									void command("JOIN_ROOM", { roomId: transferId });
-								}}
-							>
-								<label>
-									Community ID
-									<input
-										value={transferId}
-										minLength={6}
-										maxLength={6}
-										pattern="[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}"
-										required
-										onChange={(event) =>
-											setTransferId(event.currentTarget.value.toUpperCase())
-										}
-									/>
-								</label>
-								<button type="submit" disabled={pending || disconnected}>
-									Join Community
-								</button>
-							</form>
-						)}
-						{menu === "options" && (
+						) : (
 							<OptionsButtons
 								options={options}
 								flyAllowed={flyAllowed}
 								onChange={updateOptions}
-								onControls={() => setMenu("controls")}
 								onError={setError}
 							/>
 						)}
-						{menu === "controls" && <ControlsHelp flyAllowed={flyAllowed} />}
 						{error && <p role="alert">{error}</p>}
 					</MenuPanel>
 				</section>

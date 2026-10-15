@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ControlsHelp } from "../components/ControlsHelp";
 import { MenuPanel } from "../components/MenuPanel";
 import { AuthForm } from "../features/account/AuthForm";
-import { OnlineGame } from "../features/community/OnlineGame";
-import {
-	duration,
-	soloStatistics,
-	sumStatistics,
-} from "../features/records/format";
+import { ChangePassword } from "../features/account/ChangePassword";
+import { OnlineGame } from "../features/online/OnlineGame";
+import { duration, soloStatistics } from "../features/records/format";
 import { HistoryDetail } from "../features/records/HistoryDetail";
 import { HistoryList } from "../features/records/HistoryList";
 import { StatisticsPanel } from "../features/records/StatisticsPanel";
@@ -14,8 +12,8 @@ import { roomFinishScreen } from "../features/rooms/ending";
 import { Lobby } from "../features/rooms/Lobby";
 import { PublicRooms } from "../features/rooms/PublicRooms";
 import { Results } from "../features/rooms/Results";
-import { ControlsHelp, OptionsButtons } from "../features/solo/OptionsPanel";
-import { readOptions, saveOptions } from "../features/solo/options";
+import { OptionsButtons } from "../features/settings/OptionsPanel";
+import { readOptions, saveOptions } from "../features/settings/options";
 import { SoloGame } from "../features/solo/SoloGame";
 import {
 	currentSolo,
@@ -49,16 +47,14 @@ type Screen =
 	| "online"
 	| "sign-in"
 	| "register"
-	| "merge-history"
 	| "account"
 	| "community"
 	| "leaderboard"
 	| "history"
 	| "detail"
 	| "options"
-	| "controls"
-	| "nickname"
-	| "join"
+	| "rooms"
+	| "password"
 	| "public-rooms"
 	| "lobby"
 	| "results";
@@ -69,7 +65,6 @@ interface SoloLaunch {
 }
 const initialIdentity: Identity = {
 	authenticated: false,
-	guest: false,
 	account: null,
 };
 const routes: Partial<Record<Screen, string>> = {
@@ -124,7 +119,6 @@ export function App() {
 	const [result, setResult] = useState<MatchResult | null>(null);
 	const resultRef = useRef<MatchResult | null>(null);
 	const viewedEnding = useRef<string | null>(null);
-	const [roomIntent, setRoomIntent] = useState<{ roomId?: string }>({});
 	const [options, setOptions] = useState(readOptions);
 	const [flyAllowed, setFlyAllowed] = useState(__SOLO_FLY_ENABLED__);
 	const [error, setError] = useState("");
@@ -138,9 +132,7 @@ export function App() {
 	const profile = identity.account
 		? backendOrigin() + ":account:" + identity.account.id
 		: "guest";
-	const reconnectProfile = identity.account
-		? profile
-		: (typeof location === "undefined" ? "" : backendOrigin()) + ":guest";
+	const reconnectProfile = profile;
 	const playing = screen === "play" || screen === "online";
 	useEffect(() => {
 		if (identity.account?.crownUnlocked || identity.crownUnlocked)
@@ -193,13 +185,15 @@ export function App() {
 	}, [profile]);
 	const back = () => {
 		const next =
-			screen === "controls"
-				? "options"
-				: screen === "leaderboard"
-					? "community"
-					: screen === "detail"
-						? "history"
-						: "home";
+			screen === "public-rooms"
+				? "rooms"
+				: screen === "password"
+					? "account"
+					: screen === "leaderboard"
+						? "community"
+						: screen === "detail"
+							? "history"
+							: "home";
 		if (routes[next]) window.history.replaceState(null, "", routes[next]);
 		setError("");
 		setScreenState(next);
@@ -231,11 +225,7 @@ export function App() {
 		window.addEventListener("popstate", pop);
 		void api<Identity>("/auth/me")
 			.then((value) => {
-				if (
-					typeof value.authenticated !== "boolean" ||
-					typeof value.guest !== "boolean"
-				)
-					return;
+				if (typeof value.authenticated !== "boolean") return;
 				if (!disposed && identityRevision.current === expectedIdentityRevision)
 					setIdentity(value);
 			})
@@ -253,7 +243,7 @@ export function App() {
 		};
 	}, [setIdentity]);
 	useEffect(() => {
-		if (!identity.authenticated && !identity.guest) return;
+		if (!identity.authenticated) return;
 		let cancelled = false;
 		void loadReconnect(reconnectProfile)
 			.then(async (context) => {
@@ -267,7 +257,7 @@ export function App() {
 		return () => {
 			cancelled = true;
 		};
-	}, [reconnectProfile, identity.authenticated, identity.guest]);
+	}, [reconnectProfile, identity.authenticated]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: Revision là tín hiệu tải lại khi Solo sync hoàn tất.
 	useEffect(() => {
@@ -291,14 +281,11 @@ export function App() {
 					);
 				return { ...EMPTY_STATS };
 			});
-		if (identity.authenticated || identity.guest) {
+		if (identity.authenticated) {
 			void api<{ total: Statistics }>("/profile/me")
 				.then(async ({ total }) => {
-					const solo = await local;
-					if (!disposed)
-						setStatistics(
-							identity.authenticated ? total : sumStatistics(total, solo),
-						);
+					await local;
+					if (!disposed) setStatistics(total);
 				})
 				.catch(() => {});
 		}
@@ -326,13 +313,7 @@ export function App() {
 		return () => {
 			disposed = true;
 		};
-	}, [
-		profile,
-		screen,
-		identity.authenticated,
-		identity.guest,
-		recordsRevision,
-	]);
+	}, [profile, screen, identity.authenticated, recordsRevision]);
 
 	const openSolo = (action: "new" | "continue") => {
 		void execute(async () => {
@@ -366,14 +347,8 @@ export function App() {
 			(await hasCrown(profile).catch(() => false))
 		)
 			await syncSolo(profile, identity.account.id);
-		if (!identity.authenticated && !identity.guest)
-			setIdentity(await api<Identity>("/auth/guest", "POST"));
-		if (
-			!socket.current &&
-			!identity.authenticated &&
-			(await hasCrown("guest").catch(() => false))
-		)
-			await api("/profile/crown", "POST");
+		if (!identity.authenticated || !identity.account)
+			throw new Error("Sign in to play online");
 		if (!socket.current)
 			socket.current = new GameSocket(
 				(type, payload) => {
@@ -393,7 +368,7 @@ export function App() {
 							resultRef.current = next.result as MatchResult;
 							setResult(next.result as MatchResult);
 						}
-						if (next.state === "PLAYING" || next.state === "PAUSED") {
+						if (next.state === "PLAYING" || next.state === "COUNTDOWN") {
 							setScreen("online");
 							return;
 						}
@@ -470,18 +445,7 @@ export function App() {
 	const command = (type: string, payload: Record<string, unknown> = {}) => {
 		void execute(async () => {
 			const connection = await connectedSocket();
-			if (
-				type === "JOIN_COMMUNITY" &&
-				connection.selfId &&
-				room?.kind === "COMMUNITY"
-			) {
-				await connection.command(
-					payload.newRun === true ? "NEW_COMMUNITY_RUN" : "GET_ROOM_STATE",
-					payload.newRun === true
-						? { expectedRunId: payload.expectedRunId }
-						: {},
-				);
-			} else await connection.command(type, payload);
+			await connection.command(type, payload);
 		});
 	};
 	const updateOptions = (key: keyof typeof options) => {
@@ -559,18 +523,15 @@ export function App() {
 									{
 										"sign-in": "Sign In",
 										register: "Create Account",
-										"merge-history": "Guest Progress",
+										password: "Change Password",
+										rooms: "Room",
 										account: "Account",
 										community: "Community Tower",
 										leaderboard: "Leaderboard",
 										history: "History",
 										detail: "Game Details",
 										options: "Options",
-										controls: "Controls",
-										nickname: roomIntent.roomId
-											? "Join Room"
-											: "Play with Friends",
-										join: "Join by ID",
+
 										"public-rooms": "Join Public",
 										lobby:
 											room?.kind === "COMMUNITY" ? "Community Tower" : "Lobby",
@@ -602,26 +563,8 @@ export function App() {
 							>
 								New Solo Game
 							</button>
-							<button
-								type="button"
-								onClick={() => {
-									setRoomIntent({});
-									setScreen("nickname");
-								}}
-							>
-								Play with Friends
-							</button>
-							<button
-								type="button"
-								onClick={() => {
-									setError("");
-									setScreen("public-rooms");
-								}}
-							>
-								Join Public
-							</button>
-							<button type="button" onClick={() => setScreen("join")}>
-								Join by ID
+							<button type="button" onClick={() => setScreen("rooms")}>
+								Room
 							</button>
 							<button type="button" onClick={() => setScreen("community")}>
 								Community Tower
@@ -656,49 +599,21 @@ export function App() {
 							register={screen === "register"}
 							onSuccess={(value) => {
 								setIdentity(value);
-								if (value.guestHistoryAvailable) setScreen("merge-history");
-								else back();
+								back();
 							}}
 							onSwitch={() =>
 								setScreen(screen === "register" ? "sign-in" : "register")
 							}
 						/>
 					)}
-					{screen === "merge-history" && (
-						<>
-							<p>
-								Add this Guest's Room history and earned crown to your account?
-							</p>
-							<button
-								type="button"
-								disabled={pending}
-								onClick={() => {
-									void execute(async () => {
-										const result = await api<{ merged: boolean }>(
-											"/auth/guest-history/merge",
-											"POST",
-										);
-										if (!result.merged)
-											throw new Error("History could not be merged");
-										setIdentity(await api<Identity>("/auth/me"));
-										back();
-									});
-								}}
-							>
-								Merge Guest Progress
-							</button>
-							<button type="button" disabled={pending} onClick={back}>
-								Skip
-							</button>
-						</>
-					)}
 					{screen === "account" && identity.account && (
 						<>
+							<button type="button" onClick={() => setScreen("password")}>
+								Change Password
+							</button>
 							<dl className="account-info">
 								<dt>Username</dt>
 								<dd>{identity.account.username}</dd>
-								<dt>Email</dt>
-								<dd>{identity.account.email}</dd>
 							</dl>
 							<button
 								type="button"
@@ -720,6 +635,17 @@ export function App() {
 								Sign Out
 							</button>
 						</>
+					)}
+					{screen === "password" && identity.account && (
+						<ChangePassword
+							onChanged={() => {
+								socket.current?.close();
+								socket.current = null;
+								setIdentity(initialIdentity);
+								setScreen("sign-in");
+								setError("Password changed. Sign in again.");
+							}}
+						/>
 					)}
 					{screen === "community" && (
 						<>
@@ -798,7 +724,7 @@ export function App() {
 						<HistoryList
 							profile={profile}
 							authenticated={identity.authenticated}
-							hasIdentity={identity.authenticated || identity.guest}
+							hasIdentity={identity.authenticated}
 							revision={recordsRevision}
 							onSelect={(item, local) => {
 								setDetail(item);
@@ -815,125 +741,83 @@ export function App() {
 						/>
 					)}
 					{screen === "options" && (
-						<OptionsButtons
-							options={options}
-							flyAllowed={flyAllowed}
-							onChange={updateOptions}
-							onControls={() => setScreen("controls")}
-							onError={setError}
-						/>
+						<>
+							<OptionsButtons
+								options={options}
+								flyAllowed={flyAllowed}
+								onChange={updateOptions}
+								onError={setError}
+							/>
+							<ControlsHelp />
+						</>
 					)}
-					{screen === "controls" && <ControlsHelp flyAllowed={flyAllowed} />}
-					{screen === "nickname" && (
-						<form
-							className="menu-form"
-							onSubmit={(event) => {
-								event.preventDefault();
-								const nickname = String(
-									new FormData(event.currentTarget).get("nickname"),
-								).trim();
-								command(roomIntent.roomId ? "JOIN_ROOM" : "CREATE_ROOM", {
-									...(roomIntent.roomId ? { roomId: roomIntent.roomId } : {}),
-									nickname,
-									...(!roomIntent.roomId
-										? {
-												visibility: String(
-													new FormData(event.currentTarget).get("visibility"),
-												),
-											}
-										: {}),
-								});
-							}}
-						>
-							<label>
-								Nickname
-								<input
-									name="nickname"
-									defaultValue={identity.account?.username.slice(0, 16) || ""}
-									required
-									maxLength={16}
-								/>
-							</label>
-							{!roomIntent.roomId && (
-								<label>
-									Visibility
-									<select
-										name="visibility"
-										aria-label="Visibility"
-										defaultValue="PRIVATE"
+					{screen === "rooms" && (
+						<>
+							{!identity.authenticated ? (
+								<>
+									<p>Sign in to play online.</p>
+									<button type="button" onClick={() => setScreen("sign-in")}>
+										Sign In
+									</button>
+									<button type="button" onClick={() => setScreen("register")}>
+										Create Account
+									</button>
+								</>
+							) : (
+								<>
+									<button
+										type="button"
+										disabled={pending}
+										onClick={() => command("CREATE_ROOM")}
 									>
-										<option value="PRIVATE">Private</option>
-										<option value="PUBLIC">Public</option>
-									</select>
-								</label>
+										Create Room
+									</button>
+									<form
+										className="menu-form"
+										onSubmit={(event) => {
+											event.preventDefault();
+											const roomId = String(
+												new FormData(event.currentTarget).get("roomId") || "",
+											)
+												.trim()
+												.toUpperCase();
+											command("JOIN_ROOM", { roomId });
+										}}
+									>
+										<label>
+											Room ID
+											<input
+												name="roomId"
+												required
+												minLength={6}
+												maxLength={6}
+												autoComplete="off"
+												autoCapitalize="characters"
+												pattern="[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}"
+												onInput={(event) => {
+													event.currentTarget.value =
+														event.currentTarget.value.toUpperCase();
+												}}
+											/>
+										</label>
+										<button type="submit" disabled={pending}>
+											Join
+										</button>
+									</form>
+									<button
+										type="button"
+										onClick={() => setScreen("public-rooms")}
+									>
+										Join Public
+									</button>
+								</>
 							)}
-							<button type="submit" disabled={pending}>
-								{pending
-									? "Connecting…"
-									: roomIntent.roomId
-										? "Join"
-										: "Create Room"}
-							</button>
-						</form>
+						</>
 					)}
-					{screen === "public-rooms" && (
+					{screen === "public-rooms" && identity.authenticated && (
 						<PublicRooms
-							onJoin={(roomId) => {
-								setError("");
-								setRoomIntent({ roomId });
-								setScreen("nickname");
-							}}
+							onJoin={(roomId) => command("JOIN_ROOM", { roomId })}
 						/>
-					)}
-					{screen === "join" && (
-						<form
-							className="menu-form"
-							onSubmit={(event) => {
-								event.preventDefault();
-								const roomId = String(
-									new FormData(event.currentTarget).get("roomId"),
-								)
-									.trim()
-									.toUpperCase();
-								void execute(async () => {
-									const found = await api<{
-										kind: "ROOM" | "COMMUNITY";
-										joinable: boolean;
-									}>("/rooms/" + encodeURIComponent(roomId));
-									if (!found.joinable)
-										throw new Error("This room is not accepting new players");
-									if (found.kind === "ROOM") {
-										setRoomIntent({ roomId });
-										setScreen("nickname");
-									} else {
-										if (!identity.authenticated)
-											throw new Error("Sign in to join Community Tower");
-										const connection = await connectedSocket();
-										await connection.command("JOIN_ROOM", { roomId });
-									}
-								});
-							}}
-						>
-							<label>
-								Room ID
-								<input
-									name="roomId"
-									required
-									minLength={6}
-									maxLength={6}
-									autoCapitalize="characters"
-									autoComplete="off"
-									pattern="[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}"
-									onInput={(event) => {
-										event.currentTarget.value =
-											event.currentTarget.value.toUpperCase();
-									}}
-								/>
-							</label>
-							<button type="submit" disabled={pending}>
-								{pending ? "Looking up…" : "Join"}
-							</button>
-						</form>
 					)}
 					{screen === "lobby" && room && (
 						<Lobby
@@ -954,6 +838,7 @@ export function App() {
 							onLeave={() => command("LEAVE_ROOM")}
 						/>
 					)}
+
 					{error && (
 						<p className="error" role="alert">
 							{error}

@@ -25,7 +25,7 @@ class RoomRestartIT {
   }
 
   @Test
-  void restartClosesAPausedMatchUsingOnlyCommittedMetricsAndDoesNotRestoreItsRoom()
+  void restartClosesAnOfflineMatchUsingOnlyCommittedMetricsAndDoesNotRestoreItsRoom()
       throws Exception {
     String match, room;
     long duration, owner;
@@ -34,13 +34,13 @@ class RoomRestartIT {
       int port = ((WebServerApplicationContext) first).getWebServer().getPort();
       try (var a = new GameClient(port);
           var b = new GameClient(port)) {
-        a.guest();
-        b.guest();
+        a.register();
+        b.register();
         owner = a.owner;
         a.connect();
         b.connect();
-        room = a.ok("CREATE_ROOM", Map.of("nickname", "Host")).path("roomId").asText();
-        b.ok("JOIN_ROOM", Map.of("roomId", room, "nickname", "Peer"));
+        room = a.ok("CREATE_ROOM", Map.of()).path("roomId").asText();
+        b.ok("JOIN_ROOM", Map.of("roomId", room));
         a.ok("START_GAME", Map.of());
         match =
             a.await(message -> message.path("type").asText().equals("GAME_STARTED"))
@@ -50,11 +50,12 @@ class RoomRestartIT {
         var time = first.getBean(RoomRaceIT.TestTime.class);
         time.advance(3000);
         a.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT"));
-        a.ok("SET_ROOM_PAUSED", Map.of("playId", match, "paused", true));
-        a.await(
-            message ->
-                message.path("type").asText().equals("SAVE_STATUS")
-                    && message.path("payload").path("saveStatus").asText().equals("SAVED"));
+        a.disconnect();
+        b.disconnect();
+        GameClient.until(
+            () ->
+                jdbc.queryForObject("SELECT COUNT(*) FROM matches WHERE id=?", Integer.class, match)
+                    == 1);
         duration =
             jdbc.queryForObject("SELECT duration_ticks FROM matches WHERE id=?", Long.class, match);
       }
@@ -101,12 +102,7 @@ class RoomRestartIT {
       var started = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
       var runs = new java.util.ArrayList<jumpking.service.RoomRuns.Run>();
       for (int index = 0; index < 2; index++) {
-        String hash = java.util.UUID.randomUUID().toString().replace("-", "").repeat(2);
-        jdbc.update(
-            "INSERT INTO users(type,guest_token_hash,created_at) VALUES ('GUEST',?,UTC_TIMESTAMP(3))",
-            hash);
-        long owner =
-            jdbc.queryForObject("SELECT id FROM users WHERE guest_token_hash=?", Long.class, hash);
+        long owner = TestDatabase.get().historicalGuest();
         runs.add(
             new jumpking.service.RoomRuns.Run(
                 java.util.UUID.randomUUID().toString(),

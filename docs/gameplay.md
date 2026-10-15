@@ -8,7 +8,7 @@ Solo/Community dùng Main Babe hoàn chỉnh theo geometry, physics, camera và 
 | --- | --- | --- |
 | Solo | Lượt mới hoặc tiếp tục save, không cần đăng nhập/backend | Save/Stats/History local; Account đồng bộ metrics khi có mạng, không lên leaderboard |
 | Community Tower | Bắt buộc Account; tạo mới hoặc tiếp tục lượt cá nhân | Lưu tiến độ/History trên server; chỉ kiểu chơi này lên leaderboard |
-| Room | Guest/Account tạo Public/Private, Join Public hoặc bằng ID; chờ Host Start | Cuộc đua cùng xuất phát; lưu History, không lên leaderboard, không checkpoint dài hạn |
+| Room | Account tạo Public/Private, Join Public hoặc bằng ID; chờ Host Start | Cuộc đua cùng xuất phát; lưu History, không lên leaderboard, không checkpoint dài hạn |
 
 Solo/Community chỉ có chế độ bình thường. Continue của hai kiểu chơi độc lập, không chuyển save cho nhau. Solo lưu trên thiết bị, Community theo Account; chỉ có thể Continue lượt chưa kết thúc. Room chọn `RACE`, `HARDCORE`, `TIME_LIMIT` hoặc `NO_WALK`. Tất cả players không va chạm và không dùng item tác động người khác.
 
@@ -56,7 +56,7 @@ Spawn chuẩn (231,302), vx=0, vy=1, grounded=true, direction=1; buffers/counter
 
 Tile codes: space rỗng, `#` solid, `a/b/c/d` bốn slope, `I` băng, `N` tuyết. Không thêm water/sand/teleport ngoài map; biên x của body clamp trong [−9,471].
 
-Camera nguyên screen 4:3, letterbox; không smooth-follow. Screen ứng viên = clamp(−floor((y+bodyHeight/2)/360),0,42); chỉ đổi khi hướng vận tốc khớp hướng đổi screen, trừ lúc đang lên với |vy|<3. Tải trước art của screen liền kề.
+Camera nguyên screen 4:3, letterbox; không smooth-follow. Screen ứng viên = clamp(−floor((y+bodyHeight/2)/360),0,42); chỉ đổi khi hướng vận tốc khớp hướng đổi screen, trừ lúc đang lên với |vy|<3. Textures được tải trước khi dựng màn chơi; chỉ hiển thị screen hiện tại.
 
 ## Solo
 
@@ -78,9 +78,9 @@ Bay vẫn tính save/Stats/History/xếp hạng/leaderboard bình thường. Com
 
 ## Community Tower
 
-Mỗi sảnh tối đa 10 người, gồm slot reconnect còn hạn. Tự tìm sảnh còn chỗ, ưu tiên sảnh đông hơn; không còn chỗ thì tạo sảnh mới. Join by ID vào đúng sảnh chỉ định; đầy thì báo lỗi, không tự chuyển sảnh.
+Mỗi sảnh tối đa 10 người, gồm slot reconnect còn hạn. Tự tìm sảnh còn chỗ, ưu tiên sảnh đông hơn; không còn chỗ thì tạo sảnh mới. Không chọn Community bằng ID; New Game/Continue tự xếp sảnh. Reconnect hợp lệ giữ membership khi còn hạn.
 
-Một Account có một lượt Community đang lưu và một membership online hoạt động. Continue tự khôi phục lượt đó; chưa có thì tạo mới. Chuyển Community giữ state/time của lượt; New Run xác nhận bỏ lượt hiện tại, giữ thành tích cũ. Không chuyển save Solo/Room sang Community.
+Một Account có một lượt Community đang lưu và một membership online hoạt động. Continue tự khôi phục lượt đó; chưa có thì tạo mới. Save & Exit rồi Continue giữ state/time của lượt; New Run xác nhận bỏ lượt hiện tại, giữ thành tích cũ. Không chuyển save Solo/Room sang Community.
 
 - Pause chỉ tác động bản thân. Nếu đang charge, cancel rồi pause; nếu đang trên không, simulation và clock chạy đến khi grounded ổn định rồi mới pause. Khi đang bay có thể pause ngay và xóa input; trạng thái đang rơi thoát solid phải hoàn tất như cú rơi bình thường.
 - Save & Exit lưu state đã ổn định trước khi xác nhận rời. Disconnect xử lý như yêu cầu Pause rồi lưu; không kéo người chơi về checkpoint trước cú rơi.
@@ -91,16 +91,14 @@ Leaderboard xét thành tích tốt nhất của mỗi Account từ các lượt
 
 ## Room và xếp hạng
 
-Room tối đa 10 người; trận đầu Start cần ít nhất hai người connected, không cần Ready. ID sáu ký tự từ `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`; dùng chung ô Join by ID với Community. Người tạo là Host; khi cần chuyển quyền, chọn người connected có joinOrder nhỏ nhất.
+Room tối đa 10 người; trận đầu Start cần ít nhất hai người connected, không cần Ready. ID sáu ký tự từ `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`; Join by ID chỉ dành cho Room. Người tạo là Host; khi cần chuyển quyền, chọn người connected có joinOrder nhỏ nhất.
 
 ```text
 WAITING -- Host Start --> COUNTDOWN -- 3 giây --> PLAYING -- finalize --> FINISHED
 FINISHED -- Play Again --> WAITING
-PLAYING -- Host Pause --> PAUSED -- Host Resume --> PLAYING
-PAUSED -- Host End / hết hạn --> finalize
 ```
 
-Room Private không được liệt kê, ai biết ID vẫn Join được; Public xuất hiện trong Join Public khi WAITING và còn chỗ. Host chọn visibility/mode/map trước Start. Chỉ WAITING nhận Join mới và cho Host đổi settings; COUNTDOWN/PLAYING/PAUSED/FINISHED chỉ nhận reconnect của thành viên cũ. Start chốt roster; FINISHED hiện Results. Ghi trận theo [data](data.md#kết-quả-room).
+Room Private không được liệt kê, ai biết ID vẫn Join được; Public xuất hiện trong Join Public khi WAITING và còn chỗ. Host chọn visibility/mode/map trước Start. Chỉ WAITING nhận Join mới và cho Host đổi settings; COUNTDOWN/PLAYING/FINISHED chỉ nhận reconnect của thành viên cũ. Start chốt roster; client tải xong màn chơi rồi server đếm ngược 3 giây trước khi chạy physics/clock. Quá 30 giây chưa sẵn sàng hoặc thành viên rời khi chuẩn bị thì hủy về Lobby; không có nút Ready thủ công. FINISHED hiện Results. Ghi trận theo [data](data.md#kết-quả-room).
 
 | Mode | Luật |
 | --- | --- |
@@ -109,11 +107,10 @@ Room Private không được liệt kê, ai biết ID vẫn Join được; Publi
 | TIME_LIMIT | Luật di chuyển như Race; Host chọn số phút nguyên 1–30 |
 | NO_WALK | Luật kết thúc như Race; input ngang trên nền chỉ chọn hướng, không tạo vận tốc đi bộ; di chuyển ngang bằng nhảy, bounce hoặc quán tính còn lại |
 
-Đồng hồ chung chạy từ hết countdown đến finalize. Menu/chat/đổi tab/mất focus/AFK không dừng physics hoặc clock; không tự rời Room vì mở menu lâu. Khi mọi người disconnect, tạm dừng tick trong hạn reconnect, không chuyển sang Host Pause.
+Đồng hồ chung chạy từ hết countdown đến finalize. Menu/chat/đổi tab/mất focus/AFK không dừng physics hoặc clock; không tự rời Room vì mở menu lâu. Khi mọi người disconnect, tạm dừng tick trong hạn reconnect, không có Pause toàn phòng.
 
-Host Pause chuyển PLAYING → PAUSED, dừng toàn bộ simulation/clock và hủy input/charge. Giữ Room trong RAM tối đa 24 giờ liên tục, kể cả khi mọi người đóng tab; thời hạn chạy theo thời gian thực, không đổi khi Pause lặp/chuyển Host/reconnect. Host Resume tiếp tục cùng trận/state/clock; không cộng ticks thời gian nghỉ hoặc nhận lại input cũ. Hết hạn thì finalize tại state đã dừng, không tạo winner, rồi giải phóng Room. Không áp dụng hạn Pause cá nhân cho Room.
 
-Finish đầu tiên kết thúc trận; xử lý hết players của tick đó trước finalize. Những người Finish cùng tick đồng hạng nhất. Time Limit hết giờ thì chốt state ở deadline; Finish hợp lệ tại tick deadline được xét trước timeout. Host End được dùng khi PLAYING hoặc PAUSED.
+Finish đầu tiên kết thúc trận; xử lý hết players của tick đó trước finalize. Những người Finish cùng tick đồng hạng nhất. Time Limit hết giờ thì chốt state ở deadline; Finish hợp lệ tại tick deadline được xét trước timeout. Host End được dùng khi PLAYING.
 
 Người Finish đứng đầu theo finish time. Người còn lại so current progress giảm dần, thêm peak giảm dần riêng Time Limit, rồi thời gian trận tăng dần. Vì dùng cùng clock, các khóa bằng nhau đồng hạng; ID chỉ ổn định hiển thị. Chưa ai Finish thì không có winner.
 
@@ -127,9 +124,9 @@ Có 10 mốc Finish tăng dần từ chân tháp; map 10 là Main Babe đầy đ
 
 Đóng tab hoặc mất kết nối hủy input; server giữ slot 5 phút từ lúc phát hiện disconnect. Reconnect cần đúng identity/token, không tự bật lại điều khiển. Với Community, hạn disconnect thay hạn Pause; reconnect khi còn paused bắt đầu lại hạn Pause. Các mốc AFK/Pause/reconnect tập trung trong shared rules.
 
-Riêng Room PAUSED giữ roster theo hạn Host Pause; Resume cho thành viên còn offline 5 phút reconnect tính từ Resume. Room đang chạy tiếp tục physics khi còn người connected; Leave hoặc hết hạn reconnect chốt DNF, đóng băng metrics.
+Room giữ slot reconnect tối đa 5 phút. Khi còn người connected, trận tiếp tục; khi mọi người offline, ngừng tick đến lúc có reconnect hoặc hết hạn rồi finalize. Leave/hết hạn reconnect chốt DNF, đóng băng metrics.
 
-Host disconnect/Leave chuyển quyền ngay, kể cả khi PAUSED; giữ nguyên state/deadline. Không ai connected thì Host=null; người reconnect đầu tiên nhận quyền, người về sau không giành lại Host. Leave là bỏ membership; nếu mọi người Leave thì đóng Room, xử lý kết quả theo [data](data.md#kết-quả-room).
+Host disconnect/Leave chuyển quyền ngay, giữ nguyên tiến độ trận. Không ai connected thì Host=null; người reconnect đầu tiên nhận quyền, người về sau không giành lại Host. Leave là bỏ membership; nếu mọi người Leave thì đóng Room, xử lý kết quả theo [data](data.md#kết-quả-room).
 
 Community giữ lượt theo Account dù slot hết hạn; sảnh mới cũng Continue được. Room chỉ khôi phục từ RAM khi phòng còn tồn tại; restart theo [architecture](architecture.md#lỗi-và-khả-năng-mở-rộng). Room giải tán sau khi đã vào gameplay phải finalize một lần; hủy trước gameplay không ghi kết quả.
 
@@ -139,19 +136,21 @@ Sau Results, mỗi người chọn Play Again để xác nhận ván mới. Ngư
 
 Chỉ triển khai Main Babe; không mở rộng campaign/DLC khác.
 
+Timer luôn hiện; không hiển thị số lần nhảy trong HUD. Jumps vẫn được đếm cho Stats/History.
+
 Giữ NPC/hội thoại, bảng/sách/nhật ký và môi trường Main Babe; đọc/hội thoại không trực tiếp yêu cầu Pause. Không có Inventory, nhặt/mua vật phẩm hoặc quest nhận đồ. Loại hội thoại/trigger phụ thuộc đồ đã bỏ; dùng một ending cơ bản không credit.
 
-Hoàn thành full map ở Solo/Community/Room map 10 tự mở vương miện cho các lượt sau. Account lưu server, Guest lưu profile trình duyệt; Merge giữ trạng thái đã mở. Room ngắn không mở vương miện. Solo do client khai báo chỉ cấp ngoại hình, không làm bằng chứng leaderboard. Màu của mỗi người nhất quán trên mọi client; bản thân opacity=1 và vẽ trên peers opacity=0.7. Nickname rõ và hội thoại vẽ trên tên.
+Hoàn thành full map ở Solo/Community/Room map 10 tự mở vương miện cho các lượt sau. Account lưu server, Guest lưu profile trình duyệt; Guest Solo không chuyển crown sang Account. Room ngắn không mở vương miện. Solo do client khai báo chỉ cấp ngoại hình, không làm bằng chứng leaderboard. Màu của mỗi người nhất quán trên mọi client; bản thân opacity=1 và vẽ trên peers opacity=0.7. Nickname rõ và hội thoại vẽ trên tên.
 
 Ending giữ cảnh/nhạc/ảnh kết thúc và Skip, bỏ credit. Solo Finish phát ending; Community chỉ người Finish xem; Room chỉ winners xem, người khác tới Results. End/timeout chưa có Finish không phát ending. Ending không đổi kết quả/thời gian, xử lý một lần theo runId/matchId và hủy khi chuyển lượt.
 
-Server cấp một trong 10 ngoại hình riêng cho mỗi membership, giữ qua reconnect và giải phóng khi rời. Community dùng username của Account; Room dùng nickname lúc Join. Trạng thái hiển thị không tác động hitbox/physics.
+Server cấp một trong 10 ngoại hình riêng cho mỗi membership, giữ qua reconnect và giải phóng khi rời. Mọi player online dùng username của Account; kết quả Room giữ tên lúc Join. Trạng thái hiển thị không tác động hitbox/physics.
 
 ## Thống kê và History
 
 Thống kê chỉ có tổng: active play time, jumps/falls, số lượt Finish, số trận/thắng Room và best finish time. Nhảy tính khi launch, ngã khi splat, thắng chỉ tính Room; respawn/lượt mới không xóa số liệu cũ. Lượt chưa Finish không có finish time. Nguồn số liệu và chống cộng trùng theo [data](data.md#history-và-leaderboard).
 
-History gồm các lượt Solo/Community đã kết thúc và các trận Room đã finalize. Continue/Pause/Save & Exit không tạo mục mới; cùng lượt/trận chỉ có một mục. Account xem dữ liệu thuộc mình; Guest xem Solo trên thiết bị và Room theo identity Guest. Login có Merge/Skip lịch sử Room của Guest, không import Solo Guest.
+History gồm các lượt Solo/Community đã kết thúc và các trận Room đã finalize. Continue/Pause/Save & Exit không tạo mục mới; cùng lượt/trận chỉ có một mục. Account xem dữ liệu thuộc mình; Guest chỉ xem Solo trên thiết bị; Account xem cả ba kiểu chơi. Login/Register không import dữ liệu Guest.
 
 Community và Room có chat riêng theo sảnh; chat hủy input nhưng không trực tiếp Pause. AFK áp dụng theo [điều khiển](#điều-khiển-và-physics); định dạng, giới hạn và lưu chat theo [protocol](protocol.md).
 
@@ -159,6 +158,6 @@ Assets có manifest; `source/client/public/assets/ATTRIBUTION.md` ghi nguồn v�
 
 ## Chat và bảng trong trận
 
-Enter mở/focus chat hoặc gửi khi đang nhập; Esc đóng và trả input. Không bắt phím từ form khác. Tin mới hiện 10 giây, không lấy focus; chat mở thủ công giữ đến khi đóng. Có nút cảm ứng, chat không đi vào database.
+Lobby luôn hiện chat và ô nhập. Trong trận, Enter mở/focus chat hoặc gửi khi đang nhập; Esc đóng và trả input. Không bắt phím từ form khác. Tin mới hiện 10 giây, không lấy focus; chat mở thủ công giữ đến khi đóng. Có nút cảm ứng, chat không đi vào database.
 
-Players là thứ hạng hiện tại trong cùng phòng: Room theo comparator mode, Community theo độ cao hiện tại và đồng hạng khi bằng nhau. Server tính từ state RAM. Leaderboard là thành tích Community đã commit, có thể xem khi chơi; refresh theo chu kỳ thay vì mỗi frame. Hai bảng có thể thu gọn.
+Players là thứ hạng hiện tại trong cùng phòng: Room theo comparator mode, Community theo độ cao hiện tại và đồng hạng khi bằng nhau. Server tính từ state RAM. Leaderboard là thành tích Community đã commit, có thể xem khi chơi; tải khi mở hoặc nhấn Refresh. Hai bảng có thể thu gọn. Community chỉ bắt đầu lượt mới từ menu sau Save & Exit.

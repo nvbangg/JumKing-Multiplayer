@@ -46,19 +46,16 @@ class RoomEndingIT {
 
   private Started start(String mode, GameClient... clients) throws Exception {
     for (var client : clients) {
-      client.guest();
+      client.register();
       client.connect();
     }
     var settings = new HashMap<String, Object>();
     settings.put("mode", mode);
     settings.put("timeLimitMinutes", mode.equals("TIME_LIMIT") ? 30 : null);
     String room =
-        clients[0]
-            .ok("CREATE_ROOM", Map.of("nickname", "Host", "settings", settings))
-            .path("roomId")
-            .asText();
+        clients[0].ok("CREATE_ROOM", Map.of("settings", settings)).path("roomId").asText();
     for (int index = 1; index < clients.length; index++)
-      clients[index].ok("JOIN_ROOM", Map.of("roomId", room, "nickname", "Peer " + index));
+      clients[index].ok("JOIN_ROOM", Map.of("roomId", room));
     clients[0].ok("START_GAME", Map.of());
     String play =
         clients[0]

@@ -17,7 +17,6 @@ test("reconnect context is stored per backend/identity and contains only the own
 		};
 		await saveReconnect(a, {
 			...context,
-			email: "private@example.test",
 			snapshot: { position: 99999 },
 		});
 		const saved = await loadReconnect(a),

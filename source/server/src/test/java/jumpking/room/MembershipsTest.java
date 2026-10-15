@@ -20,9 +20,9 @@ class MembershipsTest {
       var change =
           threads.submit(
               () ->
-                  registry.vacantOwners(
-                      1,
-                      2,
+                  registry.changingIdentity(
+                      1L,
+                      2L,
                       () -> {
                         entered.countDown();
                         try {

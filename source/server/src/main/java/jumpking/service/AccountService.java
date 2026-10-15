@@ -6,7 +6,6 @@ import jumpking.dto.AccountCredentials;
 import jumpking.dto.AccountDto;
 import jumpking.entity.User;
 import jumpking.exception.ApiException;
-import jumpking.repository.PlayRunRepository;
 import jumpking.repository.UserRepository;
 import jumpking.room.Memberships;
 import jumpking.security.IdentityContext;
@@ -21,7 +20,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class AccountService {
   private final UserRepository users;
-  private final PlayRunRepository runs;
   private final PasswordEncoder passwords;
   private final AuthenticationManager authentication;
   private final TransactionTemplate transactions;
@@ -30,14 +28,12 @@ public class AccountService {
 
   public AccountService(
       UserRepository users,
-      PlayRunRepository runs,
       PasswordEncoder passwords,
       AuthenticationManager authentication,
       TransactionTemplate transactions,
       Memberships memberships,
       Clock clock) {
     this.users = users;
-    this.runs = runs;
     this.passwords = passwords;
     this.authentication = authentication;
     this.transactions = transactions;
@@ -46,48 +42,20 @@ public class AccountService {
   }
 
   public AccountDto.Account register(
-      AccountCredentials.Registration form,
-      Long guest,
-      Consumer<AccountDto.Account> authenticated) {
+      AccountCredentials.Registration form, Consumer<AccountDto.Account> authenticated) {
     form.validate();
-    String encoded = passwords.encode(form.password());
-    return memberships.changingIdentity(
-        guest,
-        null,
-        () -> {
-          try {
-            var account =
-                transactions.execute(
-                    status -> {
-                      if (guest == null)
-                        users.saveAndFlush(
-                            User.account(form.username(), form.email(), encoded, clock.instant()));
-                      else {
-                        var user =
-                            users
-                                .lockById(guest)
-                                .orElseThrow(
-                                    () ->
-                                        new ApiException(
-                                            409, "CONFLICT", "This Guest identity has changed"));
-                        if (!"GUEST".equals(user.getType()) || user.getMergedIntoUserId() != null)
-                          throw new ApiException(
-                              409, "CONFLICT", "This Guest identity has changed");
-                        user.setType("ACCOUNT");
-                        user.setUsername(form.username());
-                        user.setEmail(form.email());
-                        user.setPasswordHash(encoded);
-                        user.setGuestTokenHash(null);
-                        users.saveAndFlush(user);
-                      }
-                      return account(form.email());
-                    });
-            authenticated.accept(account);
-            return account;
-          } catch (DataIntegrityViolationException duplicate) {
-            throw new ApiException(409, "CONFLICT", "Username or email is unavailable");
-          }
-        });
+    var hash = passwords.encode(form.password());
+    try {
+      var account =
+          transactions.execute(
+              status ->
+                  IdentityContext.accountView(
+                      users.saveAndFlush(User.account(form.username(), hash, clock.instant()))));
+      authenticated.accept(account);
+      return account;
+    } catch (DataIntegrityViolationException duplicate) {
+      throw new ApiException(409, "CONFLICT", "Username is unavailable");
+    }
   }
 
   public AccountDto.Account login(
@@ -95,11 +63,15 @@ public class AccountService {
     if (!AccountCredentials.passwordWithinBcrypt(form.password())) throw invalidCredentials();
     try {
       authentication.authenticate(
-          UsernamePasswordAuthenticationToken.unauthenticated(form.email(), form.password()));
+          UsernamePasswordAuthenticationToken.unauthenticated(form.username(), form.password()));
     } catch (AuthenticationException invalid) {
       throw invalidCredentials();
     }
-    var account = account(form.email());
+    var account =
+        users
+            .findByTypeAndUsername("ACCOUNT", form.username())
+            .map(IdentityContext::accountView)
+            .orElseThrow(AccountService::invalidCredentials);
     return memberships.changingIdentity(
         current,
         Long.valueOf(account.id()),
@@ -109,20 +81,24 @@ public class AccountService {
         });
   }
 
-  public boolean guestHistory(Long guest) {
-    return guest != null
-        && (users.findById(guest).map(User::isCrownUnlocked).orElse(false)
-            || runs.existsByUserIdAndKind(guest, "ROOM"));
-  }
-
-  private AccountDto.Account account(String email) {
-    return users
-        .findByTypeAndEmail("ACCOUNT", email)
-        .map(IdentityContext::accountView)
-        .orElseThrow(AccountService::invalidCredentials);
+  public void changePassword(long owner, AccountCredentials.PasswordChange form) {
+    AccountCredentials.validatePassword(form.newPassword());
+    if (!AccountCredentials.passwordWithinBcrypt(form.currentPassword()))
+      throw invalidCredentials();
+    // Hash ngoài transaction; kiểm tra mật khẩu hiện tại dưới lock để hai yêu cầu không ghi đè
+    // nhau.
+    var hash = passwords.encode(form.newPassword());
+    transactions.executeWithoutResult(
+        status -> {
+          var user = users.lockById(owner).orElseThrow(AccountService::invalidCredentials);
+          if (!"ACCOUNT".equals(user.getType())
+              || !passwords.matches(form.currentPassword(), user.getPasswordHash()))
+            throw invalidCredentials();
+          user.setPasswordHash(hash);
+        });
   }
 
   private static ApiException invalidCredentials() {
-    return new ApiException(401, "INVALID_CREDENTIALS", "Email or password is incorrect");
+    return new ApiException(401, "INVALID_CREDENTIALS", "Username or password is incorrect");
   }
 }

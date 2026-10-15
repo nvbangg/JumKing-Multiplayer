@@ -33,11 +33,8 @@ export function AuthForm({
 						return;
 					}
 					const body = {
-						email: String(data.get("email")).trim(),
+						username: String(data.get("username")).trim(),
 						password,
-						...(register
-							? { username: String(data.get("username")).trim() }
-							: {}),
 					};
 					setPending(true);
 					setError("");
@@ -60,27 +57,15 @@ export function AuthForm({
 						.finally(() => setPending(false));
 				}}
 			>
-				{register && (
-					<label>
-						Username
-						<input
-							name="username"
-							autoComplete="username"
-							required
-							minLength={3}
-							maxLength={32}
-							pattern={"[\\p{L}\\p{N}_\\-]+"}
-						/>
-					</label>
-				)}
 				<label>
-					Email
+					Username
 					<input
-						type="email"
-						name="email"
-						autoComplete="email"
+						name="username"
+						autoComplete="username"
 						required
-						maxLength={254}
+						minLength={3}
+						maxLength={32}
+						pattern={"[\\p{L}\\p{N}_\\-]+"}
 					/>
 				</label>
 				<label>

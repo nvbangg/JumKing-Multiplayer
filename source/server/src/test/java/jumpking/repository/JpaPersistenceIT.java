@@ -37,11 +37,7 @@ class JpaPersistenceIT {
     var now = Instant.parse("2026-10-15T00:00:00.123Z");
     var owner =
         users.saveAndFlush(
-            User.account(
-                "jpa_" + UUID.randomUUID().toString().substring(0, 8),
-                UUID.randomUUID() + "@test.invalid",
-                "hash",
-                now));
+            User.account("jpa_" + UUID.randomUUID().toString().substring(0, 8), "hash", now));
     var run = new PlayRun();
     run.setId(UUID.randomUUID().toString());
     run.setUserId(owner.getId());

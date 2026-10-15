@@ -28,9 +28,9 @@ public final class RoomBrowserFixture implements AutoCloseable {
       second.register();
       first.connect();
       second.connect();
-      var host = first.ok("CREATE_ROOM", Map.of("nickname", "Winner"));
+      var host = first.ok("CREATE_ROOM", Map.of());
       roomId = host.path("roomId").asText();
-      var other = second.ok("JOIN_ROOM", Map.of("roomId", roomId, "nickname", "Peer"));
+      var other = second.ok("JOIN_ROOM", Map.of("roomId", roomId));
       first.ok("START_GAME", Map.of());
       playId =
           first
@@ -39,13 +39,25 @@ public final class RoomBrowserFixture implements AutoCloseable {
               .path("playId")
               .asText();
       first.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT"));
-      first.ok("SET_ROOM_PAUSED", Map.of("playId", playId, "paused", true));
-      first.await(
-          message ->
-              message.path("type").asText().equals("SAVE_STATUS")
-                  && message.path("payload").path("saveStatus").asText().equals("SAVED"));
+      first.disconnect();
+      second.disconnect();
       var before = MainBabeRoute.beforeFinish(shared, json);
       Object room = ((Map<?, ?>) ReflectionTestUtils.getField(server, "rooms")).get(roomId);
+      var actor = (SerialExecutor) ReflectionTestUtils.getField(room, "actor");
+      GameClient.until(
+          () -> {
+            var offline = new CompletableFuture<Boolean>();
+            actor.execute(
+                () ->
+                    offline.complete(
+                        ((Map<?, ?>) ReflectionTestUtils.getField(room, "players"))
+                            .values().stream()
+                                .allMatch(
+                                    player ->
+                                        ReflectionTestUtils.getField(player, "connection")
+                                            == null)));
+            return offline.join();
+          });
       var prepared = new CompletableFuture<Void>();
       ((SerialExecutor) ReflectionTestUtils.getField(room, "actor"))
           .execute(
@@ -79,8 +91,8 @@ public final class RoomBrowserFixture implements AutoCloseable {
     return Map.of(
         "owner",
         client.owner,
-        "email",
-        client.request("/auth/me", "GET", null).path("account").path("email").asText(),
+        "username",
+        client.request("/auth/me", "GET", null).path("account").path("username").asText(),
         "password",
         PASSWORD,
         "context",
@@ -100,7 +112,7 @@ public final class RoomBrowserFixture implements AutoCloseable {
         var client = entry.getKey();
         var credential = entry.getValue();
         if (memberships.find(client.owner) == null) continue;
-        client.login((String) credential.get("email"), PASSWORD);
+        client.login((String) credential.get("username"), PASSWORD);
         client.connect();
         @SuppressWarnings("unchecked")
         var context = (Map<String, Object>) credential.get("context");

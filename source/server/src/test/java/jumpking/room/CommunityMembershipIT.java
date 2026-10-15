@@ -31,8 +31,7 @@ class CommunityMembershipIT {
   @Autowired RoomDirectory directory;
 
   @Test
-  void capacityTransferAndReconnectKeepTheRunAndCannotUseAnotherIdentityOrOldSocket()
-      throws Exception {
+  void capacityAndReconnectRejectDirectCommunityJoinAndForeignIdentity() throws Exception {
     var clients = new ArrayList<GameClient>();
     try {
       String full = null;
@@ -77,15 +76,14 @@ class CommunityMembershipIT {
                   .path("payload")
                   .path("code")
                   .asText())
-          .isEqualTo("ROOM_FULL");
+          .isEqualTo("ROOM_NOT_FOUND");
       assertThat(memberships.find(last.owner).roomId()).isEqualTo(target);
       String originalRun = original.path("playId").asText();
-      var moved = first.ok("JOIN_ROOM", Map.of("roomId", target));
-      assertThat(moved.path("playId").asText()).isEqualTo(originalRun);
-      assertThat(moved.path("roomId").asText()).isEqualTo(target);
-      assertThat(first.ok("GET_ROOM_STATE", Map.of()).path("members")).hasSize(2);
-      final String sourceRoom = full;
-      GameClient.until(() -> directory.find(sourceRoom).joinable());
+      assertThat(first.command("JOIN_ROOM", Map.of("roomId", target)).path("type").asText())
+          .isEqualTo("ERROR");
+      var moved = original;
+      target = full;
+      assertThat(first.ok("GET_ROOM_STATE", Map.of()).path("members")).hasSize(10);
       assertThat(
               last.command(
                       "RECONNECT",

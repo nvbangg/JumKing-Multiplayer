@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { soloJumps } from "./support/solo";
 
 test("touch holds direction and Jump simultaneously and cancellation never launches", async ({
 	page,
@@ -28,12 +29,12 @@ test("touch holds direction and Jump simultaneously and cancellation never launc
 		touchPoints: [],
 	});
 	await page.waitForTimeout(250);
-	await expect(page.getByText("Jumps: 0", { exact: true })).toBeVisible();
+	await expect.poll(() => soloJumps(page)).toBe(0);
 	await cdp.send("Input.dispatchTouchEvent", {
 		type: "touchStart",
 		touchPoints: [point(left!, 1), point(bounds!, 2)],
 	});
-	await expect(page.getByText("Jumps: 1", { exact: true })).toBeVisible();
+	await expect.poll(() => soloJumps(page)).toBe(1);
 	await cdp.send("Input.dispatchTouchEvent", {
 		type: "touchEnd",
 		touchPoints: [],

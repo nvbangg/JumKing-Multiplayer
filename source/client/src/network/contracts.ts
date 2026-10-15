@@ -1,14 +1,11 @@
 export interface Account {
 	id: string;
 	username: string;
-	email: string;
 	crownUnlocked: boolean;
 }
 export interface Identity {
 	authenticated: boolean;
-	guest: boolean;
 	account: Account | null;
-	guestHistoryAvailable?: boolean;
 	crownUnlocked?: boolean;
 }
 export interface Statistics {

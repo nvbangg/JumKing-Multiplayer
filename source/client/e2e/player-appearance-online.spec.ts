@@ -1,6 +1,12 @@
 import { expect, type Page, test } from "@playwright/test";
 import rules from "../../common/rules.json" with { type: "json" };
-import { leaveOnline } from "./support/online";
+import {
+	createRoom,
+	joinRoom,
+	leaveOnline,
+	registerOnline,
+	startRoom,
+} from "./support/online";
 
 test.skip(
 	process.env.E2E_AUTH_ONLINE !== "true",
@@ -80,36 +86,24 @@ test("player colors match across browsers while only the local player has full o
 					),
 				);
 				const page = await context.newPage();
-				await page.goto("/");
+				await registerOnline(page, "appearance");
 				await captureScene(page);
 				return page;
 			}),
 		);
-		await host!
-			.getByRole("button", { name: "Play with Friends", exact: true })
-			.click();
-		await host!.getByLabel("Nickname", { exact: true }).fill("Appearance Host");
-		await host!
-			.getByRole("button", { name: "Create Room", exact: true })
-			.click();
-		const id = await host!.locator(".room-code code").innerText();
-		await guest!
-			.getByRole("button", { name: "Join by ID", exact: true })
-			.click();
-		await guest!.getByLabel("Room ID", { exact: true }).fill(id);
-		await guest!.getByRole("button", { name: "Join", exact: true }).click();
-		await guest!
-			.getByLabel("Nickname", { exact: true })
-			.fill("Appearance Guest");
-		await guest!.getByRole("button", { name: "Join", exact: true }).click();
-		await host!.bringToFront();
-		await host!.getByRole("button", { name: "Start", exact: true }).click();
+		const hostName = (await (await host!.request.get("/api/auth/me")).json())
+			.account.username;
+		const peerName = (await (await guest!.request.get("/api/auth/me")).json())
+			.account.username;
+		const id = await createRoom(host!);
+		await joinRoom(guest!, id);
+		await startRoom(host!, guest!);
 		for (const [index, page] of [host!, guest!].entries()) {
 			await expect(
 				page.getByRole("button", { name: "Menu", exact: true }),
 			).toBeVisible({ timeout: 15_000 });
-			const ownName = index === 0 ? "Appearance Host" : "Appearance Guest";
-			const peerName = index === 0 ? "Appearance Guest" : "Appearance Host";
+			const ownName = index === 0 ? hostName : peerName;
+			const otherName = index === 0 ? peerName : hostName;
 			const ownColor = rules.appearanceColors[index]!;
 			const peerColor = rules.appearanceColors[1 - index]!;
 			await expect
@@ -135,7 +129,7 @@ test("player colors match across browsers while only the local player has full o
 						visible: true,
 					},
 					{
-						nickname: peerName,
+						nickname: otherName,
 						color: peerColor,
 						alpha: 0.7,
 						tint: Number.parseInt(peerColor.slice(1), 16),

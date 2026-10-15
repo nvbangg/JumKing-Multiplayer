@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { leaveOnline } from "./support/online";
+import { leaveOnline, observeOnline } from "./support/online";
 
 test.skip(
 	!process.env.E2E_ROOM_FINISH,
@@ -22,6 +22,7 @@ test("only the committed Room winner sees ending while peers can confirm the nex
 			});
 		const winner = await first.newPage(),
 			peer = await second.newPage(),
+			observed = observeOnline(winner),
 			errors: string[] = [],
 			winnerFinishes: unknown[] = [],
 			peerFinishes: unknown[] = [];
@@ -40,7 +41,9 @@ test("only the committed Room winner sees ending while peers can confirm the nex
 		async function restore(page: Page, credential: typeof fixture.winner) {
 			await page.goto("/");
 			await page.getByRole("button", { name: "Sign In", exact: true }).click();
-			await page.getByLabel("Email", { exact: true }).fill(credential.email);
+			await page
+				.getByLabel("Username", { exact: true })
+				.fill(credential.username);
 			await page
 				.getByLabel("Password", { exact: true })
 				.fill(credential.password);
@@ -58,21 +61,11 @@ test("only the committed Room winner sees ending while peers can confirm the nex
 			}, credential);
 			await page.reload();
 			await expect(
-				page.getByRole("button", { name: "Menu", exact: true }),
+				page.getByRole("button", { name: /^(Menu|Skip|Play Again)$/ }),
 			).toBeVisible({ timeout: 15_000 });
 		}
 		await restore(winner, fixture.winner);
 		await restore(peer, fixture.peer);
-		await winner.bringToFront();
-		if (
-			!(await winner
-				.getByRole("button", { name: "Resume Room", exact: true })
-				.isVisible())
-		)
-			await winner.getByRole("button", { name: "Menu", exact: true }).click();
-		await winner
-			.getByRole("button", { name: "Resume Room", exact: true })
-			.click();
 		await expect(
 			winner.getByRole("button", { name: "Skip", exact: true }),
 		).toBeVisible({ timeout: 15_000 });
@@ -117,7 +110,8 @@ test("only the committed Room winner sees ending while peers can confirm the nex
 		await expect(
 			winner.getByRole("button", { name: "Skip", exact: true }),
 		).toBeHidden();
-		await expect(winner.locator(".game-hud")).toContainText("Jumps: 0");
+		await expect.poll(() => observed.snapshot?.playId).not.toBe(fixture.playId);
+		expect(observed.snapshot!.self.simulation.physics.jumps).toBe(0);
 		await winner.getByRole("button", { name: "Menu", exact: true }).click();
 		await winner
 			.getByRole("button", { name: "End Match", exact: true })

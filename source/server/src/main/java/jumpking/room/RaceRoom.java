@@ -34,8 +34,8 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
           "RECONNECT",
           "CHAT_SEND",
           "START_GAME",
+          "GAME_READY",
           "END_MATCH",
-          "SET_ROOM_PAUSED",
           "PLAY_AGAIN",
           "PLAYER_INPUT",
           "CANCEL_INPUT");
@@ -100,7 +100,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     final String nickname;
     final long order;
     GameConnection connection;
-    boolean confirmed = true, crowned;
+    boolean confirmed = true, crowned, ready;
     String endingNotifiedPlay;
     long disconnectedAt, generation;
 
@@ -125,8 +125,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     String state = "WAITING", visibility = "PRIVATE";
     RoomMatch match;
     CheckpointWriter<RoomRuns.Write> writer;
-    long countdownAt, nextTick, serverTick, lastSnapshotTick, eventSeq, lastSave, pauseDeadline;
-    java.time.Instant pauseExpiresAt;
+    long prepareDeadline, countdownAt, nextTick, serverTick, lastSnapshotTick, eventSeq, lastSave;
     boolean retired;
     final AtomicBoolean tickQueued = new AtomicBoolean();
     String host;
@@ -198,7 +197,6 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
                 connection,
                 command,
                 () -> {
-                  expirePause(room, time.nanos());
                   var player = room.players.get(membership.playerId());
                   if (player == null)
                     throw new ApiException(404, "ROOM_NOT_FOUND", "Membership has ended");
@@ -261,6 +259,24 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
                       start(room, player);
                       connection.reply(command, "ROOM_STATE", state(room));
                     }
+                    case "GAME_READY" -> {
+                      GameEnvelope.fields(command.payload(), Set.of("playId", "generation"));
+                      if (!room.state.equals("COUNTDOWN")
+                          || room.match == null
+                          || !room.match.id.equals(GameEnvelope.text(command.payload(), "playId"))
+                          || GameEnvelope.integer(command.payload(), "generation")
+                              != player.generation)
+                        throw new ApiException(
+                            409, "STALE_PLAY", "Loading acknowledgement belongs to an old match");
+                      player.ready = true;
+                      if (room.countdownAt == 0
+                          && room.players.values().stream()
+                              .allMatch(p -> p.ready && p.connection != null))
+                        room.countdownAt =
+                            time.nanos() + rules.path("countdownMs").asLong() * 1_000_000L;
+                      connection.reply(command, "ROOM_STATE", state(room));
+                      broadcast(room);
+                    }
                     case "PLAY_AGAIN" -> {
                       GameEnvelope.fields(command.payload(), Set.of("matchId"));
                       if (room.match == null
@@ -282,20 +298,11 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
                     case "END_MATCH" -> {
                       GameEnvelope.fields(command.payload(), Set.of());
                       requireHost(room, player);
-                      if (!Set.of("PLAYING", "PAUSED").contains(room.state))
+                      if (!room.state.equals("PLAYING"))
                         throw new ApiException(409, "CONFLICT", "No running match to end");
                       room.match.finish("HOST_ENDED", clock.instant());
                       finish(room);
                       connection.reply(command, "GAME_FINISHED", room.match.results());
-                    }
-                    case "SET_ROOM_PAUSED" -> {
-                      GameEnvelope.fields(command.payload(), Set.of("playId", "paused"));
-                      requireHost(room, player);
-                      if (room.match == null
-                          || !room.match.id.equals(GameEnvelope.text(command.payload(), "playId")))
-                        throw new ApiException(409, "STALE_PLAY", "Pause belongs to an old match");
-                      setPaused(room, GameEnvelope.bool(command.payload(), "paused", false));
-                      connection.reply(command, "ROOM_STATE", state(room));
                     }
                     case "PLAYER_INPUT", "CANCEL_INPUT" -> {
                       var racer = room.match == null ? null : room.match.players.get(player.id);
@@ -328,17 +335,11 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
 
   private synchronized void join(GameConnection connection, GameEnvelope command) {
     boolean create = command.type().equals("CREATE_ROOM");
-    GameEnvelope.fields(
-        command.payload(),
-        create ? Set.of("nickname", "settings", "visibility") : Set.of("roomId", "nickname"));
-    String nickname = GameEnvelope.text(command.payload(), "nickname").strip();
-    if (nickname.codePointCount(0, nickname.length()) > 16
-        || !nickname.matches("[\\p{L}\\p{M}\\p{N} _-]+"))
-      throw new ApiException(
-          400,
-          "VALIDATION",
-          "Nickname must contain 1–16 letters, numbers, spaces, underscores or hyphens");
-    String visibility = create ? visibility(command.payload()) : "PRIVATE";
+    if (!connection.identity().account())
+      throw new ApiException(401, "AUTH_REQUIRED", "Sign in to play Room");
+    GameEnvelope.fields(command.payload(), create ? Set.of("settings") : Set.of("roomId"));
+    String nickname = connection.identity().username();
+    String visibility = "PRIVATE";
     var settings =
         create && command.payload().has("settings")
             ? RoomSettings.parse(command.payload().get("settings"), rules)
@@ -413,8 +414,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
             GameEnvelope.text(command.payload(), "reconnectToken")
                 .getBytes(java.nio.charset.StandardCharsets.UTF_8)))
       throw new ApiException(403, "INVALID_RECONNECT", "Invalid reconnect context");
-    if (!room.state.equals("PAUSED")
-        && player.connection == null
+    if (player.connection == null
         && time.nanos() - player.disconnectedAt >= rules.path("reconnectMs").asLong() * 1_000_000L)
       throw new ApiException(409, "RECONNECT_EXPIRED", "Reconnect is no longer available");
     var old = player.connection;
@@ -506,8 +506,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     if (room.host == null) state.putNull("hostPlayerId");
     else state.put("hostPlayerId", room.host);
     state.set("settings", json.valueToTree(room.settings));
-    for (String field : List.of("currentPlay", "result", "pauseExpiresAt")) state.putNull(field);
-    if (room.pauseExpiresAt != null) state.put("pauseExpiresAt", room.pauseExpiresAt.toString());
+    for (String field : List.of("currentPlay", "result")) state.putNull(field);
     if (room.match != null) {
       state
           .putObject("currentPlay")
@@ -515,7 +514,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
           .put("elapsedTimeMs", room.match.ms(room.match.ticks))
           .put(
               "countdownRemainingMs",
-              room.state.equals("COUNTDOWN")
+              room.state.equals("COUNTDOWN") && room.countdownAt > 0
                   ? Math.max(0, (room.countdownAt - time.nanos()) / 1_000_000L)
                   : 0);
       if (room.match.endedAt != null) state.set("result", json.valueToTree(room.match.results()));
@@ -632,7 +631,9 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     for (var player : roster)
       if (player.crowned) room.match.players.get(player.id).game.adventure().complete();
     room.state = "COUNTDOWN";
-    room.countdownAt = time.nanos() + rules.path("countdownMs").asLong() * 1_000_000L;
+    room.countdownAt = 0;
+    room.prepareDeadline = time.nanos() + rules.path("roomLoadTimeoutMs").asLong() * 1_000_000L;
+    roster.forEach(player -> player.ready = false);
     directory.joinable(room.id, false);
     for (var player : roster)
       player.connection.send(
@@ -655,39 +656,6 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     directory.joinable(room.id, true);
   }
 
-  private void setPaused(Room room, boolean paused) {
-    if (!Set.of("PLAYING", "PAUSED").contains(room.state))
-      throw new ApiException(409, "CONFLICT", "No running match to pause");
-    if (paused == room.state.equals("PAUSED")) return;
-    long now = time.nanos();
-    for (var racer : room.match.players.values()) {
-      racer.input.clear();
-      racer.game.physics().cancelInput();
-    }
-    if (paused) {
-      room.state = "PAUSED";
-      room.pauseDeadline = now + rules.path("hostPauseMs").asLong() * 1_000_000L;
-      room.pauseExpiresAt = clock.instant().plusMillis(rules.path("hostPauseMs").asLong());
-      save(room, true);
-    } else {
-      room.state = "PLAYING";
-      room.pauseDeadline = 0;
-      room.pauseExpiresAt = null;
-      room.nextTick = now;
-      for (var member : room.players.values())
-        if (member.connection == null) member.disconnectedAt = now;
-    }
-    broadcast(room);
-    snapshots(room);
-  }
-
-  private void expirePause(Room room, long now) {
-    if (!room.state.equals("PAUSED") || now < room.pauseDeadline) return;
-    room.match.finish("PAUSE_TIMEOUT", clock.instant());
-    finish(room);
-    for (var member : List.copyOf(room.players.values())) remove(room, member, null);
-  }
-
   private void advance(Room room) {
     long now = time.nanos();
     if (room.retired) {
@@ -698,13 +666,15 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     }
     for (var player : List.copyOf(room.players.values()))
       if (player.connection != null && !player.connection.open()) dropConnection(room, player);
-    expirePause(room, now);
-    if (!room.state.equals("PAUSED"))
-      for (var player : List.copyOf(room.players.values()))
-        if (player.connection == null
-            && now - player.disconnectedAt >= rules.path("reconnectMs").asLong() * 1_000_000L)
-          remove(room, player, null);
-    if (room.state.equals("COUNTDOWN") && now >= room.countdownAt) {
+    for (var player : List.copyOf(room.players.values()))
+      if (player.connection == null
+          && now - player.disconnectedAt >= rules.path("reconnectMs").asLong() * 1_000_000L)
+        remove(room, player, null);
+    if (room.state.equals("COUNTDOWN") && room.countdownAt == 0 && now >= room.prepareDeadline) {
+      cancelCountdown(room);
+      broadcast(room);
+    }
+    if (room.state.equals("COUNTDOWN") && room.countdownAt > 0 && now >= room.countdownAt) {
       room.match.start(clock.instant());
       room.state = "PLAYING";
       room.nextTick = now;
@@ -745,8 +715,6 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
 
   private void finish(Room room) {
     room.players.values().forEach(player -> player.confirmed = false);
-    room.pauseDeadline = 0;
-    room.pauseExpiresAt = null;
     room.state = "FINISHED";
     directory.joinable(room.id, false);
     save(room, true);
@@ -879,7 +847,8 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
   private void snapshots(Room room) {
     var match = room.match;
     if (match == null || match.startedAt == null) return;
-    // Commands có thể đổi state mà không chạy physics; snapshot mới vẫn phải có thứ tự riêng.
+    // Commands có thể đổi state mà không chạy physics; snapshot mới vẫn phải có
+    // thứ tự riêng.
     room.serverTick = Math.max(room.serverTick, room.lastSnapshotTick + 1);
     room.lastSnapshotTick = room.serverTick;
     var standings = json.valueToTree(match.standings(room.players.keySet()));

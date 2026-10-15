@@ -48,12 +48,11 @@ class SchemaIT {
   private long account() {
     String token = UUID.randomUUID().toString();
     jdbc.update(
-        "INSERT INTO users(type,username,email,password_hash,created_at) VALUES ('ACCOUNT',?,?,?,UTC_TIMESTAMP(3))",
+        "INSERT INTO users(type,username,password_hash,created_at) VALUES ('ACCOUNT',?,?,UTC_TIMESTAMP(3))",
         token.substring(0, 24),
-        token + "@example.test",
         "hash");
     return jdbc.queryForObject(
-        "SELECT id FROM users WHERE email=?", Long.class, token + "@example.test");
+        "SELECT id FROM users WHERE username=?", Long.class, token.substring(0, 24));
   }
 
   private void community(long userId) {

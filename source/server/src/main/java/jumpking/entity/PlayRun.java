@@ -47,7 +47,7 @@ public class PlayRun {
   @Column(name = "finish_ticks")
   private Long finishTicks;
 
-  @Column(name = "nickname", length = 16)
+  @Column(name = "nickname", length = 32)
   private String nickname;
 
   @JdbcTypeCode(SqlTypes.TINYINT)

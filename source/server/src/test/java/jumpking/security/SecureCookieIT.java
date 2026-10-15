@@ -31,7 +31,7 @@ class SecureCookieIT {
   @LocalServerPort int port;
 
   @Test
-  void httpsConfigurationMarksBothCookiesSecureWithoutDomain() throws Exception {
+  void httpsConfigurationMarksSessionCookieSecureBeforeAndAfterAuthentication() throws Exception {
     try (var http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()) {
       String origin = "http://127.0.0.1:" + port;
       var csrf =
@@ -44,17 +44,27 @@ class SecureCookieIT {
           .doesNotContain("Domain=");
       String token = new ObjectMapper().readTree(csrf.body()).path("token").asText();
       // HTTP loopback chỉ dùng kiểm tra headers; gửi cookie thủ công vì browser sẽ đòi HTTPS.
-      var guest =
+      var account =
           http.send(
-              HttpRequest.newBuilder(URI.create(origin + "/api/auth/guest"))
+              HttpRequest.newBuilder(URI.create(origin + "/api/auth/register"))
                   .header("Cookie", cookie.split(";", 2)[0])
                   .header("X-CSRF-TOKEN", token)
-                  .POST(HttpRequest.BodyPublishers.noBody())
+                  .header("Content-Type", "application/json")
+                  .POST(
+                      HttpRequest.BodyPublishers.ofString(
+                          new ObjectMapper()
+                              .writeValueAsString(
+                                  java.util.Map.of(
+                                      "username",
+                                      "secure_"
+                                          + java.util.UUID.randomUUID().toString().substring(0, 12),
+                                      "password",
+                                      "A secure integration password"))))
                   .build(),
               HttpResponse.BodyHandlers.ofString());
-      assertThat(guest.statusCode()).isEqualTo(200);
-      assertThat(guest.headers().firstValue("set-cookie").orElseThrow())
-          .contains("JK_GUEST=", "Secure", "HttpOnly", "SameSite=Lax", "Path=/")
+      assertThat(account.statusCode()).isEqualTo(200);
+      assertThat(account.headers().firstValue("set-cookie").orElseThrow())
+          .contains("JSESSIONID=", "Secure", "HttpOnly", "SameSite=Lax", "Path=/")
           .doesNotContain("Domain=");
     }
   }

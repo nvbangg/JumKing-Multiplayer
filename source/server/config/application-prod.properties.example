@@ -3,5 +3,5 @@ spring.datasource.username=jumpking_app
 spring.datasource.password=CHANGE_ME
 server.address=127.0.0.1
 server.port=8080
-# Điền domain của Cloudflare Pages (ví dụ: https://game.yourdomain.com hoặc https://jumpking.pages.dev)
+# Origin HTTPS mà người chơi dùng để mở game
 app.allowed-origins=https://game.yourdomain.com

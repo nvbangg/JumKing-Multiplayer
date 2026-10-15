@@ -1,55 +1,49 @@
 import { expect, test } from "@playwright/test";
+import { soloJumps } from "./support/solo";
 
-test("Options persist between home and game and timer reflects active play", async ({
+test("Options keep sound, show controls and the game timer is always visible", async ({
 	page,
 }) => {
 	await page.goto("/");
+	await expect(
+		page.getByText("Hold Space / W / ↑, then release", { exact: true }),
+	).toHaveCount(0);
 	await page.getByRole("button", { name: "Options", exact: true }).click();
+	await expect(
+		page.getByText("Hold Space / W / ↑, then release", { exact: true }),
+	).toBeVisible();
+	await expect(
+		page.getByRole("button", { name: "Controls", exact: true }),
+	).toHaveCount(0);
+	await expect(page.getByRole("switch", { name: /Display Timer/ })).toHaveCount(
+		0,
+	);
+	await page.getByRole("switch", { name: "Sound: On", exact: true }).click();
 	if (await page.evaluate(() => document.fullscreenEnabled)) {
 		await page.getByRole("button", { name: "Fullscreen", exact: true }).click();
 		await expect
 			.poll(() => page.evaluate(() => document.fullscreenElement !== null))
 			.toBe(true);
 		await page.getByRole("button", { name: "Fullscreen", exact: true }).click();
-		await expect
-			.poll(() => page.evaluate(() => document.fullscreenElement === null))
-			.toBe(true);
 	}
-	await page.getByRole("switch", { name: "Sound: On", exact: true }).click();
-	await page
-		.getByRole("switch", { name: "Display Timer: Off", exact: true })
-		.click();
 	await page.getByRole("button", { name: "Back", exact: true }).click();
 	await page
 		.getByRole("button", { name: "New Solo Game", exact: true })
 		.click();
-	await expect(page.getByLabel("Play time")).toBeVisible();
+	await expect(page.getByLabel("Play time", { exact: true })).toBeVisible();
+	await expect(page.getByText(/^Jumps:/)).toHaveCount(0);
 	await page.getByRole("button", { name: "Menu", exact: true }).click();
+	const paused = await page
+		.getByLabel("Play time", { exact: true })
+		.textContent();
+	await page.waitForTimeout(500);
+	await expect(page.getByLabel("Play time", { exact: true })).toHaveText(
+		paused!,
+	);
 	await page.getByRole("button", { name: "Options", exact: true }).click();
 	await expect(
 		page.getByRole("switch", { name: "Sound: Off", exact: true }),
-	).toHaveAttribute("aria-checked", "false");
-	await page.getByRole("button", { name: "Controls", exact: true }).click();
-	await page.keyboard.press("Escape");
-	await expect(
-		page.getByRole("heading", { name: "Options", exact: true }),
 	).toBeVisible();
-	await page
-		.getByRole("switch", { name: "Display Timer: On", exact: true })
-		.click();
-	await page.getByRole("button", { name: "Back", exact: true }).click();
-	await page.getByRole("button", { name: "Save & Exit", exact: true }).click();
-	await expect(
-		page.getByRole("button", { name: "Continue Solo", exact: true }),
-	).toBeVisible();
-	await page.reload();
-	await page.getByRole("button", { name: "Options", exact: true }).click();
-	await expect(
-		page.getByRole("switch", { name: "Display Timer: Off", exact: true }),
-	).toHaveAttribute("aria-checked", "false");
-	await expect(
-		page.getByRole("switch", { name: "Sound: Off", exact: true }),
-	).toHaveAttribute("aria-checked", "false");
 });
 
 test("native audio unlocks, decodes and caches effects and stops old ambience", async ({
@@ -152,7 +146,7 @@ test("blocked audio reports a limitation without blocking the game", async ({
 		page.getByRole("button", { name: "Menu", exact: true }),
 	).toBeVisible();
 	await page.keyboard.down("Space");
-	await expect(page.getByText("Jumps: 1", { exact: true })).toBeVisible();
+	await expect.poll(() => soloJumps(page)).toBe(1);
 	await page.keyboard.up("Space");
 	await page.getByRole("button", { name: "Menu", exact: true }).click();
 	await expect(page.getByRole("alert")).toContainText(

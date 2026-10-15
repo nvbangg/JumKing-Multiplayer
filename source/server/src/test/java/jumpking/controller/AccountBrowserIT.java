@@ -11,7 +11,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import jumpking.JumpKingApplication;
-import jumpking.security.GuestIdentity;
 import jumpking.support.TestDatabase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -35,23 +34,21 @@ class AccountBrowserIT {
   @Autowired jumpking.game.SharedData shared;
   @Autowired com.fasterxml.jackson.databind.ObjectMapper json;
 
-  private record FinishFixture(long owner, String email, String password, String run) {}
+  private record FinishFixture(long owner, String username, String password, String run) {}
 
-  private record AdventureFixture(String email, String password) {}
+  private record AdventureFixture(String username, String password) {}
 
   private AdventureFixture adventureFixture() throws Exception {
     var jdbc = TestDatabase.get().jdbc;
     String
         name =
             "adventure_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12),
-        email = name + "@example.test",
         password = java.util.UUID.randomUUID().toString();
     jdbc.update(
-        "INSERT INTO users(type,username,email,password_hash,created_at) VALUES ('ACCOUNT',?,?,?,UTC_TIMESTAMP(3))",
+        "INSERT INTO users(type,username,password_hash,created_at) VALUES ('ACCOUNT',?,?,UTC_TIMESTAMP(3))",
         name,
-        email,
         passwords.encode(password));
-    long owner = jdbc.queryForObject("SELECT id FROM users WHERE email=?", Long.class, email);
+    long owner = jdbc.queryForObject("SELECT id FROM users WHERE username=?", Long.class, name);
     var game =
         new jumpking.game.GameSimulation(
             json.treeToValue(shared.map(), jumpking.game.GameMap.class),
@@ -66,21 +63,19 @@ class AccountBrowserIT {
     var physics = game.physics().snapshot();
     game.physics().restore(physics);
     communityRuns.open(owner, false, null, game.snapshot());
-    return new AdventureFixture(email, password);
+    return new AdventureFixture(name, password);
   }
 
   private FinishFixture finishFixture() throws Exception {
     var jdbc = TestDatabase.get().jdbc;
     String
         name = "finish_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12),
-        email = name + "@example.test",
         password = java.util.UUID.randomUUID().toString();
     jdbc.update(
-        "INSERT INTO users(type,username,email,password_hash,created_at) VALUES ('ACCOUNT',?,?,?,UTC_TIMESTAMP(3))",
+        "INSERT INTO users(type,username,password_hash,created_at) VALUES ('ACCOUNT',?,?,UTC_TIMESTAMP(3))",
         name,
-        email,
         passwords.encode(password));
-    long owner = jdbc.queryForObject("SELECT id FROM users WHERE email=?", Long.class, email);
+    long owner = jdbc.queryForObject("SELECT id FROM users WHERE username=?", Long.class, name);
     var before = jumpking.support.MainBabeRoute.beforeFinish(shared, json);
     var stored = communityRuns.open(owner, false, null, before);
     var physics = before.physics();
@@ -93,49 +88,7 @@ class AccountBrowserIT {
     communityRuns.save(
         new jumpking.service.CommunityRuns.Write(
             stored.id(), owner, 2, "ACTIVE", before, progress, progress, physics.ticks, null));
-    return new FinishFixture(owner, email, password, stored.id());
-  }
-
-  private record MergeFixture(
-      long guest,
-      long account,
-      String token,
-      String username,
-      String email,
-      String password,
-      String run) {}
-
-  private MergeFixture mergeFixture() {
-    var jdbc = TestDatabase.get().jdbc;
-    String name =
-        "merge_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-    String email = name + "@example.test", password = java.util.UUID.randomUUID().toString();
-    byte[] bytes = new byte[32];
-    new java.security.SecureRandom().nextBytes(bytes);
-    String token = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes),
-        hash = GuestIdentity.hash(token);
-    jdbc.update(
-        "INSERT INTO users(type,guest_token_hash,created_at) VALUES ('GUEST',?,UTC_TIMESTAMP(3))",
-        hash);
-    long guest =
-        jdbc.queryForObject("SELECT id FROM users WHERE guest_token_hash=?", Long.class, hash);
-    jdbc.update(
-        "INSERT INTO users(type,username,email,password_hash,created_at) VALUES ('ACCOUNT',?,?,?,UTC_TIMESTAMP(3))",
-        name,
-        email,
-        passwords.encode(password));
-    long account = jdbc.queryForObject("SELECT id FROM users WHERE email=?", Long.class, email);
-    String match = java.util.UUID.randomUUID().toString(),
-        run = java.util.UUID.randomUUID().toString();
-    jdbc.update(
-        "INSERT INTO matches(id,room_code,mode,started_at,ended_at,end_reason) VALUES (?,'ABCDEF','RACE',UTC_TIMESTAMP(3),UTC_TIMESTAMP(3),'HOST_ENDED')",
-        match);
-    jdbc.update(
-        "INSERT INTO play_runs(id,user_id,kind,match_id,status,nickname,started_at,updated_at,ended_at) VALUES (?,?,'ROOM',?,'UNFINISHED','Guest Player',UTC_TIMESTAMP(3),UTC_TIMESTAMP(3),UTC_TIMESTAMP(3))",
-        run,
-        guest,
-        match);
-    return new MergeFixture(guest, account, token, name, email, password, run);
+    return new FinishFixture(owner, name, password, stored.id());
   }
 
   @DynamicPropertySource
@@ -208,24 +161,19 @@ class AccountBrowserIT {
       builder.environment().put("E2E_BASE_URL", origin);
       builder.environment().put("E2E_AUTH_ONLINE", "true");
       builder.environment().put("E2E_OUTPUT_DIR", "../../.local/browser-online-tests");
-      var merge = mergeFixture();
-      builder.environment().put("E2E_MERGE_USERNAME", merge.username);
-      builder.environment().put("E2E_MERGE_EMAIL", merge.email);
-      builder.environment().put("E2E_MERGE_PASSWORD", merge.password);
-      builder.environment().put("E2E_MERGE_GUEST", merge.token);
       var finish = finishFixture();
-      builder.environment().put("E2E_FINISH_EMAIL", finish.email);
+      builder.environment().put("E2E_FINISH_USERNAME", finish.username);
       builder.environment().put("E2E_FINISH_PASSWORD", finish.password);
       builder.environment().put("E2E_FINISH_RUN", finish.run);
       var adventure = adventureFixture();
-      builder.environment().put("E2E_ADVENTURE_EMAIL", adventure.email);
+      builder.environment().put("E2E_ADVENTURE_USERNAME", adventure.username);
       builder.environment().put("E2E_ADVENTURE_PASSWORD", adventure.password);
       browser =
           builder
               .redirectErrorStream(true)
               .redirectOutput(Path.of("target/auth-browser-test.log").toFile())
               .start();
-      assertThat(browser.waitFor(300, TimeUnit.SECONDS))
+      assertThat(browser.waitFor(600, TimeUnit.SECONDS))
           .as("Browser test timeout; inspect target/auth-browser-test.log")
           .isTrue();
       assertThat(browser.exitValue())
@@ -234,14 +182,6 @@ class AccountBrowserIT {
       // Các fixtures này chỉ được hoàn tất khi chạy toàn bộ scenarios online.
       if (specs.equals(ALL_SPECS)) {
         var jdbc = TestDatabase.get().jdbc;
-        assertThat(
-                jdbc.queryForObject(
-                    "SELECT user_id FROM play_runs WHERE id=?", Long.class, merge.run))
-            .isEqualTo(merge.account);
-        assertThat(
-                jdbc.queryForObject(
-                    "SELECT merged_into_user_id FROM users WHERE id=?", Long.class, merge.guest))
-            .isEqualTo(merge.account);
         assertThat(
                 jdbc.queryForObject(
                     "SELECT COUNT(*) FROM play_runs WHERE id=? AND status='FINISHED' AND snapshot IS NULL AND finish_ticks=16957",

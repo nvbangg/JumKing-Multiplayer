@@ -102,17 +102,14 @@ class RoomFlyIT {
       try (var a = new GameClient(port);
           var b = new GameClient(port)) {
         a.register();
-        b.guest();
+        b.register();
         a.connect();
         b.connect();
         var settings = new HashMap<String, Object>();
         settings.put("mode", mode);
         settings.put("timeLimitMinutes", mode.equals("TIME_LIMIT") ? 30 : null);
-        String room =
-            a.ok("CREATE_ROOM", Map.of("nickname", "Fly King", "settings", settings))
-                .path("roomId")
-                .asText();
-        b.ok("JOIN_ROOM", Map.of("roomId", room, "nickname", "Peer"));
+        String room = a.ok("CREATE_ROOM", Map.of("settings", settings)).path("roomId").asText();
+        b.ok("JOIN_ROOM", Map.of("roomId", room));
         a.ok("START_GAME", Map.of());
         String play =
             a.await(message -> message.path("type").asText().equals("GAME_STARTED"))

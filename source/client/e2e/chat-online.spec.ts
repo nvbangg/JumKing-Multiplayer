@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 import type { OnlineSnapshot } from "../src/game/netcode/OnlineRuntime";
-import { leaveOnline } from "./support/online";
+import {
+	createRoom,
+	joinRoom,
+	leaveOnline,
+	registerOnline,
+	startRoom,
+} from "./support/online";
 
 test.skip(
 	process.env.E2E_AUTH_ONLINE !== "true",
@@ -36,46 +42,22 @@ test("chat shortcuts, passive ten-second messages and touch work without launchi
 				if (message.type === "GAME_SNAPSHOT") snapshots.push(message.payload);
 			}),
 		);
-		await a.goto("/");
-		await a
-			.getByRole("button", { name: "Play with Friends", exact: true })
-			.click();
-		await a.getByLabel("Nickname", { exact: true }).fill("Chat Host");
-		await a.getByRole("button", { name: "Create Room", exact: true }).click();
-		const id = await a.locator(".room-code code").innerText();
-		await b.goto("/");
-		await b.getByRole("button", { name: "Join by ID", exact: true }).tap();
-		await b.getByLabel("Room ID", { exact: true }).fill(id);
-		await b.getByRole("button", { name: "Join", exact: true }).tap();
-		await b.getByLabel("Nickname", { exact: true }).fill("Touch Peer");
-		await b.getByRole("button", { name: "Join", exact: true }).tap();
-		await a.getByRole("button", { name: "Chat", exact: true }).click();
-		await expect(a.getByLabel("Message", { exact: true })).toBeFocused();
+		const hostName = await registerOnline(a, "chat_host"),
+			peerName = await registerOnline(b, "touch_peer");
+		const id = await createRoom(a);
+		await joinRoom(b, id);
 		await a.getByLabel("Message", { exact: true }).fill("Lobby hello");
-		await a.keyboard.press("Enter");
+		await a.getByRole("button", { name: "Send", exact: true }).click();
+		await expect(b.getByRole("log")).toContainText("Lobby hello");
+		await expect(b.getByLabel("Message", { exact: true })).toBeVisible();
+		await expect(
+			b.getByRole("button", { name: "Close chat", exact: true }),
+		).toHaveCount(0);
+		await startRoom(a, b);
 		const preview = b.getByRole("region", {
 			name: "New chat messages",
 			exact: true,
 		});
-		await expect(preview).toContainText("Lobby hello");
-		await expect(b.getByLabel("Message", { exact: true })).toHaveCount(0);
-		await expect(preview).toBeHidden({ timeout: 12_000 });
-		await expect(
-			a.getByRole("region", { name: "Room chat", exact: true }),
-		).toBeVisible();
-		await b.getByRole("button", { name: "Chat", exact: true }).tap();
-		await expect(b.getByLabel("Message", { exact: true })).toBeFocused();
-		await b.keyboard.press("Escape");
-		await a.keyboard.press("Escape");
-		await a.bringToFront();
-		await a.getByRole("button", { name: "Start", exact: true }).click();
-		await expect(
-			a.getByRole("button", { name: "Menu", exact: true }),
-		).toBeVisible({ timeout: 15_000 });
-		if (
-			await a.getByRole("button", { name: "Resume", exact: true }).isVisible()
-		)
-			await a.getByRole("button", { name: "Resume", exact: true }).click();
 		await a.locator("canvas").click();
 		const jumps = snapshots.at(-1)!.self.simulation.physics.jumps;
 		const players = a.locator("summary").filter({ hasText: /^Players$/ });
@@ -107,6 +89,7 @@ test("chat shortcuts, passive ten-second messages and touch work without launchi
 		await a.getByLabel("Message", { exact: true }).fill("Online hello");
 		await a.keyboard.press("Enter");
 		await expect(preview).toContainText("Online hello");
+		await expect(preview).toBeHidden({ timeout: 12000 });
 		await expect(b.getByLabel("Message", { exact: true })).toHaveCount(0);
 		await a.screenshot({ path: info.outputPath("online-chat.png") });
 		await a.keyboard.press("Escape");
@@ -125,14 +108,14 @@ test("chat shortcuts, passive ten-second messages and touch work without launchi
 				() =>
 					snapshots
 						.at(-1)
-						?.players?.find((player) => player.nickname === "Touch Peer")?.rank,
+						?.players?.find((player) => player.nickname === peerName)?.rank,
 				{ intervals: [20] },
 			)
 			.toBe(2);
 		await players.click();
 		await expect(
 			a.getByRole("list", { name: "Current players" }).locator("li").first(),
-		).toContainText("1. Chat Host");
+		).toContainText("1. " + hostName);
 		await a.getByRole("button", { name: "Menu", exact: true }).click();
 		await a.getByRole("button", { name: "End Match", exact: true }).click();
 		await expect(

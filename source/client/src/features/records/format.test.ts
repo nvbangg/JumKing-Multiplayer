@@ -1,7 +1,6 @@
 import { expect, test } from "vitest";
-import { EMPTY_STATS } from "../../network/contracts";
 import type { SoloRun } from "../solo/storage";
-import { duration, soloHistory, soloStatistics, sumStatistics } from "./format";
+import { duration, soloHistory, soloStatistics } from "./format";
 
 const run = (overrides: Partial<SoloRun>): SoloRun => ({
 	id: "a",
@@ -20,36 +19,6 @@ const run = (overrides: Partial<SoloRun>): SoloRun => ({
 	endedAt: null,
 	snapshot: null,
 	...overrides,
-});
-
-test("Guest totals add local Solo to online results and preserve the best finish", () => {
-	const online = {
-		...EMPTY_STATS,
-		totalJumps: 5,
-		totalFalls: 2,
-		totalPlayTimeMs: 4000,
-		finishes: 1,
-		matchesPlayed: 3,
-		wins: 1,
-		bestFinishTimeMs: 3000,
-	};
-	const local = soloStatistics([
-		run({ status: "FINISHED", playTicks: 90, finishTicks: 90 }),
-	]);
-	expect(sumStatistics(online, local)).toEqual({
-		totalPlayTimeMs: 5500,
-		totalJumps: 8,
-		totalFalls: 3,
-		finishes: 2,
-		matchesPlayed: 3,
-		wins: 1,
-		bestFinishTimeMs: 1500,
-	});
-	expect(sumStatistics(online, { ...EMPTY_STATS }).bestFinishTimeMs).toBe(3000);
-	expect(sumStatistics({ ...EMPTY_STATS }, local).bestFinishTimeMs).toBe(1500);
-	expect(
-		sumStatistics({ ...EMPTY_STATS }, { ...EMPTY_STATS }).bestFinishTimeMs,
-	).toBeNull();
 });
 
 test("totals retain abandoned and active attempts but best time only uses finishes", () => {

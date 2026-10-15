@@ -30,25 +30,12 @@ public class Memberships {
     members.remove(owner, expected);
   }
 
-  public synchronized void move(long owner, Membership expected, Membership replacement) {
-    if (changing.contains(owner)) throw busy();
-    if (!members.replace(owner, expected, replacement))
-      throw new ApiException(409, "CONFLICT", "Membership changed before transfer");
-  }
-
   public <T> T changingIdentity(Long current, Long target, Supplier<T> action) {
     var owners = new HashSet<Long>();
     if (current != null) owners.add(current);
     if (target != null) owners.add(target);
     return change(
         owners, current != null && !current.equals(target) ? Set.of(current) : Set.of(), action);
-  }
-
-  public <T> T vacantOwners(long source, long target, Supplier<T> action) {
-    var owners = new HashSet<Long>();
-    owners.add(source);
-    owners.add(target);
-    return change(owners, owners, action);
   }
 
   private <T> T change(Set<Long> owners, Set<Long> vacant, Supplier<T> action) {

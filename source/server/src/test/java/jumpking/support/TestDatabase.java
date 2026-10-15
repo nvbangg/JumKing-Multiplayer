@@ -44,7 +44,7 @@ public final class TestDatabase {
         throw new IllegalStateException("Integration requires a new, empty jumpking_it database");
       }
       // Chỉ tạo bảng trong database test đã kiểm tra; không chạy phần reset jumpking.
-      String ddl = tableDdl(Files.readString(Path.of("../../scripts/schema.sql")));
+      String ddl = tableDdl(Files.readString(Path.of("../database/schema.sql")));
       try (var connection = dataSource.getConnection()) {
         ScriptUtils.executeSqlScript(
             connection, new ByteArrayResource(ddl.getBytes(StandardCharsets.UTF_8)));
@@ -60,6 +60,14 @@ public final class TestDatabase {
       }
       throw failure;
     }
+  }
+
+  public long historicalGuest() {
+    String name =
+        "fixture_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 20);
+    jdbc.update(
+        "INSERT INTO users(type,username,created_at) VALUES ('GUEST',?,UTC_TIMESTAMP(3))", name);
+    return jdbc.queryForObject("SELECT id FROM users WHERE username=?", Long.class, name);
   }
 
   private void close() {

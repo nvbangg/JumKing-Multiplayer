@@ -26,14 +26,12 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
   private static final Set<String> COMMANDS =
       Set.of(
           "JOIN_COMMUNITY",
-          "JOIN_ROOM",
           "GET_ROOM_STATE",
           "LEAVE_ROOM",
           "PLAYER_INPUT",
           "CANCEL_INPUT",
           "RECONNECT",
           "SET_COMMUNITY_PAUSED",
-          "NEW_COMMUNITY_RUN",
           "CHAT_SEND");
   private final GameWorkers workers;
   private final RoomDirectory directory;
@@ -127,7 +125,6 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
     PlayerInput lastPhysicalInput = new PlayerInput(false, false, false, false, false, false);
     GameEnvelope leaveCommand;
     GameEnvelope operationCommand;
-    Runnable operationFailure;
 
     Member(GameConnection connection, RoomDirectory.Slot slot) {
       this.connection = connection;
@@ -325,7 +322,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
   public boolean supports(GameConnection connection, GameEnvelope command) {
     if (!COMMANDS.contains(command.type())) return false;
     if (command.type().equals("JOIN_COMMUNITY")) return true;
-    if (command.type().equals("JOIN_ROOM") || command.type().equals("RECONNECT")) {
+    if (command.type().equals("RECONNECT")) {
       var info = directory.find(command.payload().path("roomId").asText());
       return info != null && info.kind().equals("COMMUNITY");
     }
@@ -335,7 +332,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
 
   @Override
   public void handle(GameConnection connection, GameEnvelope command) {
-    if (command.type().equals("JOIN_COMMUNITY") || command.type().equals("JOIN_ROOM")) {
+    if (command.type().equals("JOIN_COMMUNITY")) {
       join(connection, command);
       return;
     }
@@ -428,7 +425,6 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                       connection.reply(command, "COMMUNITY_RUN_STATE", runPayload(player));
                       snapshots(tower);
                     }
-                    case "NEW_COMMUNITY_RUN" -> newRun(tower, player, command);
                     case "CHAT_SEND" -> {
                       GameEnvelope.fields(command.payload(), Set.of("text"));
                       var message =
@@ -457,116 +453,19 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
     }
   }
 
-  private void newRun(Tower tower, Member player, GameEnvelope command) {
-    GameEnvelope.fields(command.payload(), Set.of("expectedRunId"));
-    if (!command.payload().has("expectedRunId")) throw GameEnvelope.invalid();
-    String expected =
-        command.payload().path("expectedRunId").isNull()
-            ? null
-            : GameEnvelope.text(command.payload(), "expectedRunId");
-    if (!Objects.equals(expected, player.finished ? null : player.stored.id()))
-      throw new ApiException(
-          409, "CONFLICT", "Community save changed; refresh before starting a new game");
-    if (player.leaving) throw new ApiException(409, "CONFLICT", "Save & Exit is in progress");
-    player.operation = true;
-    player.operationCommand = command;
-    player.input.clear();
-    player.game.physics().cancelInput();
-    save(
-        tower,
-        player,
-        true,
-        () -> {
-          try {
-            database.execute(
-                () -> {
-                  try {
-                    var game =
-                        new GameSimulation(map, physics, adventure, flags.flyEnabled(), false);
-                    if (crowns.unlocked(player.identity.owner())) game.adventure().complete();
-                    var stored =
-                        records.open(player.identity.owner(), true, expected, game.snapshot());
-                    tower.actor.complete(
-                        () -> {
-                          player.game = game;
-                          player.stored = stored;
-                          player.revision = player.savedRevision = stored.revision();
-                          player.maximum = 0;
-                          player.peakTicks = 0;
-                          player.finished =
-                              player.terminalQueued =
-                                  player.operation = player.pausePending = player.paused = false;
-                          player.finishedAt = null;
-                          player.operationCommand = null;
-                          player.ending = null;
-                          player.endingNotified = false;
-                          player.generation++;
-                          player.input.reset(stored.id(), player.generation);
-                          player.lastPhysical = player.lastSave = time.nanos();
-                          player.saveStatus = "SAVED";
-                          if (player.connection == null) pause(player);
-                          if (player.connection != null)
-                            player.connection.reply(
-                                command, "COMMUNITY_RUN_STATE", runPayload(player));
-                          broadcast(tower);
-                          snapshots(tower);
-                        });
-                  } catch (Exception error) {
-                    tower.actor.complete(
-                        () -> {
-                          player.operation = false;
-                          player.operationCommand = null;
-                          pause(player);
-                          if (player.connection != null)
-                            player.connection.error(
-                                command, error instanceof ApiException api ? api : saveError());
-                        });
-                  }
-                });
-          } catch (RejectedExecutionException busy) {
-            player.operation = false;
-            player.operationCommand = null;
-            pause(player);
-            if (player.connection != null) player.connection.error(command, saveError());
-          }
-        });
-  }
-
   private synchronized void join(GameConnection connection, GameEnvelope command) {
     if (!connection.identity().account())
       throw new ApiException(403, "ACCOUNT_REQUIRED", "Sign in to play Community Tower");
-    boolean direct = command.type().equals("JOIN_ROOM");
-    GameEnvelope.fields(
-        command.payload(),
-        direct ? Set.of("roomId", "nickname") : Set.of("newRun", "expectedRunId"));
-    String requested = direct ? GameEnvelope.text(command.payload(), "roomId") : null;
-    boolean replace = !direct && GameEnvelope.bool(command.payload(), "newRun", true);
+    GameEnvelope.fields(command.payload(), Set.of("newRun", "expectedRunId"));
+    boolean replace = GameEnvelope.bool(command.payload(), "newRun", true);
     if (replace && !command.payload().has("expectedRunId")) throw GameEnvelope.invalid();
     String expected =
-        command.payload().path("expectedRunId").isNull() || !command.payload().has("expectedRunId")
-            ? null
-            : GameEnvelope.text(command.payload(), "expectedRunId");
-    var existing = memberships.find(connection.identity().owner());
-    if (existing != null) {
-      var source = towers.get(existing.roomId());
-      if (direct && source != null) {
-        source.actor.execute(
-            () ->
-                safely(
-                    connection,
-                    command,
-                    () ->
-                        transfer(
-                            source,
-                            source.players.get(existing.playerId()),
-                            connection,
-                            command,
-                            requested)));
-        return;
-      }
+        command.payload().hasNonNull("expectedRunId")
+            ? GameEnvelope.text(command.payload(), "expectedRunId")
+            : null;
+    if (memberships.find(connection.identity().owner()) != null)
       throw new ApiException(409, "ALREADY_IN_ROOM", "Leave your current room first");
-    }
-    var slot = directory.community(requested);
+    var slot = directory.community();
     var player = new Member(connection, slot);
     try {
       memberships.claim(
@@ -631,98 +530,6 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
       }
       throw busy;
     }
-  }
-
-  private void transfer(
-      Tower source, Member old, GameConnection connection, GameEnvelope command, String requested) {
-    if (old == null || old.connection != connection)
-      throw new ApiException(409, "INVALID_RECONNECT", "Reconnect with your saved token first");
-    if (old.loading || old.operation || old.leaving)
-      throw new ApiException(409, "CONFLICT", "A Community operation is still in progress");
-    if (requested.equals(source.id)) {
-      connection.reply(command, "ROOM_STATE", state(source));
-      return;
-    }
-    var slot = directory.community(requested);
-    old.operation = true;
-    old.operationCommand = command;
-    old.operationFailure = () -> directory.release(slot);
-    old.input.clear();
-    old.game.physics().cancelInput();
-    save(
-        source,
-        old,
-        true,
-        () -> {
-          try {
-            var target = towers.computeIfAbsent(slot.roomId(), Tower::new);
-            var next = new Member(connection, slot);
-            target.actor.complete(
-                () -> {
-                  try {
-                    memberships.move(
-                        old.identity.owner(),
-                        new Memberships.Membership(source.id, old.id),
-                        new Memberships.Membership(target.id, next.id));
-                    next.game = old.game;
-                    next.stored = old.stored;
-                    next.generation = old.generation + 1;
-                    next.revision = old.revision;
-                    next.savedRevision = old.savedRevision;
-                    next.maximum = old.maximum;
-                    next.peakTicks = old.peakTicks;
-                    next.finished = old.finished;
-                    next.finishedAt = old.finishedAt;
-                    next.ending = old.ending;
-                    next.endingNotified = old.endingNotified;
-                    next.terminalQueued = old.terminalQueued;
-                    next.paused = true;
-                    next.pausedAt = time.nanos();
-                    next.loading = false;
-                    next.input.reset(next.stored.id(), next.generation);
-                    if (!connection.open()) {
-                      next.connection = null;
-                      next.disconnectedAt = time.nanos();
-                    }
-                    target.players.put(next.id, next);
-                    source.actor.complete(
-                        () -> {
-                          old.operationFailure = null;
-                          source.players.remove(old.id);
-                          source.chat.leave(old.id);
-                          old.connection = null;
-                          if (directory.release(old.slot)) {
-                            towers.remove(source.id, source);
-                            source.timer.cancel(false);
-                          } else broadcast(source);
-                        });
-                    connection.reply(command, "ROOM_JOINED", joined(next));
-                    broadcast(target);
-                    chatHistory(target, next);
-                    runState(next);
-                    snapshots(target);
-                  } catch (Exception error) {
-                    source.actor.complete(() -> transferFailed(old, command, slot, error));
-                  }
-                });
-          } catch (Exception error) {
-            transferFailed(old, command, slot, error);
-          }
-        });
-  }
-
-  private void transferFailed(
-      Member old, GameEnvelope command, RoomDirectory.Slot slot, Exception error) {
-    old.operation = false;
-    old.operationCommand = null;
-    old.operationFailure = null;
-    pause(old);
-    if (directory.release(slot)) {
-      var empty = towers.remove(slot.roomId());
-      if (empty != null) empty.timer.cancel(false);
-    }
-    if (old.connection != null)
-      old.connection.error(command, error instanceof ApiException api ? api : saveError());
   }
 
   private void reconnect(
@@ -858,10 +665,6 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                     pause(player);
                     player.leaving = false;
                     player.operation = false;
-                    if (player.operationFailure != null) {
-                      player.operationFailure.run();
-                      player.operationFailure = null;
-                    }
                     if (player.operationCommand != null && player.connection != null)
                       player.connection.error(player.operationCommand, saveError());
                     player.operationCommand = null;
@@ -888,10 +691,6 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
       player.saveStatus = "FAILED";
       pause(player);
       player.leaving = player.operation = false;
-      if (player.operationFailure != null) {
-        player.operationFailure.run();
-        player.operationFailure = null;
-      }
       if (player.connection != null) {
         if (player.operationCommand != null)
           player.connection.error(player.operationCommand, saveError());
@@ -967,8 +766,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
             .put("roomId", tower.id)
             .put("kind", "COMMUNITY")
             .put("state", "PLAYING");
-    for (String field :
-        List.of("hostPlayerId", "settings", "currentPlay", "result", "pauseExpiresAt"))
+    for (String field : List.of("hostPlayerId", "settings", "currentPlay", "result"))
       value.putNull(field);
     var players = value.putArray("members");
     for (Member player : tower.players.values())

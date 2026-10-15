@@ -36,7 +36,7 @@ source/
     public/assets/                # manifest, game assets và attribution
     src/
       app/                        # routing và bootstrap
-      features/                   # solo, community, rooms, account, records
+      features/                   # solo, online, community, rooms, account, records, settings
       components/                 # UI dùng chung
       game/                       # simulation, input, netcode và presentation
         content/                  # lời thoại và metadata hiển thị
@@ -76,7 +76,7 @@ source/
     room-maps.json                # 10 mốc Finish của Room trên cùng geometry
     adventure.json
     fixtures/
-scripts/                          # schema.sql và test-mysql.ps1
+  database/                       # schema.sql và test-mysql.ps1
 docs/                             # thiết kế, runbooks và tài liệu học phần
 statics/                          # sơ đồ kiến trúc/protocol
 ```
@@ -99,8 +99,8 @@ JPA tắt Open EntityManager in View, chỉ validate schema khi start. Repositor
 
 - Một executor xử lý tuần tự commands, deadlines và ticks của từng sảnh/phòng; các executor dùng chung worker pool. Registry tìm/tạo phòng, executor kiểm tra lại capacity trước Join.
 - Simulation fixed-step **60 Hz**, snapshot **20 Hz**, dùng monotonic clock. Không nhận deltaTime từ client hoặc tăng số bước theo số packet.
-- Community giữ simulation và active clock riêng cho từng lượt; Pause/chuyển sảnh không thay pha vật lý của lượt đó. Room dùng đồng hồ trận chung.
-- Room giữ state, roster, reconnect tokens, xác nhận ván kế tiếp và hạn Host Pause trong RAM; khi paused vẫn xử lý commands/deadlines, không chạy simulation. Resume đặt lại mốc scheduler, không chạy bù ticks thời gian nghỉ.
+- Community giữ simulation và active clock riêng cho từng lượt; Pause/Continue không thay pha vật lý của lượt đó. Room dùng đồng hồ trận chung.
+- Room giữ state, roster, reconnect tokens và xác nhận ván kế tiếp trong RAM; khi mọi thành viên offline chỉ giữ cửa sổ reconnect, không chạy bù ticks offline. Room không có Pause toàn phòng.
 - Socket validate rồi enqueue; hàng đợi lệnh và callback hoàn tất có giới hạn riêng, ưu tiên callback để không mất save/cleanup khi quá tải. Tick không chờ database hoặc socket chậm; snapshots gộp bản mới nhất, control messages giữ thứ tự.
 - Persistence worker xử lý ngoài tick theo [data](data.md). Solo sync không đi qua Java simulation hoặc WS membership.
 

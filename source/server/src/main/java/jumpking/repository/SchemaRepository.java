@@ -37,17 +37,12 @@ public class SchemaRepository {
     require(
         names(
                 "SELECT index_name FROM information_schema.statistics WHERE table_schema=DATABASE() AND non_unique=0")
-            .containsAll(
-                Set.of(
-                    "uq_users_username",
-                    "uq_users_email",
-                    "uq_users_guest_token",
-                    "uq_active_community_user")),
+            .containsAll(Set.of("uq_users_username", "uq_active_community_user")),
         "Required unique indexes missing");
     require(
         names(
                 "SELECT constraint_name FROM information_schema.referential_constraints WHERE constraint_schema=DATABASE() AND delete_rule IN ('RESTRICT','NO ACTION')")
-            .containsAll(Set.of("fk_users_merged_into", "fk_runs_user", "fk_runs_match")),
+            .containsAll(Set.of("fk_runs_user", "fk_runs_match")),
         "Required restrictive foreign keys missing");
     require(
         count(
@@ -84,6 +79,6 @@ public class SchemaRepository {
       throw new IllegalStateException(
           "Database schema is incompatible: "
               + message
-              + ". Review scripts/schema.sql; no automatic changes were applied.");
+              + ". Review source/database/schema.sql; no automatic changes were applied.");
   }
 }

@@ -31,22 +31,6 @@ export function soloStatistics(runs: SoloRun[]): Statistics {
 	total.totalPlayTimeMs = ticksToMs(ticks);
 	return total;
 }
-export function sumStatistics(a: Statistics, b: Statistics): Statistics {
-	return {
-		totalPlayTimeMs: a.totalPlayTimeMs + b.totalPlayTimeMs,
-		totalJumps: a.totalJumps + b.totalJumps,
-		totalFalls: a.totalFalls + b.totalFalls,
-		finishes: a.finishes + b.finishes,
-		matchesPlayed: a.matchesPlayed + b.matchesPlayed,
-		wins: a.wins + b.wins,
-		bestFinishTimeMs:
-			a.bestFinishTimeMs === null
-				? b.bestFinishTimeMs
-				: b.bestFinishTimeMs === null
-					? a.bestFinishTimeMs
-					: Math.min(a.bestFinishTimeMs, b.bestFinishTimeMs),
-	};
-}
 export function soloHistory(runs: SoloRun[]): HistoryItem[] {
 	return runs
 		.filter((run) => run.status !== "ACTIVE")

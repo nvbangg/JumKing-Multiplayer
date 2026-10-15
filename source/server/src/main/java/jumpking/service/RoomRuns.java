@@ -32,12 +32,6 @@ public class RoomRuns {
       endedAt = millis(endedAt);
     }
 
-    Run owned(long value) {
-      return new Run(
-          id, value, nickname, status, ticks, jumps, falls, progress, maximum, peak, finish, rank,
-          winner, endedAt);
-    }
-
     Run unranked() {
       return new Run(
           id, owner, nickname, status, ticks, jumps, falls, progress, maximum, peak, finish, null,
@@ -102,8 +96,8 @@ public class RoomRuns {
     validate(write);
     owners.writeAll(
         write.runs.stream().map(Run::owner).toList(),
-        ownership -> {
-          var next = write.runs.stream().map(run -> run.owned(ownership.get(run.owner))).toList();
+        () -> {
+          var next = write.runs;
           var matchEntity = matchRepository.lockById(write.id).orElse(null);
           var previous = matchEntity == null ? null : matchView(matchEntity);
           var entities = runRepository.lockByMatchId(write.id);

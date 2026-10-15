@@ -15,30 +15,22 @@ test("two independent browser identities use real WS and logout revokes only the
 			b = await second.newPage();
 		await a.goto("/");
 		await b.goto("/");
-		const setup = async (page: typeof a, account: boolean) =>
-			page.evaluate(async (account) => {
+		const setup = async (page: typeof a) =>
+			page.evaluate(async () => {
 				const csrf = await (await fetch("/api/auth/csrf")).json();
 				const name =
 					"ws_" + crypto.randomUUID().replaceAll("-", "").slice(0, 15);
-				const response = await fetch(
-					account ? "/api/auth/register" : "/api/auth/guest",
-					{
-						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-							[csrf.headerName]: csrf.token,
-						},
-						...(account
-							? {
-									body: JSON.stringify({
-										username: name,
-										email: name + "@example.test",
-										password: "A secure WS browser password",
-									}),
-								}
-							: {}),
+				const response = await fetch("/api/auth/register", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						[csrf.headerName]: csrf.token,
 					},
-				);
+					body: JSON.stringify({
+						username: name,
+						password: "A secure WS browser password",
+					}),
+				});
 				if (!response.ok)
 					throw new Error("Identity creation failed: " + response.status);
 				const messages: Record<string, unknown>[] = [];
@@ -80,9 +72,9 @@ test("two independent browser identities use real WS and logout revokes only the
 					}),
 				);
 				return name;
-			}, account);
-		const nameA = await setup(a, true),
-			nameB = await setup(b, false);
+			});
+		const nameA = await setup(a),
+			nameB = await setup(b);
 		const messages = async (page: typeof a) =>
 			page.evaluate(
 				() =>

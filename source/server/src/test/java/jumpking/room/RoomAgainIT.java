@@ -69,28 +69,21 @@ class RoomAgainIT {
         var c = new GameClient(port);
         var d = new GameClient(port)) {
       for (var player : List.of(a, b, c, d)) {
-        player.guest();
+        player.register();
         player.connect();
       }
       String room =
           a.ok(
                   "CREATE_ROOM",
-                  Map.of(
-                      "nickname",
-                      "Host",
-                      "settings",
-                      Map.of("mode", "TIME_LIMIT", "timeLimitMinutes", 8)))
+                  Map.of("settings", Map.of("mode", "TIME_LIMIT", "timeLimitMinutes", 8)))
               .path("roomId")
               .asText();
-      b.ok("JOIN_ROOM", Map.of("roomId", room, "nickname", "Confirmed"));
-      c.ok("JOIN_ROOM", Map.of("roomId", room, "nickname", "Away"));
+      b.ok("JOIN_ROOM", Map.of("roomId", room));
+      c.ok("JOIN_ROOM", Map.of("roomId", room));
       String first = started(a);
       ended(a);
       assertThat(
-              d.command("JOIN_ROOM", Map.of("roomId", room, "nickname", "New"))
-                  .path("payload")
-                  .path("code")
-                  .asText())
+              d.command("JOIN_ROOM", Map.of("roomId", room)).path("payload").path("code").asText())
           .isEqualTo("ROOM_NOT_JOINABLE");
       var waiting = b.ok("PLAY_AGAIN", Map.of("matchId", first));
       assertThat(waiting.path("state").asText()).isEqualTo("WAITING");
@@ -104,7 +97,7 @@ class RoomAgainIT {
                   .path("code")
                   .asText())
           .isEqualTo("STALE_PLAY");
-      d.ok("JOIN_ROOM", Map.of("roomId", room, "nickname", "New"));
+      d.ok("JOIN_ROOM", Map.of("roomId", room));
       a.ok("PLAY_AGAIN", Map.of("matchId", first));
       b.ok("PLAY_AGAIN", Map.of("matchId", first));
       String second = started(a);
@@ -131,12 +124,12 @@ class RoomAgainIT {
     String trigger = "again_" + UUID.randomUUID().toString().replace("-", "");
     try (var a = new GameClient(port);
         var b = new GameClient(port)) {
-      a.guest();
-      b.guest();
+      a.register();
+      b.register();
       a.connect();
       b.connect();
-      String room = a.ok("CREATE_ROOM", Map.of("nickname", "Host")).path("roomId").asText();
-      b.ok("JOIN_ROOM", Map.of("roomId", room, "nickname", "Peer"));
+      String room = a.ok("CREATE_ROOM", Map.of()).path("roomId").asText();
+      b.ok("JOIN_ROOM", Map.of("roomId", room));
       String play = started(a);
       jdbc.execute(
           "CREATE TRIGGER "

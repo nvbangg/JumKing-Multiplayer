@@ -7,24 +7,12 @@ CREATE TABLE users (
     id BIGINT NOT NULL AUTO_INCREMENT,
     type VARCHAR(16) NOT NULL,
     username VARCHAR(32) NULL,
-    email VARCHAR(254) NULL,
     password_hash VARCHAR(255) NULL,
-    guest_token_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
-    merged_into_user_id BIGINT NULL,
     crown_unlocked BOOLEAN NOT NULL DEFAULT FALSE,
     created_at DATETIME(3) NOT NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uq_users_username (username),
-    UNIQUE KEY uq_users_email (email),
-    UNIQUE KEY uq_users_guest_token (guest_token_hash),
-    CONSTRAINT fk_users_merged_into FOREIGN KEY (merged_into_user_id) REFERENCES users (id) ON DELETE RESTRICT,
-    CONSTRAINT ck_users_identity CHECK (
-        (type = 'ACCOUNT' AND username IS NOT NULL AND email IS NOT NULL AND password_hash IS NOT NULL
-            AND guest_token_hash IS NULL AND merged_into_user_id IS NULL)
-        OR (type = 'GUEST' AND username IS NULL AND email IS NULL AND password_hash IS NULL
-            AND ((guest_token_hash IS NOT NULL AND merged_into_user_id IS NULL)
-                OR (guest_token_hash IS NULL AND merged_into_user_id IS NOT NULL)))
-    )
+    CONSTRAINT ck_users_identity CHECK (type IN ('ACCOUNT','GUEST') AND (type <> 'ACCOUNT' OR (username IS NOT NULL AND password_hash IS NOT NULL)))
 ) ENGINE=InnoDB;
 
 CREATE TABLE matches (
@@ -64,7 +52,7 @@ CREATE TABLE play_runs (
     max_progress DOUBLE NOT NULL DEFAULT 0,
     peak_reached_ticks BIGINT NOT NULL DEFAULT 0,
     finish_ticks BIGINT NULL,
-    nickname VARCHAR(16) NULL,
+    nickname VARCHAR(32) NULL,
     `rank` TINYINT NULL,
     is_winner BOOLEAN NOT NULL DEFAULT FALSE,
     snapshot JSON NULL,

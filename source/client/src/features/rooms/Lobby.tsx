@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import rules from "../../../../common/rules.json";
 import { ROOM_MAPS } from "../../game/simulation/roomMaps";
 import type { GameSocket, RoomState } from "../../network/GameSocket";
@@ -17,6 +18,31 @@ export function Lobby({
 	socket?: GameSocket | null;
 }) {
 	const host = room.hostPlayerId === selfId;
+	const limit =
+		room.settings?.timeLimitMinutes ?? rules.timeLimitDefaultMinutes;
+	const [minutes, setMinutes] = useState(String(limit)),
+		[minutesError, setMinutesError] = useState("");
+	useEffect(() => {
+		setMinutes(String(limit));
+		setMinutesError("");
+	}, [limit]);
+	const commitMinutes = () => {
+		const value = Number(minutes);
+		if (
+			!Number.isInteger(value) ||
+			value < rules.timeLimitMinutesMin ||
+			value > rules.timeLimitMinutesMax
+		) {
+			setMinutesError("Enter a whole number from 1 to 30");
+			return;
+		}
+		setMinutesError("");
+		if (value !== limit)
+			command("UPDATE_ROOM_SETTINGS", {
+				mode: "TIME_LIMIT",
+				timeLimitMinutes: value,
+			});
+	};
 	return (
 		<>
 			<p className="room-code">
@@ -101,18 +127,18 @@ export function Lobby({
 								type="number"
 								min={rules.timeLimitMinutesMin}
 								max={rules.timeLimitMinutesMax}
-								value={
-									room.settings.timeLimitMinutes ||
-									rules.timeLimitDefaultMinutes
-								}
+								value={minutes}
 								disabled={!host || room.state !== "WAITING" || pending}
-								onChange={(event) =>
-									command("UPDATE_ROOM_SETTINGS", {
-										mode: "TIME_LIMIT",
-										timeLimitMinutes: Number(event.target.value),
-									})
-								}
+								onChange={(event) => setMinutes(event.currentTarget.value)}
+								onBlur={commitMinutes}
+								onKeyDown={(event) => {
+									if (event.key === "Enter") {
+										event.preventDefault();
+										event.currentTarget.blur();
+									}
+								}}
 							/>
+							{minutesError && <small role="alert">{minutesError}</small>}
 						</label>
 					)}
 				</>
@@ -131,29 +157,6 @@ export function Lobby({
 				>
 					Start
 				</button>
-			)}
-			{host && (room.state === "PLAYING" || room.state === "PAUSED") && (
-				<>
-					<button
-						type="button"
-						disabled={pending}
-						onClick={() =>
-							command("SET_ROOM_PAUSED", {
-								playId: room.currentPlay?.id,
-								paused: room.state !== "PAUSED",
-							})
-						}
-					>
-						{room.state === "PAUSED" ? "Resume Room" : "Pause Room"}
-					</button>
-					<button
-						type="button"
-						disabled={pending}
-						onClick={() => command("END_MATCH")}
-					>
-						End Match
-					</button>
-				</>
 			)}
 			<button
 				type="button"

@@ -1,4 +1,11 @@
 import { expect, test } from "@playwright/test";
+import {
+	createRoom,
+	joinRoom,
+	observeOnline,
+	registerOnline,
+	startRoom,
+} from "./support/online";
 
 test.skip(
 	process.env.E2E_PACKAGED !== "true",
@@ -15,30 +22,14 @@ test("the production web JAR supports Community save and a two-player Room throu
 			await context.addInitScript(() =>
 				localStorage.setItem(
 					"jumpking.options",
-					JSON.stringify({ sound: false, displayTimer: true }),
+					JSON.stringify({ sound: false }),
 				),
 			);
 		const a = await account.newPage(),
 			b = await guest.newPage();
-		await a.goto("/");
-		const username =
-			"jar_" + crypto.randomUUID().replaceAll("-", "").slice(0, 12);
-		await a
-			.getByRole("button", { name: "Create Account", exact: true })
-			.click();
-		await a.getByLabel("Username", { exact: true }).fill(username);
-		await a
-			.getByLabel("Email", { exact: true })
-			.fill(username + "@example.test");
-		await a
-			.getByLabel("Password", { exact: true })
-			.fill("A secure packaged browser password");
-		await a
-			.getByRole("button", { name: "Create Account", exact: true })
-			.click();
-		await expect(
-			a.getByRole("button", { name: username, exact: true }),
-		).toBeVisible();
+		const observed = observeOnline(a);
+		await registerOnline(a, "jar_host");
+		const peerName = await registerOnline(b, "jar_peer");
 		await a
 			.getByRole("button", { name: "Community Tower", exact: true })
 			.click();
@@ -58,40 +49,16 @@ test("the production web JAR supports Community save and a two-player Room throu
 			a.getByRole("button", { name: "Continue", exact: true }),
 		).toBeVisible();
 		await a.getByRole("button", { name: "Back", exact: true }).click();
-		await a
-			.getByRole("button", { name: "Play with Friends", exact: true })
-			.click();
-		await a.getByLabel("Nickname", { exact: true }).fill("JAR Host");
-		await a.getByRole("button", { name: "Create Room", exact: true }).click();
-		const code = await a.locator(".room-code code").innerText();
-		await expect(
-			a.getByRole("button", { name: "Start", exact: true }),
-		).toBeDisabled();
-		await b.goto("/");
-		await b.getByRole("button", { name: "Join by ID", exact: true }).click();
-		await b.getByLabel("Room ID", { exact: true }).fill(code);
-		await b.getByRole("button", { name: "Join", exact: true }).click();
-		await b.getByLabel("Nickname", { exact: true }).fill("JAR Guest");
-		await b.getByRole("button", { name: "Join", exact: true }).click();
-		await a.bringToFront();
-		await a.getByRole("button", { name: "Start", exact: true }).click();
-		for (const page of [a, b])
-			await expect(
-				page.getByRole("button", { name: "Menu", exact: true }),
-			).toBeVisible({ timeout: 15_000 });
-		if (
-			await a.getByRole("button", { name: "Resume", exact: true }).isVisible()
-		)
-			await a.getByRole("button", { name: "Resume", exact: true }).click();
+		const code = await createRoom(a);
+		await joinRoom(b, code);
+		await startRoom(a, b);
 		await a.keyboard.down("Space");
 		await a.waitForTimeout(220);
 		await a.keyboard.up("Space");
-		await expect(a.locator(".game-hud")).toContainText("Jumps: 1");
+		await expect
+			.poll(() => observed.snapshot?.self.simulation.physics.jumps)
+			.toBe(1);
 		await a.getByRole("button", { name: "Menu", exact: true }).click();
-		await a.getByRole("button", { name: "Pause Room", exact: true }).click();
-		await expect(
-			b.getByRole("button", { name: "Room Paused", exact: true }),
-		).toBeVisible();
 		await a.getByRole("button", { name: "End Match", exact: true }).click();
 		for (const page of [a, b]) {
 			await expect(
@@ -112,7 +79,7 @@ test("the production web JAR supports Community save and a two-player Room throu
 			.getByRole("button")
 			.filter({ hasText: "ROOM" })
 			.click();
-		await expect(a.getByLabel("Match participants")).toContainText("JAR Guest");
+		await expect(a.getByLabel("Match participants")).toContainText(peerName);
 	} finally {
 		await account.close();
 		await guest.close();

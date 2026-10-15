@@ -12,7 +12,6 @@ export const PRESENTATION = Object.freeze({
 	nameGap: 3,
 	chatPreviewMs: 10000,
 	chatPreviewMessages: 3,
-	leaderboardRefreshMs: 10000,
 	inGameLeaderboardLimit: 10,
 	gamepadDeadZone: 0.35,
 	effectVolume: 0.65,

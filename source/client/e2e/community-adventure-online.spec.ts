@@ -27,8 +27,8 @@ test("NPC dialogue persists across Community Continue without Inventory", async 
 	await page.goto("/");
 	await page.getByRole("button", { name: "Sign In", exact: true }).click();
 	await page
-		.getByLabel("Email", { exact: true })
-		.fill(process.env.E2E_ADVENTURE_EMAIL!);
+		.getByLabel("Username", { exact: true })
+		.fill(process.env.E2E_ADVENTURE_USERNAME!);
 	await page
 		.getByLabel("Password", { exact: true })
 		.fill(process.env.E2E_ADVENTURE_PASSWORD!);

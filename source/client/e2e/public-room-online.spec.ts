@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { leaveOnline } from "./support/online";
+import { createRoom, leaveOnline, registerOnline } from "./support/online";
 
 test.skip(
 	process.env.E2E_AUTH_ONLINE !== "true",
@@ -21,13 +21,13 @@ test("Public rooms can be discovered and joined while Private rooms remain acces
 			);
 		const a = await first.newPage(),
 			b = await second.newPage();
-		await a.goto("/");
-		await a
-			.getByRole("button", { name: "Play with Friends", exact: true })
-			.click();
-		await a.getByLabel("Nickname", { exact: true }).fill("Public Host");
+		await registerOnline(a, "public_host");
+		await registerOnline(b, "public_peer");
+		await createRoom(a);
+		await expect(a.getByLabel("Visibility", { exact: true })).toHaveValue(
+			"PRIVATE",
+		);
 		await a.getByLabel("Visibility", { exact: true }).selectOption("PUBLIC");
-		await a.getByRole("button", { name: "Create Room", exact: true }).click();
 		const id = await a.locator(".room-code code").innerText();
 		await expect(
 			a.getByLabel("Map", { exact: true }).locator("option"),
@@ -39,7 +39,7 @@ test("Public rooms can be discovered and joined while Private rooms remain acces
 			);
 		}
 		await a.getByLabel("Map", { exact: true }).selectOption("3");
-		await b.goto("/");
+		await b.getByRole("button", { name: "Room", exact: true }).click();
 		await b.getByRole("button", { name: "Join Public", exact: true }).click();
 		await expect(b.getByRole("button", { name: new RegExp(id) })).toBeVisible();
 		await a.getByLabel("Visibility", { exact: true }).selectOption("PRIVATE");
@@ -59,8 +59,6 @@ test("Public rooms can be discovered and joined while Private rooms remain acces
 		);
 		await b.getByRole("button", { name: "Refresh", exact: true }).click();
 		await b.getByRole("button", { name: new RegExp(id) }).click();
-		await b.getByLabel("Nickname", { exact: true }).fill("Public Peer");
-		await b.getByRole("button", { name: "Join", exact: true }).click();
 		await expect(b.locator(".room-code code")).toHaveText(id);
 		await expect(b.getByLabel("Visibility", { exact: true })).toBeDisabled();
 		await expect(b.getByLabel("Map", { exact: true })).toBeDisabled();

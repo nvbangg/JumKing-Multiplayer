@@ -5,10 +5,10 @@ Website game Jump King với một map Main Babe đầy đủ, hỗ trợ chơi 
 | Kiểu chơi | Mục đích |
 | --- | --- |
 | Solo | Luyện tập offline, autosave/Continue; Account đồng bộ thống kê khi có mạng, không lên leaderboard |
-| Community Tower | Account chơi cùng sảnh, lưu tiến độ trên server và tính leaderboard |
-| Room | Tạo Public/Private, Join Public hoặc bằng ID, tối thiểu 2 người và Host Start; Race, Hardcore, Time Limit hoặc No Walk; Results và History |
+| Community Tower | Account được tự xếp sảnh, lưu tiến độ trên server và tính leaderboard |
+| Room | Account tạo Public/Private, Join Public hoặc bằng ID, tối thiểu 2 người và Host Start; Race, Hardcore, Time Limit hoặc No Walk; Results và History |
 
-Frontend dùng React + TypeScript/Phaser; backend Spring Boot/Java quyết định trạng thái và kết quả online. Spring Data JPA/Hibernate truy cập MySQL để lưu identity, lượt chơi và trận Room. Thống kê tổng và History gồm Solo, Community và Room; Guest có thể Merge lịch sử Room và crown vào Account. Luật chơi trong [gameplay](docs/gameplay.md).
+Frontend dùng React + TypeScript/Phaser; backend Spring Boot/Java quyết định trạng thái và kết quả online. Spring Data JPA/Hibernate truy cập MySQL để lưu identity, lượt chơi và trận Room. Thống kê tổng và History gồm Solo, Community và Room; Solo Guest chỉ lưu trên trình duyệt; Room/Community yêu cầu Account. Đăng ký/đăng nhập bằng username và password, có đổi mật khẩu bằng mật khẩu hiện tại; chưa có khôi phục mật khẩu. Luật chơi trong [gameplay](docs/gameplay.md).
 
 ## Kiến trúc
 
@@ -69,7 +69,7 @@ Mở **http://127.0.0.1:5173**. Backend dùng **8080**, MySQL **3306**. Linux/ma
 
 - **Solo:** bắt đầu lượt mới hoặc tiếp tục save trên thiết bị; không cần đăng nhập/backend sau khi frontend đã tải.
 - **Community Tower:** đăng ký/đăng nhập, chọn Community Tower; tiến độ tự lưu và được tính leaderboard.
-- **Room:** mở hai browser profiles, một người Create Room; người còn lại Join by ID hoặc tìm phòng Public bằng Join Public; Host chọn mode, map 1–10 và Start khi đủ hai người.
+- **Room:** đăng nhập hai Account ở hai browser profiles, một người Create Room; người còn lại Join by ID hoặc tìm phòng Public bằng Join Public; Host chọn mode, map 1–10 và Start khi đủ hai người.
 
 ## Chơi qua LAN/ZeroTier
 
@@ -84,7 +84,7 @@ Restart JAR, cho phép inbound TCP 8080 từ mạng cần dùng; players mở `h
 
 ## VPS
 
-Cách đơn giản là chạy cùng JAR trên VPS, MySQL nội bộ và Caddy phục vụ HTTPS/WSS qua một domain. Copy mẫu cấu hình prod, điền database/domain rồi chạy service theo [hướng dẫn VPS](docs/deployment.md#vps-một-domain). Frontend tách lên Cloudflare Pages là phương án mở rộng riêng.
+Chạy cùng JAR và MySQL nội bộ; cấu hình domain, HTTPS/WSS, origins và cookie theo [deployment](docs/deployment.md#vps-một-domain). Không cần tách frontend sang dịch vụ hosting khác.
 
 ## Tài liệu
 
@@ -98,10 +98,10 @@ Cách đơn giản là chạy cùng JAR trên VPS, MySQL nội bộ và Caddy ph
 | Lệnh kiểm thử và tiêu chí nghiệm thu | [testing](docs/testing.md) |
 | Báo cáo kỹ thuật học phần | [report.md](report/report.md) |
 | Quy trình agent | [AGENTS](AGENTS.md) |
-| Yêu cầu bài tập lớn | [Instruction](docs/final-project/final-project/Instruction.md) |
+| Yêu cầu bài tập lớn | [Instruction](docs/final-project/Instruction.md) |
 
 ## Kiểm thử và giới hạn
 
 Lệnh kiểm thử, tiêu chí nghiệm thu và thực nghiệm theo [testing](docs/testing.md).
 
-Giới hạn: Solo metrics do client khai báo; Room gameplay ở RAM, restart không phục hồi trận. Framework và nguồn nội dung theo [architecture](docs/architecture.md), [học phần](docs/final-project/final-project/Instruction.md) và [attribution](source/client/public/assets/ATTRIBUTION.md).
+Giới hạn: Solo metrics do client khai báo; Room gameplay ở RAM, restart không phục hồi trận. Framework và nguồn nội dung theo [architecture](docs/architecture.md), [học phần](docs/final-project/Instruction.md) và [attribution](source/client/public/assets/ATTRIBUTION.md).

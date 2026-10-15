@@ -15,7 +15,6 @@ test("account forms persist the session and keep Guest Solo separate through sig
 	context,
 }, info) => {
 	const name = "player_" + Date.now(),
-		email = name + "@example.test",
 		password = "A secure browser password";
 	await page.goto("/");
 	await page
@@ -30,7 +29,6 @@ test("account forms persist the session and keep Guest Solo separate through sig
 		.getByRole("button", { name: "Create Account", exact: true })
 		.click();
 	await page.getByLabel("Username", { exact: true }).fill(name);
-	await page.getByLabel("Email", { exact: true }).fill(email);
 	await page.getByLabel("Password", { exact: true }).fill(password);
 	await page
 		.getByRole("button", { name: "Create Account", exact: true })
@@ -45,10 +43,10 @@ test("account forms persist the session and keep Guest Solo separate through sig
 	expect(cookie?.httpOnly).toBe(true);
 	expect(cookie?.sameSite).toBe("Lax");
 	await page.getByRole("button", { name, exact: true }).click();
-	await expect(page.getByText(email, { exact: true })).toBeVisible();
+	await expect(page.getByText(name, { exact: true })).toBeVisible();
 	await expect(page.getByLabel("Total statistics")).toBeHidden();
 	await page.reload();
-	await expect(page.getByText(email, { exact: true })).toBeVisible();
+	await expect(page.getByText(name, { exact: true })).toBeVisible();
 	await page.screenshot({
 		path: info.outputPath("account.png"),
 		fullPage: true,
@@ -61,11 +59,11 @@ test("account forms persist the session and keep Guest Solo separate through sig
 		page.getByRole("button", { name: "Continue Solo", exact: true }),
 	).toBeVisible();
 	await page.getByRole("button", { name: "Sign In", exact: true }).click();
-	await page.getByLabel("Email", { exact: true }).fill(email);
+	await page.getByLabel("Username", { exact: true }).fill(name);
 	await page.getByLabel("Password", { exact: true }).fill("incorrect");
 	await page.getByRole("button", { name: "Sign In", exact: true }).click();
 	await expect(page.getByRole("alert")).toHaveText(
-		"Email or password is incorrect",
+		"Username or password is incorrect",
 	);
 	await page.getByLabel("Password", { exact: true }).fill(password);
 	await page.getByRole("button", { name: "Sign In", exact: true }).click();
@@ -80,15 +78,13 @@ test("two browser identities stay isolated and duplicate registration is a safe 
 	try {
 		const a = await first.newPage(),
 			b = await second.newPage(),
-			name = "isolated_" + Date.now(),
-			email = name + "@example.test";
+			name = "isolated_" + Date.now();
 		for (const page of [a, b]) {
 			await page.goto("/");
 			await page
 				.getByRole("button", { name: "Create Account", exact: true })
 				.click();
 			await page.getByLabel("Username", { exact: true }).fill(name);
-			await page.getByLabel("Email", { exact: true }).fill(email);
 			await page
 				.getByLabel("Password", { exact: true })
 				.fill("A secure second password");
@@ -100,9 +96,7 @@ test("two browser identities stay isolated and duplicate registration is a safe 
 		await b
 			.getByRole("button", { name: "Create Account", exact: true })
 			.click();
-		await expect(b.getByRole("alert")).toHaveText(
-			"Username or email is unavailable",
-		);
+		await expect(b.getByRole("alert")).toHaveText("Username is unavailable");
 		await b.getByRole("button", { name: "Back", exact: true }).click();
 		await expect(
 			b.getByRole("button", { name: "Sign In", exact: true }),
@@ -113,49 +107,6 @@ test("two browser identities stay isolated and duplicate registration is a safe 
 		await first.close();
 		await second.close();
 	}
-});
-
-test("Guest Room history offers Skip and merges only after explicit confirmation", async ({
-	page,
-	context,
-}) => {
-	const name = process.env.E2E_MERGE_USERNAME!,
-		email = process.env.E2E_MERGE_EMAIL!,
-		password = process.env.E2E_MERGE_PASSWORD!,
-		token = process.env.E2E_MERGE_GUEST!;
-	expect(name).toBeTruthy();
-	expect(token).toBeTruthy();
-	await context.addCookies([
-		{
-			name: "JK_GUEST",
-			value: token,
-			url: process.env.E2E_BASE_URL!,
-			httpOnly: true,
-			sameSite: "Lax",
-		},
-	]);
-	const signIn = async () => {
-		await page.getByRole("button", { name: "Sign In", exact: true }).click();
-		await page.getByLabel("Email", { exact: true }).fill(email);
-		await page.getByLabel("Password", { exact: true }).fill(password);
-		await page.getByRole("button", { name: "Sign In", exact: true }).click();
-		await expect(
-			page.getByRole("button", { name: "Merge Guest Progress", exact: true }),
-		).toBeVisible();
-	};
-	await page.goto("/");
-	await signIn();
-	await page.getByRole("button", { name: "Skip", exact: true }).click();
-	await page.getByRole("button", { name, exact: true }).click();
-	await page.getByRole("button", { name: "Sign Out", exact: true }).click();
-	await signIn();
-	await page
-		.getByRole("button", { name: "Merge Guest Progress", exact: true })
-		.click();
-	await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
-	expect(
-		(await context.cookies()).find((cookie) => cookie.name === "JK_GUEST"),
-	).toBeUndefined();
 });
 
 test("public map/config match the server contract and a rejected handshake closes cleanly", async ({
@@ -185,7 +136,6 @@ test("public map/config match the server contract and a rejected handshake close
 		socket.close();
 		return {
 			screens: map.screens.length,
-			appearances: config.appearances.length,
 			fly: config.features.flyEnabled,
 			shared,
 			disconnected,
@@ -194,7 +144,6 @@ test("public map/config match the server contract and a rejected handshake close
 	});
 	expect(result).toEqual({
 		screens: 43,
-		appearances: 10,
 		fly: false,
 		shared: true,
 		disconnected: 1,

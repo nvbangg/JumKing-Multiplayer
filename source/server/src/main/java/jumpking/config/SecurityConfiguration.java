@@ -60,12 +60,12 @@ public class SecurityConfiguration {
 
   @Bean
   UserDetailsService userDetailsService(UserRepository users) {
-    return email ->
+    return username ->
         users
-            .findByTypeAndEmail("ACCOUNT", email)
+            .findByTypeAndUsername("ACCOUNT", username)
             .map(
                 user ->
-                    User.withUsername(user.getEmail())
+                    User.withUsername(user.getUsername())
                         .password(user.getPasswordHash())
                         .roles("ACCOUNT")
                         .build())
@@ -139,7 +139,11 @@ public class SecurityConfiguration {
             requests ->
                 requests
                     .requestMatchers(
-                        "/api/community/**", "/api/solo/**", "/api/auth/guest-history/**")
+                        "/api/community/**",
+                        "/api/solo/**",
+                        "/api/profile/**",
+                        "/api/history/**",
+                        "/api/auth/password")
                     .hasRole("ACCOUNT")
                     .anyRequest()
                     .permitAll())

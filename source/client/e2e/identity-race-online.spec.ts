@@ -47,9 +47,6 @@ test("a delayed anonymous me response cannot overwrite a subsequently registered
 			.click();
 		await page.getByLabel("Username", { exact: true }).fill(name);
 		await page
-			.getByLabel("Email", { exact: true })
-			.fill(name + "@example.test");
-		await page
 			.getByLabel("Password", { exact: true })
 			.fill("A secure identity race password");
 		await page

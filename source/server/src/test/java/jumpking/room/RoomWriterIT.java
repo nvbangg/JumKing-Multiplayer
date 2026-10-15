@@ -41,12 +41,12 @@ class RoomWriterIT {
     String trigger = "writer_" + UUID.randomUUID().toString().replace("-", "");
     try (var a = new GameClient(port);
         var b = new GameClient(port)) {
-      a.guest();
-      b.guest();
+      a.register();
+      b.register();
       a.connect();
       b.connect();
-      String room = a.ok("CREATE_ROOM", Map.of("nickname", "Host")).path("roomId").asText();
-      b.ok("JOIN_ROOM", Map.of("roomId", room, "nickname", "Peer"));
+      String room = a.ok("CREATE_ROOM", Map.of()).path("roomId").asText();
+      b.ok("JOIN_ROOM", Map.of("roomId", room));
       a.ok("START_GAME", Map.of());
       String play =
           a.await(message -> message.path("type").asText().equals("GAME_STARTED"))

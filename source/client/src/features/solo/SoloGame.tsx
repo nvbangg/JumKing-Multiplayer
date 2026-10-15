@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import rules from "../../../../common/rules.json";
+import { ControlsHelp } from "../../components/ControlsHelp";
 import { MenuPanel } from "../../components/MenuPanel";
 import { loadManifest } from "../../game/content/assets";
 import { FlightToggle } from "../../game/input/FlightToggle";
@@ -10,8 +11,8 @@ import { PRESENTATION } from "../../game/presentation/config";
 import { parseMap } from "../../game/simulation/map";
 import type { PlayerState } from "../../game/simulation/types";
 import { duration, ticksToMs } from "../records/format";
-import { ControlsHelp, OptionsButtons } from "./OptionsPanel";
-import { type Options, readOptions, saveOptions } from "./options";
+import { OptionsButtons } from "../settings/OptionsPanel";
+import { type Options, readOptions, saveOptions } from "../settings/options";
 import { SoloRuntime } from "./SoloRuntime";
 import { notifySoloSaved, SoloWriter, StorageUnavailable } from "./storage";
 
@@ -34,7 +35,7 @@ export function SoloGame({
 	const closing = useRef(false);
 	const audio = useRef<AudioBus | null>(null);
 	const [options, setOptions] = useState(readOptions);
-	const [menu, setMenu] = useState<"pause" | "options" | "controls">("pause");
+	const [menu, setMenu] = useState<"pause" | "options">("pause");
 	const [optionError, setOptionError] = useState("");
 	const [ending, setEnding] = useState<"playing" | "picture" | null>(null);
 	const [pictureReady, setPictureReady] = useState(false);
@@ -403,12 +404,11 @@ export function SoloGame({
 			{ready && !ending && (
 				<div className="game-hud">
 					<span>
-						Jumps: {state?.jumps ?? 0}
-						{options.displayTimer && (
+						{
 							<span className="timer" role="timer" aria-label="Play time">
 								{duration(ticksToMs(state?.ticks || 0))}
 							</span>
-						)}
+						}
 					</span>
 					<button type="button" onClick={pause}>
 						Menu
@@ -447,14 +447,11 @@ export function SoloGame({
 									? "Options"
 									: "Controls"
 						}
-						onBack={
-							menu === "pause"
-								? undefined
-								: () => setMenu(menu === "controls" ? "options" : "pause")
-						}
+						onBack={menu === "pause" ? undefined : () => setMenu("pause")}
 					>
 						{menu === "pause" && (
 							<>
+								<ControlsHelp />
 								<button
 									type="button"
 									disabled={leaving}
@@ -505,12 +502,8 @@ export function SoloGame({
 								options={options}
 								flyAllowed={__SOLO_FLY_ENABLED__}
 								onChange={updateOptions}
-								onControls={() => setMenu("controls")}
 								onError={setOptionError}
 							/>
-						)}
-						{menu === "controls" && (
-							<ControlsHelp flyAllowed={__SOLO_FLY_ENABLED__} />
 						)}
 						{optionError && <p role="alert">{optionError}</p>}
 					</MenuPanel>

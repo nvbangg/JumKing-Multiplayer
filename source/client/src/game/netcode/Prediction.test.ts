@@ -17,7 +17,6 @@ const room: RoomState = {
 	settings: null,
 	currentPlay: null,
 	result: null,
-	pauseExpiresAt: null,
 	members: [
 		{
 			playerId: "self",

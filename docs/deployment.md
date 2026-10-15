@@ -46,11 +46,11 @@ IP/port trong file mẫu là mặc định local, không phải địa chỉ b�
 
 | ENV tương ứng | Property / mặc định |
 | --- | --- |
-| SPRING_PROFILES_ACTIVE | local cho HTTP Local/LAN; prod cho HTTPS qua proxy |
+| SPRING_PROFILES_ACTIVE | local cho HTTP Local/LAN; prod cho HTTPS |
 | SPRING_DATASOURCE_URL/USERNAME/PASSWORD | spring.datasource.url/username/password |
 | SERVER_ADDRESS/PORT | server.address/port |
 | APP_ALLOWED_ORIGINS | app.allowed-origins; origins cụ thể cách nhau dấu phẩy |
-| SERVER_SERVLET_SESSION_COOKIE_SECURE | true khi HTTPS; áp dụng cả Guest cookie |
+| SERVER_SERVLET_SESSION_COOKIE_SECURE | true khi HTTPS |
 | SERVER_SERVLET_SESSION_TIMEOUT | server.servlet.session.timeout; idle theo [protocol](protocol.md#identity-và-security) |
 | APP_SESSION_ABSOLUTE_TIMEOUT | app.session-absolute-timeout; hạn tối đa theo protocol |
 | APP_AUTH_RATE_PER_MINUTE / APP_HTTP_BODY_LIMIT | app.auth-rate-per-minute=20; app.http-body-limit=16384 bytes |
@@ -78,7 +78,7 @@ Mặc định false; profile prod luôn ép false dù ENV=true. Khi deploy vẫn
 ## MySQL
 
 1. Cài/chạy MySQL Server, kết nối bằng Workbench hoặc mysql CLI.
-2. Dừng backend, review rồi chạy `scripts/schema.sql` bằng tài khoản quản trị. Script DROP database `jumpking` nếu tồn tại rồi tạo mới ba bảng trong [data](data.md); mọi dữ liệu cũ sẽ mất.
+2. Dừng backend, review rồi chạy `source/database/schema.sql` bằng tài khoản quản trị. Script DROP database `jumpking` nếu tồn tại rồi tạo mới ba bảng trong [data](data.md); mọi dữ liệu cũ sẽ mất.
 3. Tạo user ứng dụng một lần; thay password mẫu trong câu SQL trước khi chạy:
 
 ```sql
@@ -88,7 +88,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON jumpking.* TO 'jumpking_app'@'127.0.0.1'
 
 4. Điền datasource; backend chỉ kiểm tra schema, không tự reset/update và không chạy bằng root.
 
-mysql CLI: từ root project mở mysql client rồi chạy `SOURCE scripts/schema.sql;`. Workbench: File → Open SQL Script → schema.sql → Execute. Chỉ chạy khi cài mới hoặc chủ động reset, không chạy mỗi lần khởi động. Reset database không xóa user MySQL đã tạo; không cần tạo lại user nếu thông tin và quyền vẫn đúng. Muốn giữ dữ liệu khi thay schema phải chuẩn bị SQL nâng cấp riêng trước khi thực hiện.
+mysql CLI: từ root project mở mysql client rồi chạy `SOURCE source/database/schema.sql;`. Workbench: File → Open SQL Script → schema.sql → Execute. Chỉ chạy khi cài mới hoặc chủ động reset, không chạy mỗi lần khởi động. Reset database không xóa user MySQL đã tạo; không cần tạo lại user nếu thông tin và quyền vẫn đúng. Muốn giữ dữ liệu khi thay schema phải chuẩn bị SQL nâng cấp riêng trước khi thực hiện.
 
 Backup bằng mysqldump/Workbench vào `.local/backups/`, dùng prompt nhập password hoặc cấu hình riêng. Thử restore vào instance cô lập, kiểm tra dữ liệu trước thay database thật; không commit dump. [MySQL CREATE USER](https://dev.mysql.com/doc/refman/8.4/en/create-user.html)
 
@@ -150,65 +150,34 @@ Máy người chơi kiểm tra `Test-NetConnection 10.147.17.5 -Port 8080`; `Tcp
 
 ## VPS một domain
 
-Phương án gọn: JAR web + MySQL + Caddy cùng VPS Linux; không cần Node.js trên VPS nếu build JAR ở máy khác. Cài JDK 25, MySQL và [Caddy](https://caddyserver.com/docs/install), trỏ DNS domain về VPS. Chỉ mở 80/443 cho web; giữ 8080/3306 nội bộ.
+Build JAR có frontend theo phần trên; đặt MySQL trong mạng riêng của backend. Copy mẫu application-prod.properties, điền datasource và origins theo domain thực tế, bật cookie Secure và giữ Fly tắt. Chạy với --spring.profiles.active=prod.
 
-1. Tạo schema/user theo phần MySQL; chuẩn bị JAR web đã build với `VITE_BACKEND_ORIGIN` trống để dùng cùng origin.
-2. Tạo user hệ thống và thư mục (thực hiện một lần):
+HTTPS/WSS có thể kết thúc trực tiếp tại Spring Boot bằng server.ssl.* và keystore riêng được ignore, hoặc qua reverse proxy đã cấu hình đúng. Không mặc định trust forwarded headers khi không có proxy; không mở MySQL ra Internet. Chứng chỉ/keystore/password không đưa lên Git. DNS chỉ trỏ địa chỉ, không tự cấp HTTPS. Sau cập nhật phải build và restart JAR; push Git không tự deploy nếu chưa có pipeline.
 
-```bash
-sudo useradd --system --user-group --home-dir /opt/jumpking --shell /usr/sbin/nologin jumpking
-sudo install -d -o jumpking -g jumpking /opt/jumpking/config
-```
-
-Chép JAR web thành `/opt/jumpking/jumpking-server.jar`. Tạo `/opt/jumpking/config/application-prod.properties` từ mẫu prod; điền datasource và `app.allowed-origins=https://game.example.com` theo domain thật. Sau khi chép JAR/config, cấp quyền:
-
-```bash
-sudo chown jumpking:jumpking /opt/jumpking/jumpking-server.jar /opt/jumpking/config/application-prod.properties
-sudo chmod 600 /opt/jumpking/config/application-prod.properties
-```
-
-3. Tạo `/etc/systemd/system/jumpking.service` (đổi đường dẫn Java nếu khác):
-
-```ini
-[Unit]
-Description=JumpKing
-After=network.target mysql.service
-
-[Service]
-User=jumpking
-WorkingDirectory=/opt/jumpking
-ExecStart=/usr/bin/java -jar /opt/jumpking/jumpking-server.jar --spring.profiles.active=prod
-Restart=on-failure
-RestartSec=5
-TimeoutStopSec=60
-NoNewPrivileges=true
-PrivateTmp=true
-
-[Install]
-WantedBy=multi-user.target
-```
-
-4. Trong `/etc/caddy/Caddyfile`, thay domain:
-
-```caddyfile
-game.example.com {
-    encode zstd gzip
-    reverse_proxy 127.0.0.1:8080
-}
-```
-
-5. Chạy `sudo systemctl daemon-reload`, `sudo systemctl enable --now jumpking`, rồi `sudo systemctl reload caddy`. Đọc lỗi bằng `sudo journalctl -u jumpking -n 100`; health tại `https://game.example.com/api/health` phải trả `UP`. Nghiệm thu đăng nhập, Community save/Continue và Room hai người qua mạng ngoài.
-
-Profile prod bật Secure cookies, chỉ tin forwarded headers từ proxy loopback và luôn tắt Fly. Không mở JAR trực tiếp ra Internet; Caddy ghi đè forwarded headers và tự xử lý [HTTPS](https://caddyserver.com/docs/automatic-https), [WebSocket](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy). Không đặt `internal-proxies` rỗng hoặc tin mọi IP. [Spring proxy configuration](https://docs.spring.io/spring-boot/3.5/how-to/webserver.html#howto.webserver.use-behind-a-proxy-server)
-
-## Vận hành và Cloudflare Pages
-
-Dừng/restart có kiểm soát: ngừng nhận phiên mới, flush checkpoint/kết quả rồi dừng process. Crash vẫn có giới hạn trong [architecture](architecture.md#lỗi-và-khả-năng-mở-rộng). Cập nhật backend/frontend giữ contract tương thích; backup trước thay schema, rollback không ghi đè dữ liệu mới bằng dump cũ.
-
-Nếu tách frontend lên Cloudflare Pages: dùng `game.example.com` và API VPS `api.example.com` cùng site để phù hợp cookie SameSite=Lax; *.pages.dev và API khác site cần proxy cùng origin hoặc thiết kế lại authentication, CORS không thay cookie policy.
-
-Build Pages từ frontend, command `npm run build`, output `dist`, đặt VITE_BACKEND_ORIGIN trước build. VPS chạy JAR như service, proxy WebSocket upgrade, Secure cookies và origins cụ thể; chỉ tin forwarded headers từ proxy. Nghiệm thu từ mạng ngoài theo testing; Solo vẫn dùng được khi backend không sẵn sàng.
+Kiểm tra từ mạng ngoài: đăng ký/đăng nhập, WS, Room hai Account, Community save/Continue và reconnect. Cấu hình TLS/service cụ thể phụ thuộc VPS, không dùng thông số máy cá nhân trong source.
 
 ## Persistence JPA
 
 Backend dùng Spring Data JPA/Hibernate với `spring.jpa.hibernate.ddl-auto=validate` và `spring.jpa.open-in-view=false`; không tự tạo/update/reset database khi start. Khởi tạo lại theo phần [MySQL](#mysql). Credentials giữ ở file riêng như bảng cấu hình; không đưa database vào Git.
+
+## Nâng cấp identity từ schema có email
+
+Dừng backend cũ trước khi nâng cấp; không chạy schema.sql reset nếu muốn giữ dữ liệu. Với schema có email/Guest token/Merge pointer, sao lưu riêng, kiểm tra đúng tên constraints rồi chạy một lần bằng tài khoản quản trị. Các lượt của Guest đã Merge phải thuộc Account đích trước khi bỏ pointer:
+
+```sql
+USE jumpking;
+-- Kết quả phải bằng 0; nếu khác 0, dừng để kiểm tra ownership.
+SELECT COUNT(*) FROM play_runs p JOIN users u ON u.id=p.user_id
+WHERE u.merged_into_user_id IS NOT NULL;
+
+ALTER TABLE users DROP CHECK ck_users_identity;
+ALTER TABLE users DROP FOREIGN KEY fk_users_merged_into;
+ALTER TABLE users DROP INDEX uq_users_email, DROP INDEX uq_users_guest_token,
+  DROP COLUMN email, DROP COLUMN guest_token_hash, DROP COLUMN merged_into_user_id;
+ALTER TABLE users ADD CONSTRAINT ck_users_identity CHECK
+  (type IN ('ACCOUNT','GUEST') AND
+   (type <> 'ACCOUNT' OR (username IS NOT NULL AND password_hash IS NOT NULL)));
+ALTER TABLE play_runs MODIFY nickname VARCHAR(32) NULL;
+```
+
+ID, username, password hash, crown và các lượt/trận giữ nguyên. Rows GUEST chỉ còn dữ liệu lịch sử, không đăng nhập hoặc tham gia online; không chuyển dữ liệu sang Account. Chạy bản backend mới sau khi nâng cấp; không áp dụng lại đoạn SQL nếu các cột đã được bỏ.

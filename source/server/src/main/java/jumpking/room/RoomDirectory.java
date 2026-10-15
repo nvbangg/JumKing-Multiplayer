@@ -84,18 +84,16 @@ public class RoomDirectory {
     }
   }
 
-  public synchronized Slot community(String requested) {
-    String id = requested;
-    if (id == null)
-      id =
-          entries.entrySet().stream()
-              .filter(
-                  entry ->
-                      entry.getValue().kind.equals("COMMUNITY")
-                          && entry.getValue().slots.cardinality() < capacity)
-              .max(java.util.Comparator.comparingInt(entry -> entry.getValue().slots.cardinality()))
-              .map(Map.Entry::getKey)
-              .orElse(null);
+  public synchronized Slot community() {
+    String id =
+        entries.entrySet().stream()
+            .filter(
+                entry ->
+                    entry.getValue().kind.equals("COMMUNITY")
+                        && entry.getValue().slots.cardinality() < capacity)
+            .max(java.util.Comparator.comparingInt(entry -> entry.getValue().slots.cardinality()))
+            .map(Map.Entry::getKey)
+            .orElse(null);
     if (id == null) id = create("COMMUNITY");
     return reserve(id, "COMMUNITY");
   }

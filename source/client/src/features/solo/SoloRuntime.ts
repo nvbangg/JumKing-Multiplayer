@@ -38,7 +38,6 @@ export class SoloRuntime implements GameRuntime {
 		private onEvents: (
 			events: AdventureEvent[],
 			world: WorldEvent[],
-			state: GameSnapshot,
 		) => void = () => {},
 	) {
 		this.game = new GameSimulation(map, __SOLO_FLY_ENABLED__);
@@ -70,7 +69,7 @@ export class SoloRuntime implements GameRuntime {
 			if (this.simulation.finished) this.finish();
 			const state = this.simulation.snapshot();
 			this.onEffects(events.movement, state);
-			this.onEvents(events.adventure, events.world, this.game.snapshot());
+			this.onEvents(events.adventure, events.world);
 			this.onTick(state);
 		}
 	}

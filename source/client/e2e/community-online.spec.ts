@@ -17,7 +17,6 @@ async function account(page: Page, prefix: string) {
 		.getByRole("button", { name: "Create Account", exact: true })
 		.click();
 	await page.getByLabel("Username", { exact: true }).fill(name);
-	await page.getByLabel("Email", { exact: true }).fill(name + "@example.test");
 	await page
 		.getByLabel("Password", { exact: true })
 		.fill("A secure Community test password");
@@ -98,7 +97,7 @@ test("two Accounts share server simulation, see each other jump, leave and Conti
 				if (location.protocol === "http:" || location.protocol === "https:")
 					localStorage.setItem(
 						"jumpking.options",
-						JSON.stringify({ sound: false, displayTimer: true }),
+						JSON.stringify({ sound: false }),
 					);
 			});
 		const a = await first.newPage(),
@@ -118,11 +117,11 @@ test("two Accounts share server simulation, see each other jump, leave and Conti
 			a.getByRole("button", { name: "Menu", exact: true }),
 		).toBeVisible({ timeout: 15_000 });
 		await expect.poll(() => observedA.snapshots.length).toBeGreaterThan(0);
-		const roomId = await a.getByLabel("Room ID", { exact: true }).innerText(),
-			runId = observedA.snapshots.at(-1)!.playId;
-		await b.getByRole("button", { name: "Join by ID", exact: true }).click();
-		await b.getByLabel("Room ID", { exact: true }).fill(roomId);
-		await b.getByRole("button", { name: "Join", exact: true }).click();
+		const runId = observedA.snapshots.at(-1)!.playId;
+		await b
+			.getByRole("button", { name: "Community Tower", exact: true })
+			.click();
+		await b.getByRole("button", { name: "New Game", exact: true }).click();
 		await expect(
 			b.getByRole("button", { name: "Menu", exact: true }),
 		).toBeVisible({ timeout: 15_000 });
@@ -295,6 +294,7 @@ test("prediction stays usable with delayed and reordered snapshots across Pause 
 	});
 	const errors: string[] = [];
 	page.on("pageerror", (error) => errors.push(error.message));
+	const observed = observe(page);
 	await account(page, "latency");
 	await page
 		.getByRole("button", { name: "Community Tower", exact: true })
@@ -305,7 +305,9 @@ test("prediction stays usable with delayed and reordered snapshots across Pause 
 	).toBeVisible();
 	await page.waitForTimeout(500);
 	await jump(page);
-	await expect(page.locator(".game-hud")).toContainText("Jumps: 1");
+	await expect
+		.poll(() => observed.snapshots.at(-1)?.self.simulation.physics.jumps)
+		.toBe(1);
 	await page.getByRole("button", { name: "Menu", exact: true }).click();
 	await expect(
 		page.getByRole("button", { name: "Resume", exact: true }),
@@ -317,7 +319,9 @@ test("prediction stays usable with delayed and reordered snapshots across Pause 
 		page.getByRole("button", { name: "Resume", exact: true }),
 	).toHaveCount(0);
 	await jump(page);
-	await expect(page.locator(".game-hud")).toContainText("Jumps: 2");
+	await expect
+		.poll(() => observed.snapshots.at(-1)?.self.simulation.physics.jumps)
+		.toBe(2);
 	await expect(page.getByRole("alert")).toHaveCount(0);
 	expect(errors).toEqual([]);
 	await leave(page);
@@ -340,8 +344,13 @@ test("Community New Game keeps old History and metrics while replacing only the 
 	await expect.poll(() => observed.snapshots.length).toBeGreaterThan(0);
 	const first = observed.snapshots.at(-1)!.playId;
 	await jump(page);
-	await expect(page.locator(".game-hud")).toContainText("Jumps: 1");
-	await page.getByRole("button", { name: "Menu", exact: true }).click();
+	await expect
+		.poll(() => observed.snapshots.at(-1)?.self.simulation.physics.jumps)
+		.toBe(1);
+	await leave(page);
+	await page
+		.getByRole("button", { name: "Community Tower", exact: true })
+		.click();
 	page.once("dialog", (dialog) => dialog.accept());
 	await page.getByRole("button", { name: "New Game", exact: true }).click();
 	await expect.poll(() => observed.snapshots.at(-1)?.playId).not.toBe(first);

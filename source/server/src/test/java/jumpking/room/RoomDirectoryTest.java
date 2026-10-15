@@ -24,7 +24,7 @@ class RoomDirectoryTest {
     var directory = directory();
     var privateRoom = directory.createRoom();
     var publicRoom = directory.createRoom();
-    directory.community(null);
+    directory.community();
     assertThat(directory.publicRooms()).isEmpty();
     directory.describeRoom(publicRoom.roomId(), "PUBLIC", "HARDCORE", 10);
     assertThat(directory.publicRooms())

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { soloJumps } from "./support/solo";
 
 test("Solo saves, continues and archives replaced runs without losing totals", async ({
 	page,
@@ -11,7 +12,7 @@ test("Solo saves, continues and archives replaced runs without losing totals", a
 		page.getByRole("button", { name: "Menu", exact: true }),
 	).toBeVisible();
 	await page.keyboard.down("Space");
-	await expect(page.getByText("Jumps: 1", { exact: true })).toBeVisible();
+	await expect.poll(() => soloJumps(page)).toBe(1);
 	await page.keyboard.up("Space");
 	await page.getByRole("button", { name: "Menu", exact: true }).click();
 	await page.getByRole("button", { name: "Save & Exit", exact: true }).click();
@@ -21,7 +22,7 @@ test("Solo saves, continues and archives replaced runs without losing totals", a
 	await page
 		.getByRole("button", { name: "Continue Solo", exact: true })
 		.click();
-	await expect(page.getByText("Jumps: 1", { exact: true })).toBeVisible();
+	await expect.poll(() => soloJumps(page)).toBe(1);
 	await page.keyboard.down("Space");
 	await page.evaluate(
 		() =>
@@ -34,14 +35,14 @@ test("Solo saves, continues and archives replaced runs without losing totals", a
 	await expect(
 		page.getByRole("button", { name: "Menu", exact: true }),
 	).toBeVisible();
-	await expect(page.getByText("Jumps: 1", { exact: true })).toBeVisible();
+	await expect.poll(() => soloJumps(page)).toBe(1);
 	await page.getByRole("button", { name: "Menu", exact: true }).click();
 	await page.getByRole("button", { name: "Save & Exit", exact: true }).click();
 	page.once("dialog", (dialog) => dialog.accept());
 	await page
 		.getByRole("button", { name: "New Solo Game", exact: true })
 		.click();
-	await expect(page.getByText("Jumps: 0", { exact: true })).toBeVisible();
+	await expect.poll(() => soloJumps(page)).toBe(0);
 	await page.getByRole("button", { name: "Menu", exact: true }).click();
 	await page.getByRole("button", { name: "Save & Exit", exact: true }).click();
 	await page.getByRole("button", { name: "History", exact: true }).click();
@@ -77,7 +78,10 @@ test("blocked storage permits a session without claiming it was saved", async ({
 	).toBeVisible();
 	await expect(page.getByRole("alert")).toContainText("cannot be saved");
 	await page.keyboard.down("Space");
-	await expect(page.getByText("Jumps: 1", { exact: true })).toBeVisible();
+	await expect(page.getByLabel("Play time", { exact: true })).toBeVisible();
+	await expect
+		.poll(() => page.getByLabel("Play time", { exact: true }).textContent())
+		.not.toBe("00:00");
 	await page.keyboard.up("Space");
 	await page.getByRole("button", { name: "Menu", exact: true }).click();
 	await expect(page.getByText("Save failed", { exact: true })).toBeVisible();
@@ -207,11 +211,11 @@ test("blur cancels charging and the AFK deadline pauses without a release jump",
 	await expect(
 		page.getByRole("heading", { name: "Paused", exact: true }),
 	).toBeVisible();
-	await expect(page.getByText("Jumps: 0", { exact: true })).toBeVisible();
+	await expect.poll(() => soloJumps(page)).toBe(0);
 	await page.getByRole("button", { name: "Resume", exact: true }).click();
 	await page.clock.fastForward(60001);
 	await expect(
 		page.getByRole("heading", { name: "Paused", exact: true }),
 	).toBeVisible();
-	await expect(page.getByText("Jumps: 0", { exact: true })).toBeVisible();
+	await expect.poll(() => soloJumps(page)).toBe(0);
 });

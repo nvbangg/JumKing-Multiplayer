@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 class TestDatabaseTest {
   @Test
   void actualSchemaKeepsDatabaseResetOutOfIntegrationSetup() throws Exception {
-    String schema = Files.readString(Path.of("../../scripts/schema.sql"));
+    String schema = Files.readString(Path.of("../database/schema.sql"));
     assertThat(schema).contains("DROP DATABASE IF EXISTS jumpking;");
     String ddl = TestDatabase.tableDdl(schema);
     assertThat(ddl)

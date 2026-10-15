@@ -8,7 +8,7 @@ Website game Jump King với một map Main Babe đầy đủ, hỗ trợ chơi 
 | Community Tower | Account chơi cùng sảnh, lưu tiến độ trên server và tính leaderboard |
 | Room | Tạo Public/Private, Join Public hoặc bằng ID, tối thiểu 2 người và Host Start; Race, Hardcore, Time Limit hoặc No Walk; Results và History |
 
-Frontend dùng React + TypeScript/Phaser; backend Spring Boot/Java quyết định trạng thái và kết quả online. Spring Data JPA/Hibernate truy cập MySQL để lưu identity, lượt chơi và trận Room. Thống kê tổng và History gồm Solo, Community và Room; Guest có thể Merge lịch sử Room và crown vào Account. Luật chơi trong [gameplay](docs/gameplay.md); tiến độ triển khai trong [PLAN](PLAN.md).
+Frontend dùng React + TypeScript/Phaser; backend Spring Boot/Java quyết định trạng thái và kết quả online. Spring Data JPA/Hibernate truy cập MySQL để lưu identity, lượt chơi và trận Room. Thống kê tổng và History gồm Solo, Community và Room; Guest có thể Merge lịch sử Room và crown vào Account. Luật chơi trong [gameplay](docs/gameplay.md).
 
 ## Kiến trúc
 
@@ -20,14 +20,14 @@ Client–Server, server-authoritative: client gửi input, server quyết địn
 
 Cần **JDK 25, Node.js 24 và MySQL Server 8.4**. Workbench là công cụ quản trị tùy chọn; không thay MySQL Server. Maven Wrapper được cung cấp sẵn.
 
-**1. Database.** Clone project, mở `scripts/schema.sql` bằng Workbench và Execute trên MySQL mới/rỗng để tạo `jumpking`. Trong SQL editor, tạo user ứng dụng; thay password mẫu:
+**1. Database.** Dừng backend nếu đang chạy, mở `scripts/schema.sql` bằng Workbench và Execute bằng tài khoản quản trị MySQL. Script xóa database `jumpking` nếu đã tồn tại rồi tạo mới toàn bộ bảng; mọi dữ liệu cũ sẽ mất. Trong SQL editor, tạo user ứng dụng một lần; thay password mẫu:
 
 ```sql
 CREATE USER 'jumpking_app'@'127.0.0.1' IDENTIFIED BY 'CHANGE_ME';
 GRANT SELECT, INSERT, UPDATE, DELETE ON jumpking.* TO 'jumpking_app'@'127.0.0.1';
 ```
 
-Database đã có dữ liệu cần [SQL nâng cấp riêng](docs/deployment.md#mysql); không chạy lại schema tạo mới.
+Chỉ chạy script khi cài mới hoặc chủ động reset dữ liệu; không chạy mỗi lần khởi động game. [Chi tiết MySQL](docs/deployment.md#mysql)
 
 **2. Cấu hình riêng.** Từ root project:
 
@@ -96,12 +96,12 @@ Cách đơn giản là chạy cùng JAR trên VPS, MySQL nội bộ và Caddy ph
 | Database, checkpoint và thành tích | [data](docs/data.md) |
 | Cấu hình, MySQL, Local/LAN/ZeroTier/Internet | [deployment](docs/deployment.md) |
 | Lệnh kiểm thử và tiêu chí nghiệm thu | [testing](docs/testing.md) |
-| Kế hoạch, kết quả thực nghiệm và giới hạn | [PLAN](PLAN.md) |
+| Báo cáo kỹ thuật học phần | [report.md](report/report.md) |
 | Quy trình agent | [AGENTS](AGENTS.md) |
 | Yêu cầu bài tập lớn | [Instruction](docs/course-materials/final-project/Instruction.md) |
 
-## Kiểm thử, thực nghiệm và đóng góp
+## Kiểm thử và giới hạn
 
-Lệnh kiểm thử, tiêu chí nghiệm thu và thực nghiệm theo [testing](docs/testing.md); kết quả ở [PLAN](PLAN.md). Đánh giá kỹ thuật tập trung vào server-authoritative, đồng bộ input/snapshot, prediction và lưu kết quả nhất quán.
+Lệnh kiểm thử, tiêu chí nghiệm thu và thực nghiệm theo [testing](docs/testing.md).
 
-Giới hạn: Solo metrics do client khai báo; Room gameplay ở RAM, restart không phục hồi trận. Nghiệm thu LAN/ZeroTier hai thiết bị, báo cáo, phân công nhóm và Compilatio phải có bằng chứng trước nộp. Framework và nguồn nội dung theo [architecture](docs/architecture.md), [học phần](docs/course-materials/final-project/Instruction.md) và [attribution](source/client/public/assets/ATTRIBUTION.md).
+Giới hạn: Solo metrics do client khai báo; Room gameplay ở RAM, restart không phục hồi trận. Framework và nguồn nội dung theo [architecture](docs/architecture.md), [học phần](docs/course-materials/final-project/Instruction.md) và [attribution](source/client/public/assets/ATTRIBUTION.md).

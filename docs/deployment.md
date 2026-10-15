@@ -4,7 +4,7 @@
 
 JDK 25, Node.js 24, MySQL Server 8.4; build dùng Maven Wrapper/npm lockfile. Workbench quản trị MySQL; Docker phục vụ [integration tests](testing.md).
 
-Solo chỉ cần frontend; Community/Room và Solo sync cần backend/MySQL. Trạng thái triển khai các lệnh dưới đây theo [PLAN](../PLAN.md).
+Solo chỉ cần frontend; Community/Room và Solo sync cần backend/MySQL.
 
 | Thành phần | Development | Local/LAN/ZeroTier |
 | --- | --- | --- |
@@ -78,8 +78,8 @@ Mặc định false; profile prod luôn ép false dù ENV=true. Khi deploy vẫn
 ## MySQL
 
 1. Cài/chạy MySQL Server, kết nối bằng Workbench hoặc mysql CLI.
-2. Review rồi chạy `scripts/schema.sql` trên database mới/rỗng; file tạo `jumpking` và ba bảng trong [data](data.md).
-3. Tạo user ứng dụng; thay password mẫu trong câu SQL trước khi chạy:
+2. Dừng backend, review rồi chạy `scripts/schema.sql` bằng tài khoản quản trị. Script DROP database `jumpking` nếu tồn tại rồi tạo mới ba bảng trong [data](data.md); mọi dữ liệu cũ sẽ mất.
+3. Tạo user ứng dụng một lần; thay password mẫu trong câu SQL trước khi chạy:
 
 ```sql
 CREATE USER 'jumpking_app'@'127.0.0.1' IDENTIFIED BY 'CHANGE_ME';
@@ -88,10 +88,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON jumpking.* TO 'jumpking_app'@'127.0.0.1'
 
 4. Điền datasource; backend chỉ kiểm tra schema, không tự reset/update và không chạy bằng root.
 
-mysql CLI: từ root chạy `SOURCE scripts/schema.sql;`. Workbench: File → Open SQL Script → schema.sql → Execute. Database có dữ liệu dùng SQL nâng cấp riêng, không chạy lại DDL tạo mới. Dừng backend trước khi nâng cấp; mỗi script chỉ chạy một lần:
-
-- `users` chưa có `crown_unlocked`: chạy `scripts/upgrade-crown.sql`, cấp crown từ những lượt full Finish đã lưu.
-- `matches` chưa có `map_level`: chạy `scripts/upgrade-room-maps.sql`, gán map 10 cho trận cũ và giữ dữ liệu.
+mysql CLI: từ root project mở mysql client rồi chạy `SOURCE scripts/schema.sql;`. Workbench: File → Open SQL Script → schema.sql → Execute. Chỉ chạy khi cài mới hoặc chủ động reset, không chạy mỗi lần khởi động. Reset database không xóa user MySQL đã tạo; không cần tạo lại user nếu thông tin và quyền vẫn đúng. Muốn giữ dữ liệu khi thay schema phải chuẩn bị SQL nâng cấp riêng trước khi thực hiện.
 
 Backup bằng mysqldump/Workbench vào `.local/backups/`, dùng prompt nhập password hoặc cấu hình riêng. Thử restore vào instance cô lập, kiểm tra dữ liệu trước thay database thật; không commit dump. [MySQL CREATE USER](https://dev.mysql.com/doc/refman/8.4/en/create-user.html)
 
@@ -214,4 +211,4 @@ Build Pages từ frontend, command `npm run build`, output `dist`, đặt VITE_B
 
 ## Persistence JPA
 
-Backend dùng Spring Data JPA/Hibernate với `spring.jpa.hibernate.ddl-auto=validate` và `spring.jpa.open-in-view=false`. Cài mới dùng schema.sql; bản đang có dữ liệu chỉ chạy SQL nâng cấp đúng phiên bản sau khi dừng writer/backend. Không chạy CREATE/DROP hoặc bật update/create tự động trên database cá nhân. Credentials giữ ở file riêng như bảng cấu hình; không đưa database vào Git.
+Backend dùng Spring Data JPA/Hibernate với `spring.jpa.hibernate.ddl-auto=validate` và `spring.jpa.open-in-view=false`; không tự tạo/update/reset database khi start. Khởi tạo lại theo phần [MySQL](#mysql). Credentials giữ ở file riêng như bảng cấu hình; không đưa database vào Git.

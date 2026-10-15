@@ -159,6 +159,9 @@ class SchemaIT {
         jdbc.execute("ALTER TABLE matches DROP CHECK ck_matches_ticks");
         try { assertThatThrownBy(() -> schema.validate()).hasMessageContaining("CHECK"); }
         finally { jdbc.execute("ALTER TABLE matches ADD CONSTRAINT ck_matches_ticks CHECK (duration_ticks BETWEEN 0 AND 9007199254740991)"); }
+        jdbc.execute("ALTER TABLE matches DROP CHECK ck_matches_map_level");
+        try { assertThatThrownBy(() -> schema.validate()).hasMessageContaining("CHECK"); }
+        finally { jdbc.execute("ALTER TABLE matches ADD CONSTRAINT ck_matches_map_level CHECK (map_level BETWEEN 1 AND 10)"); }
     }
 
     @Test void oneActiveCommunityAndRollback() {
@@ -176,6 +179,7 @@ class SchemaIT {
     @Test void rejectsInvalidIdentityAndNullTimeLimit() {
         assertThatThrownBy(() -> jdbc.update("INSERT INTO users(type,created_at) VALUES ('ACCOUNT',UTC_TIMESTAMP(3))")).isInstanceOf(org.springframework.dao.DataAccessException.class);
         assertThatThrownBy(() -> jdbc.update("INSERT INTO matches(id,room_code,mode,started_at) VALUES (?,'ABCDEF','TIME_LIMIT',UTC_TIMESTAMP(3))", UUID.randomUUID().toString())).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        for (int level : new int[]{0, 11}) assertThatThrownBy(() -> jdbc.update("INSERT INTO matches(id,room_code,mode,map_level,started_at) VALUES (?,'ABCDEF','RACE',?,UTC_TIMESTAMP(3))", UUID.randomUUID().toString(), level)).isInstanceOf(org.springframework.dao.DataAccessException.class);
     }
 
     @Test void rejectsFinishWithoutTimeAndInvalidSnapshot() {

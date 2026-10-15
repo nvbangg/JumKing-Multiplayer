@@ -13,7 +13,7 @@ public class SchemaRepository {
     public SchemaRepository(EntityManager entityManager) { this.entityManager = entityManager; }
     public void validate() {
         require(names("SELECT constraint_name FROM information_schema.table_constraints WHERE constraint_schema=DATABASE() AND constraint_type='CHECK' AND enforced='YES'")
-            .containsAll(Set.of("ck_users_identity", "ck_matches_mode", "ck_matches_ticks", "ck_matches_end", "ck_runs_kind", "ck_runs_counters", "ck_runs_end", "ck_runs_finish", "ck_runs_snapshot", "ck_runs_rank", "ck_runs_winner")), "Required enforced CHECK constraints missing");
+            .containsAll(Set.of("ck_users_identity", "ck_matches_mode", "ck_matches_map_level", "ck_matches_ticks", "ck_matches_end", "ck_runs_kind", "ck_runs_counters", "ck_runs_end", "ck_runs_finish", "ck_runs_snapshot", "ck_runs_rank", "ck_runs_winner")), "Required enforced CHECK constraints missing");
         require(names("SELECT index_name FROM information_schema.statistics WHERE table_schema=DATABASE() AND non_unique=0")
             .containsAll(Set.of("uq_users_username", "uq_users_email", "uq_users_guest_token", "uq_active_community_user")), "Required unique indexes missing");
         require(names("SELECT constraint_name FROM information_schema.referential_constraints WHERE constraint_schema=DATABASE() AND delete_rule IN ('RESTRICT','NO ACTION')")

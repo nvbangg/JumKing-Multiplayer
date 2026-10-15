@@ -75,12 +75,12 @@ source/
     room-maps.json                # 10 mốc Finish của Room trên cùng geometry
     adventure.json
     fixtures/
-scripts/                          # schema.sql và tác vụ liên module
+scripts/                          # schema.sql và test-mysql.ps1
 docs/                             # thiết kế, runbooks và tài liệu học phần
-statics/                          # sơ đồ kiến trúc/protocol và hình thực nghiệm
+statics/                          # sơ đồ kiến trúc/protocol
 ```
 
-Báo cáo bàn giao đặt tại `report/report.pdf`; hình và kết quả được chọn để trình bày ở `statics/results/`. Chỉ thêm khi có nội dung thật. Service/queue/worker là thành phần nội bộ của server, không tách thêm ứng dụng hoặc thư mục service ở root.
+Báo cáo học phần đặt tại `report/report.md`; sơ đồ ở `statics/`. Service/queue/worker là thành phần nội bộ của server, không tách thêm ứng dụng hoặc thư mục service ở root.
 
 Java dùng root package `jumpking`, main class đặt tại root để Spring scan. Backend chia theo layer controller/service/repository/entity/dto; `network` chỉ xử lý transport/dispatch, `game` giữ luật thuần. Controller nhận/trả DTO, Service sở hữu nghiệp vụ/transaction, Repository truy cập MySQL. Không trả Entity qua API hoặc giữ managed Entity trong simulation/worker. JPA không nằm trong vòng tick; worker trao đổi snapshot bất biến. Không tạo interface/base class chỉ để chuyển tiếp lời gọi.
 
@@ -109,6 +109,6 @@ Lỗi command/connection không dừng scheduler; lỗi simulation chỉ cô l�
 
 Một backend instance giữ session/membership/gameplay Room trong RAM. Restart mất gameplay Room, chỉ khôi phục checkpoint Community và metrics đã commit; có thể mất tiến độ từ lần ghi cuối. Cách đóng match dở theo [data](data.md#kết-quả-room). Xóa browser storage trước sync có thể mất số liệu Solo.
 
-Luật/Finish/comparator thuộc `game`, persistence thuộc `service`/`repository`, độc lập transport/UI. Mở rộng theo [PLAN](../PLAN.md).
+Luật/Finish/comparator thuộc `game`, persistence thuộc `service`/`repository`, độc lập transport/UI.
 
 Tham chiếu: [Spring Boot package layout](https://docs.spring.io/spring-boot/reference/using/structuring-your-code.html), [Maven layout](https://maven.apache.org/guides/introduction/introduction-to-the-standard-directory-layout.html), [Vite assets](https://vite.dev/guide/assets.html).

@@ -1,9 +1,12 @@
 package jumpking.support;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.testcontainers.containers.MySQLContainer;
 
 public final class TestDatabase {
@@ -30,8 +33,10 @@ public final class TestDatabase {
                     || jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()", Integer.class) != 0) {
                 throw new IllegalStateException("Integration requires a new, empty jumpking_it database");
             }
-            for (String statement : Files.readString(Path.of("../../scripts/schema.sql")).split(";")) {
-                if (!statement.isBlank() && !statement.strip().startsWith("CREATE DATABASE") && !statement.strip().startsWith("USE ")) jdbc.execute(statement);
+            // Chỉ tạo bảng trong database test đã kiểm tra; không chạy phần reset jumpking.
+            String ddl = tableDdl(Files.readString(Path.of("../../scripts/schema.sql")));
+            try (var connection = dataSource.getConnection()) {
+                ScriptUtils.executeSqlScript(connection, new ByteArrayResource(ddl.getBytes(StandardCharsets.UTF_8)));
             }
             // Container dùng chung suốt JVM test; không đóng sau mỗi test hoặc constructor.
             if (container != null) Runtime.getRuntime().addShutdownHook(new Thread(this::close, "test-mysql-cleanup"));
@@ -44,6 +49,16 @@ public final class TestDatabase {
 
     private void close() {
         if (container != null) container.close();
+    }
+
+    static String tableDdl(String schema) {
+        int start = schema.indexOf("CREATE TABLE ");
+        if (start < 0) throw new IllegalArgumentException("Schema has no table definitions");
+        String ddl = schema.substring(start);
+        if (java.util.regex.Pattern.compile("(?i)\\b(?:CREATE|DROP|ALTER)\\s+(?:DATABASE|SCHEMA)\\b|\\bUSE\\s+").matcher(ddl).find()) {
+            throw new IllegalArgumentException("Test DDL must not change databases");
+        }
+        return ddl;
     }
 
     public static synchronized TestDatabase get() {

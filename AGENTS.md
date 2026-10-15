@@ -10,7 +10,7 @@ Xây dựng website game online nhiều người chơi theo mô hình server-aut
 2. Làm từng phần nhỏ trong phạm vi yêu cầu: Code → Test → Review → Commit. Không push.
 3. Tài liệu, comment code và commit messages dùng tiếng Việt; code, identifiers và UI dùng tiếng Anh.
 4. Không hard-code secrets hoặc cấu hình riêng của máy; không để lại code/nội dung tạm trong phần bàn giao.
-5. Kiểm chứng theo `docs/testing.md`; kiểm tra Git diff/status trước khi commit và bàn giao. Nêu thay đổi, kết quả kiểm tra và phần chưa hoàn tất; cập nhật tiến độ trong PLAN nếu cần.
+5. Kiểm chứng theo `docs/testing.md`; kiểm tra Git diff/status trước khi commit và bàn giao. Nêu thay đổi, kết quả kiểm tra và phần chưa hoàn tất.
 6. Bỏ qua `temp/` trừ nguồn được người dùng chỉ định.
 
 ## Source of Truth
@@ -18,7 +18,6 @@ Xây dựng website game online nhiều người chơi theo mô hình server-aut
 | File | Trách nhiệm |
 | --- | --- |
 | README.md | Tổng quan, yêu cầu môi trường và hướng dẫn bắt đầu |
-| PLAN.md | Kế hoạch theo phase, tiến độ và kết quả kiểm chứng |
 | docs/architecture.md | Công nghệ, kiến trúc hệ thống và cấu trúc code |
 | docs/gameplay.md | Luật chơi, map, các kiểu chơi và nội dung game |
 | docs/protocol.md | Giao tiếp HTTP/WebSocket và bảo mật |

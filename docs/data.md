@@ -2,7 +2,7 @@
 
 ## Schema
 
-Database `jumpking`, MySQL/InnoDB, utf8mb4, timestamps UTC. Schema tạo bằng `scripts/schema.sql`; Hibernate chỉ validate mapping khi start; SQL giữ constraints và indexes. Tạo/nâng cấp theo [deployment](deployment.md#mysql).
+Database `jumpking`, MySQL/InnoDB, utf8mb4, timestamps UTC. Schema tạo bằng `scripts/schema.sql`; Hibernate chỉ validate mapping khi start; SQL giữ constraints và indexes. Khởi tạo/reset theo [deployment](deployment.md#mysql).
 
 | Bảng | Trách nhiệm |
 | --- | --- |
@@ -163,14 +163,14 @@ Leaderboard lấy metrics Community đã commit; chọn best bằng ROW_NUMBER r
 
 Giữ hàng metrics để bảo toàn tổng/History/best. Query có tham số và kiểm tra ownership, chỉ chọn cột cần dùng; Stats/History/leaderboard không đọc snapshot hoặc credentials/token.
 
-Persistence online dùng PENDING/SAVED/FAILED; SAVED chỉ sau commit. Solo tách local save với sync status. Backup/nâng cấp theo [deployment](deployment.md#mysql).
+Persistence online dùng PENDING/SAVED/FAILED; SAVED chỉ sau commit. Solo tách local save với sync status. Quản trị MySQL theo [deployment](deployment.md#mysql).
 
-## JPA và nâng cấp
+## JPA
 
 User, PlayRun và Match ánh xạ ba bảng; Service sở hữu transaction, Repository sở hữu truy vấn. Không serialize Entity. Chỉ đọc snapshot khi Continue/save, dùng projection cho Stats/History/leaderboard. `revision` giữ thứ tự payload và chống retry khác nội dung, không thay bằng optimistic version của ORM. Các thao tác merge/New Run/writer khóa owner theo thứ tự rồi khóa lượt trong transaction.
 
 `users.crown_unlocked` chỉ chuyển false → true khi có full Finish, hoặc Merge từ Guest đã mở. Guest Solo gửi riêng quyền crown khi vào Room; đây là ngoại hình tự khai báo, không gửi save/history/metrics hoặc ảnh hưởng leaderboard. Guest nhận crown online lưu lại trong profile trình duyệt.
 
-`matches.map_level` mặc định 10 cho dữ liệu hiện có, trong [1,10]; Public/Private là metadata phòng RAM, không cần lưu khi match kết thúc. Best Finish Time bỏ Room map_level<10; counters/Finishes/Room Wins vẫn tính.
+`matches.map_level` trong [1,10], mặc định 10 (full map); Public/Private là metadata phòng RAM, không cần lưu khi match kết thúc. Best Finish Time bỏ Room map_level<10; counters/Finishes/Room Wins vẫn tính.
 
-Cập nhật database có sẵn bằng SQL additive theo deployment, không reset. Hibernate `validate` không thay thế kiểm thử CHECK/unique/FK trong MySQL thật.
+Hibernate `validate` không thay thế kiểm thử CHECK/unique/FK trong MySQL thật.

@@ -1,3 +1,5 @@
+-- Dừng backend trước khi chạy bằng tài khoản quản trị MySQL.
+DROP DATABASE IF EXISTS jumpking;
 CREATE DATABASE jumpking CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 USE jumpking;
 

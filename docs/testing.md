@@ -2,7 +2,7 @@
 
 ## Nguyên tắc và workflow
 
-Kiểm tra theo tài liệu sở hữu; báo PASS/FAIL/BLOCKED/NOT RUN đúng thực tế. Tiến độ/commit theo [PLAN](../PLAN.md#cách-sử-dụng).
+Kiểm tra theo tài liệu sở hữu; báo PASS/FAIL/BLOCKED/NOT RUN đúng thực tế.
 
 | Phần thay đổi | Checks bắt buộc |
 | --- | --- |
@@ -12,7 +12,7 @@ Kiểm tra theo tài liệu sở hữu; báo PASS/FAIL/BLOCKED/NOT RUN đúng th
 | Luồng online/save/lifecycle | Playwright với backend/MySQL thật và hai identities |
 | Tài liệu | Source of Truth, links/anchors, examples, scope và git diff --check |
 
-Khi đổi dependency: frontend chạy `npm audit`; backend lấy version bằng `.\mvnw.cmd dependency:list -DincludeScope=runtime` rồi đối chiếu [OSV](https://google.github.io/osv.dev/post-v1-querybatch/) và advisory của nhà cung cấp. Ghi kết quả cùng điều kiện ảnh hưởng/ngoại lệ có nguồn trong PLAN; không coi kết quả quét thô là bằng chứng khai thác được.
+Khi đổi dependency: frontend chạy `npm audit`; backend lấy version bằng `.\mvnw.cmd dependency:list -DincludeScope=runtime` rồi đối chiếu [OSV](https://google.github.io/osv.dev/post-v1-querybatch/) và advisory của nhà cung cấp. Báo kết quả cùng điều kiện ảnh hưởng/ngoại lệ có nguồn; không coi kết quả quét thô là bằng chứng khai thác được.
 
 ## Lệnh kiểm thử
 
@@ -36,7 +36,7 @@ cd source/server
 .\mvnw.cmd clean verify -Pintegration
 ```
 
-Các lệnh là contract của Maven/npm configuration và được nghiệm thu trong [PLAN](../PLAN.md). Linux/macOS dùng `sh mvnw`; cài Chromium cho E2E bằng `npx playwright install chromium`.
+Linux/macOS dùng `sh mvnw`; cài Chromium cho E2E bằng `npx playwright install chromium`.
 
 E2E (end-to-end) dùng Playwright thao tác trình duyệt qua UI → HTTP/WS → backend/MySQL để kiểm tra cả luồng. Chạy riêng vì cần ứng dụng đang chạy và trình duyệt, khác unit tests kiểm tra từng hàm/module.
 
@@ -48,7 +48,7 @@ $env:E2E_PORT = '5174'
 npm run test:e2e -- e2e/fly.spec.ts
 ```
 
-Integration dùng [Testcontainers MySQL](https://java.testcontainers.org/modules/databases/mysql/), Docker và MySQL theo [deployment](deployment.md#runtime-và-workflow). E2E dùng instance cô lập; không reset database cá nhân. Runner chỉ cleanup resources/fixtures do nó tạo, kể cả khi test lỗi.
+Integration dùng [Testcontainers MySQL](https://java.testcontainers.org/modules/databases/mysql/), Docker và MySQL theo [deployment](deployment.md#runtime-và-workflow). E2E dùng instance cô lập; không reset database cá nhân. Setup test chỉ nạp phần CREATE TABLE của schema.sql vào database test mới/rỗng, không chạy phần DROP/CREATE database hoặc USE. Runner chỉ cleanup resources/fixtures do nó tạo, kể cả khi test lỗi.
 
 Windows không có Docker: chạy `./scripts/test-mysql.ps1 -MySqlHome '<thư mục MySQL 8.4>' -JavaHome '<thư mục JDK 25>'` từ root. Runner tạo instance loopback/cổng ngẫu nhiên, credentials riêng, chạy integration rồi dừng và xóa dữ liệu test; không sửa service/database đang dùng. Thêm `-Web` sau khi build frontend để kiểm tra JAR chứa web và Vite proxy. Integration cũng nhận `JK_TEST_DATABASE_URL/USERNAME/PASSWORD` cho database test rỗng có tên bắt đầu `jumpking_it`; runner bên ngoài chịu trách nhiệm cleanup.
 
@@ -128,14 +128,14 @@ Workload chạy Community một người, Room 2/10 người và hai Room; input
 
 Nghiệm thu Local, LAN/ZeroTier bằng hai thiết bị và điện thoại thật; kiểm tra clean clone, setup/config, build/run, restart, backup/restore và cập nhật tương thích. Thiếu thiết bị/Docker hoặc check thất bại phải ghi BLOCKED/NOT RUN, không đánh dấu hoàn tất.
 
-Đối chiếu README với build configuration; ghi checks/commit vào PLAN. Raw traces/screenshots/logs ở `.local/reports/` hoặc reports được ignore. Git giữ tests/fixtures/scripts tái tạo và báo cáo bàn giao, không dữ liệu riêng tư.
+Đối chiếu README với build configuration; báo checks đã chạy và phần chưa kiểm chứng khi bàn giao. Raw traces/screenshots/logs ở `.local/reports/` hoặc reports được ignore. Git giữ tests/fixtures/scripts tái tạo và báo cáo bàn giao, không dữ liệu riêng tư.
 
 Báo cáo giải thích networking/concurrency/protocol, đóng góp có số đo, results/discussion/limitations và trích dẫn nguồn; đáp ứng Compilatio và demo theo yêu cầu học phần.
 
 ## Nghiệm thu thay đổi persistence và Room
 
 - JPA mapping chạy trên MySQL, transaction/lock/rollback, generated unique Community, Merge và writer đến muộn; không dùng H2 thay MySQL.
-- Nâng cấp bản schema trước đó giữ users/runs/matches và counters; full map mặc định 10, crown backfill đúng full Finish.
+- Schema hiện tại tạo đủ ba bảng, CHECK/unique/FK; test setup không thực thi lệnh reset database thật.
 - Không còn SQL/JdbcTemplate trong Controller/Service; API không trả Entity hoặc truy vấn snapshot cho bảng tổng hợp.
 - Room Public/Private: list chỉ WAITING còn chỗ, Join/Start cạnh tranh không vượt capacity, map không đổi giữa trận.
 - Mười mốc Finish đạt bằng input không Fly và tất cả spawn; map ngắn không cấp crown/ending hoặc ghi đè best full-map.

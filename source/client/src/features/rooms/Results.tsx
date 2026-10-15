@@ -1,5 +1,6 @@
 import type { MatchResult, RoomState } from '../../network/GameSocket';
 import { duration } from '../records/format';
+import { ROOM_MAPS } from '../../game/simulation/roomMaps';
 
 export function Results({ result, room, selfId, pending, onAgain, onLeave }: {
   result: MatchResult; room: RoomState | null; selfId: string | null; pending: boolean; onAgain: () => void; onLeave: () => void;
@@ -9,6 +10,7 @@ export function Results({ result, room, selfId, pending, onAgain, onLeave }: {
   return <>
     {winners.length > 0 && <p className="winner">{winners.length > 1 ? 'Winners' : 'Winner'}: {winners.join(', ')}</p>}
     <p>Time: {duration(result.durationMs)}</p>
+    <p>Map {result.mapLevel ?? 10} · {ROOM_MAPS.find(map => map.level === (result.mapLevel ?? 10))?.name}</p>
     <div className="results-table"><table><thead><tr><th>Rank</th><th>Player</th><th>Height</th><th>Finish Time</th></tr></thead><tbody>
       {result.results.map(row => <tr key={row.playerId} className={row.playerId === selfId ? 'self-result' : undefined}>
         <td>{row.rank}</td><td>{row.nickname}{row.status === 'DNF' ? ' · DNF' : ''}</td><td>{row.currentProgress.toFixed(1)}</td><td>{duration(row.finishTimeMs)}</td>

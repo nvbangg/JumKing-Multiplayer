@@ -23,16 +23,16 @@ public class RecordsRepository {
     private static final String HISTORY = """
         WITH owned_rooms AS (
           SELECT p.status,p.play_ticks,p.jumps,p.falls,p.current_progress,p.max_progress,p.finish_ticks,p.`rank`,p.is_winner,
-            m.id,m.started_at,m.ended_at,m.mode,m.room_code,m.duration_ticks,
+            m.id,m.started_at,m.ended_at,m.mode,m.map_level,m.room_code,m.duration_ticks,
             ROW_NUMBER() OVER (PARTITION BY m.id ORDER BY p.`rank`,p.id) AS choice
           FROM play_runs p JOIN matches m ON m.id=p.match_id WHERE p.user_id=:owner AND p.kind='ROOM' AND m.ended_at IS NOT NULL
         ), history AS (
           SELECT id,kind,status,started_at,ended_at,play_ticks,jumps,falls,current_progress,max_progress,finish_ticks,
-            NULL AS mode,NULL AS room_code,NULL AS duration_ticks,NULL AS `rank`,FALSE AS is_winner
+            NULL AS mode,NULL AS map_level,NULL AS room_code,NULL AS duration_ticks,NULL AS `rank`,FALSE AS is_winner
           FROM play_runs WHERE user_id=:owner AND kind IN ('SOLO','COMMUNITY') AND status<>'ACTIVE'
           UNION ALL
           SELECT id,'ROOM',status,started_at,ended_at,play_ticks,jumps,falls,current_progress,max_progress,finish_ticks,
-            mode,room_code,duration_ticks,`rank`,is_winner FROM owned_rooms WHERE choice=1
+            mode,map_level,room_code,duration_ticks,`rank`,is_winner FROM owned_rooms WHERE choice=1
         ) SELECT * FROM history
         """;
     public Statistics statistics(long owner) {
@@ -96,7 +96,7 @@ public class RecordsRepository {
         result.put("saveStatus", "SAVED"); return result;
     }
     private History historyRow(Tuple row) {
-        return new History(text(row, "id"), text(row, "kind"), instant(row, "started_at"), instant(row, "ended_at"), text(row, "status"), ms(number(row, "play_ticks")), (int) number(row, "jumps"), (int) number(row, "falls"), decimal(row, "current_progress"), decimal(row, "max_progress"), optionalMs(row, "finish_ticks"), text(row, "kind").equals("ROOM") ? new Room(text(row, "mode"), text(row, "room_code"), ms(number(row, "duration_ticks")), integer(row, "rank"), bool(row, "is_winner")) : null);
+        return new History(text(row, "id"), text(row, "kind"), instant(row, "started_at"), instant(row, "ended_at"), text(row, "status"), ms(number(row, "play_ticks")), (int) number(row, "jumps"), (int) number(row, "falls"), decimal(row, "current_progress"), decimal(row, "max_progress"), optionalMs(row, "finish_ticks"), text(row, "kind").equals("ROOM") ? new Room(text(row, "mode"), integer(row, "map_level"), text(row, "room_code"), ms(number(row, "duration_ticks")), integer(row, "rank"), bool(row, "is_winner")) : null);
     }
     private static List<Tuple> rows(Query query) { return ((List<?>) query.getResultList()).stream().map(Tuple.class::cast).toList(); }
     private static String text(Tuple row, String key) { return (String) row.get(key); }

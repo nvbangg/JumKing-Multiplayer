@@ -1,6 +1,7 @@
 import type { GameSocket, RoomState } from '../../network/GameSocket';
 import { RoomChat } from './RoomChat';
 import rules from '../../../../common/rules.json';
+import { ROOM_MAPS } from '../../game/simulation/roomMaps';
 
 export function Lobby({ room, selfId, pending, command, socket }: {
   room: RoomState; selfId: string | null; pending: boolean; command: (type: string, payload?: Record<string, unknown>) => void; socket?: GameSocket | null;
@@ -13,6 +14,10 @@ export function Lobby({ room, selfId, pending, command, socket }: {
       <span>{member.nickname}</span><span>{member.playerId === room.hostPlayerId ? 'Host' : ''}{!member.connected ? ' · Offline' : ''}{member.nextMatchConfirmed ? ' · Confirmed' : ''}</span>
     </li>)}</ul>
     {room.settings && <>
+      <label className="mode-setting">Map<select aria-label="Map" value={room.settings.mapLevel ?? 10} disabled={!host || room.state !== 'WAITING' || pending}
+        onChange={event => command('UPDATE_ROOM_SETTINGS', { mapLevel: Number(event.target.value) })}>
+        {ROOM_MAPS.map(map => <option key={map.level} value={map.level}>{map.level} · {map.name}</option>)}
+      </select></label>
       <label className="mode-setting">Visibility<select aria-label="Visibility" value={room.visibility || 'PRIVATE'} disabled={!host || room.state !== 'WAITING' || pending}
         onChange={event => command('UPDATE_ROOM_SETTINGS', { visibility: event.target.value })}>
         <option value="PRIVATE">Private</option><option value="PUBLIC">Public</option>

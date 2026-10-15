@@ -69,7 +69,7 @@ Mở **http://127.0.0.1:5173**. Backend dùng **8080**, MySQL **3306**. Linux/ma
 
 - **Solo:** bắt đầu lượt mới hoặc tiếp tục save trên thiết bị; không cần đăng nhập/backend sau khi frontend đã tải.
 - **Community Tower:** đăng ký/đăng nhập, chọn Community Tower; tiến độ tự lưu và được tính leaderboard.
-- **Room:** mở hai browser profiles, một người Create Room; người còn lại Join by ID hoặc tìm phòng Public bằng Join Public; Host chọn mode và Start khi đủ hai người.
+- **Room:** mở hai browser profiles, một người Create Room; người còn lại Join by ID hoặc tìm phòng Public bằng Join Public; Host chọn mode, map 1–10 và Start khi đủ hai người.
 
 ## Chơi qua LAN/ZeroTier
 

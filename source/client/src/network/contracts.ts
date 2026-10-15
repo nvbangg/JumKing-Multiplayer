@@ -8,7 +8,7 @@ export interface HistoryItem {
   id: string; kind: 'SOLO' | 'COMMUNITY' | 'ROOM'; status: string;
   startedAt: string; endedAt: string; playTimeMs: number; jumps: number; falls: number;
   currentProgress: number; maxProgress: number; finishTimeMs: number | null;
-  room: null | { mode: string; roomCode: string; durationMs: number; rank: number; isWinner: boolean };
+  room: null | { mode: string; mapLevel: number; roomCode: string; durationMs: number; rank: number; isWinner: boolean };
 }
 export interface LeaderboardEntry {
   id: string; rank: number; username: string; status: string;

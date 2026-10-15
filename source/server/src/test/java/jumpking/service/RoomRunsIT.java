@@ -32,6 +32,7 @@ class RoomRunsIT {
                 var write = new RoomRuns.Write(match, "ABCDEF", "RACE", null, level, 1, started, ended, 600, "FINISH", runs);
                 records.save(write); records.save(write);
                 assertThat(jdbc.queryForObject("SELECT map_level FROM matches WHERE id=?", Integer.class, match)).isEqualTo(level);
+                assertThat(history.detail(owners.getFirst(), "ROOM", match).path("room").path("mapLevel").asInt()).isEqualTo(level);
                 assertThat(jdbc.queryForObject("SELECT crown_unlocked FROM users WHERE id=?", Boolean.class, owners.getFirst())).isEqualTo(level == 10);
                 var stats = history.statistics(owners.getFirst());
                 assertThat(stats.wins()).isEqualTo(1); assertThat(stats.finishes()).isEqualTo(1); assertThat(stats.totalJumps()).isEqualTo(5);

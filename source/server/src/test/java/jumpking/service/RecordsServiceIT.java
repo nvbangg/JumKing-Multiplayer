@@ -37,6 +37,7 @@ class RecordsServiceIT {
             assertThat(second.items()).hasSize(1); assertThat(second.hasNext()).isFalse();
             assertThat(java.util.stream.Stream.concat(first.items().stream(), second.items().stream()).map(RecordsDto.History::kind)).containsExactlyInAnyOrder("SOLO", "COMMUNITY", "ROOM");
             var detail = records.detail(owner, "ROOM", match);
+            assertThat(detail.path("room").path("mapLevel").asInt()).isEqualTo(10);
             assertThat(detail.path("participants").size()).isEqualTo(2); assertThat(detail.has("snapshot")).isFalse();
             assertThatThrownBy(() -> records.detail(Long.MAX_VALUE, "ROOM", match)).isInstanceOf(jumpking.exception.ApiException.class);
         } finally { jdbc.update("DELETE FROM play_runs WHERE user_id=?", owner); jdbc.update("DELETE FROM matches WHERE id=?", match); jdbc.update("DELETE FROM users WHERE id=?", owner); }

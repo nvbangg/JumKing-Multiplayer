@@ -30,7 +30,7 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 
 - [x] Triển khai Public/Private và Join Public; kiểm tra state/capacity và Join cạnh tranh.
 - [x] Cấu hình 10 mốc Finish từ geometry chung, match map_level và kiểm thử tất cả spawn/route hợp lệ.
-- [ ] Hoàn thiện Lobby/History/Results/ending và best full-map theo độ dài; SQL nâng cấp giữ dữ liệu.
+- [x] Hoàn thiện Lobby/History/Results/ending và best full-map theo độ dài; SQL nâng cấp giữ dữ liệu.
 
 ## Phase 05 — Chat và xếp hạng
 
@@ -78,6 +78,8 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 | Phase 04 — Public/Private | PASS — 66 client unit, 50 Java unit; 75 MySQL integration PASS và 1 load opt-in SKIP; Chrome online/JAR và 27 client E2E PASS. Public chỉ liệt kê Lobby còn chỗ; Private vẫn Join bằng ID. Kiểm chứng đổi visibility, quyền Host, Join/Start cạnh tranh và capacity; build/type-check, links và diff check PASS. |
 
 | Phase 04 — Mốc Finish | PASS — 77 client unit, 52 Java unit; 10 MySQL integration PASS. Replay hợp lệ từ spawn chuẩn tới cả 10 đích, không Fly/splat; đồng bộ prediction và server. Map ngắn không cấp crown/Best Finish Time/ending; lưu map_level, retry/conflict/restart và migration giữ dữ liệu đã kiểm chứng. Build/type-check và diff check PASS. Lobby/History hoàn thiện ở mốc tiếp theo; chưa chạy migration trên database cá nhân. |
+
+| Phase 04 — Lobby/History/Results | PASS — 77 client unit, 52 Java unit; 7 Chrome online (chọn đủ 10 map, map ngắn/full ending và bốn mode Fly), 27 client E2E; nhóm MySQL History/restart 5 PASS sau sửa assertion fixture mặc định. Hai identities thấy cùng map; Results/History đúng độ dài, Play Again giữ ID/settings, không cấp nhầm crown/best full-map. Đã xem ảnh Lobby/Results; build/type-check và diff check PASS. SQL nâng cấp vẫn cần chạy trên database đang dùng trước khi chạy backend mới. |
 
 ## Lịch sử triển khai trước thay đổi kiến trúc
 

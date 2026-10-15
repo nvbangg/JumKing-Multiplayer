@@ -54,12 +54,13 @@ class RoomRestartIT {
                 long owner = jdbc.queryForObject("SELECT id FROM users WHERE guest_token_hash=?", Long.class, hash);
                 runs.add(new jumpking.service.RoomRuns.Run(java.util.UUID.randomUUID().toString(), owner, "Peer " + index, "ACTIVE", 120, 3, 1, 180, 360, 100, null, null, false, null));
             }
-            first.getBean(jumpking.service.RoomRuns.class).save(new jumpking.service.RoomRuns.Write(match, "ABCDEF", "RACE", null, 10, 1, started, null, 120, null, runs));
+            first.getBean(jumpking.service.RoomRuns.class).save(new jumpking.service.RoomRuns.Write(match, "ABCDEF", "RACE", null, 1, 1, started, null, 120, null, runs));
         }
         assertThat(jdbc.queryForObject("SELECT end_reason FROM matches WHERE id=?", String.class, match)).isNull();
         try (var restarted = launch()) {
             assertThat(restarted.getBean(RoomDirectory.class).find("ABCDEF")).isNull();
             assertThat(jdbc.queryForObject("SELECT end_reason FROM matches WHERE id=?", String.class, match)).isEqualTo("ABORTED");
+            assertThat(jdbc.queryForObject("SELECT map_level FROM matches WHERE id=?", Integer.class, match)).isEqualTo(1);
             assertThat(jdbc.queryForObject("SELECT duration_ticks FROM matches WHERE id=?", Long.class, match)).isEqualTo(120);
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM play_runs WHERE match_id=? AND status='DNF' AND play_ticks=120 AND jumps=3 AND falls=1 AND `rank`=1 AND is_winner=FALSE", Integer.class, match)).isEqualTo(2);
         }

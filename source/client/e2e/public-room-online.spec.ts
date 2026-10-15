@@ -12,6 +12,12 @@ test('Public rooms can be discovered and joined while Private rooms remain acces
     await a.getByLabel('Nickname', { exact: true }).fill('Public Host'); await a.getByLabel('Visibility', { exact: true }).selectOption('PUBLIC');
     await a.getByRole('button', { name: 'Create Room', exact: true }).click();
     const id = await a.locator('.room-code code').innerText();
+    await expect(a.getByLabel('Map', { exact: true }).locator('option')).toHaveCount(10);
+    for (let level = 1; level <= 10; level++) {
+      await a.getByLabel('Map', { exact: true }).selectOption(String(level));
+      await expect(a.getByLabel('Map', { exact: true })).toHaveValue(String(level));
+    }
+    await a.getByLabel('Map', { exact: true }).selectOption('3');
     await b.goto('/'); await b.getByRole('button', { name: 'Join Public', exact: true }).click();
     await expect(b.getByRole('button', { name: new RegExp(id) })).toBeVisible();
     await a.getByLabel('Visibility', { exact: true }).selectOption('PRIVATE'); await expect(a.getByLabel('Visibility', { exact: true })).toHaveValue('PRIVATE');
@@ -21,9 +27,10 @@ test('Public rooms can be discovered and joined while Private rooms remain acces
     await b.getByRole('button', { name: 'Refresh', exact: true }).click(); await b.getByRole('button', { name: new RegExp(id) }).click();
     await b.getByLabel('Nickname', { exact: true }).fill('Public Peer'); await b.getByRole('button', { name: 'Join', exact: true }).click();
     await expect(b.locator('.room-code code')).toHaveText(id); await expect(b.getByLabel('Visibility', { exact: true })).toBeDisabled();
+    await expect(b.getByLabel('Map', { exact: true })).toBeDisabled(); await expect(b.getByLabel('Map', { exact: true })).toHaveValue('3');
     await a.getByLabel('Mode', { exact: true }).selectOption('HARDCORE'); await expect(a.getByLabel('Mode', { exact: true })).toHaveValue('HARDCORE');
     const listed = (await (await b.request.get('/api/rooms')).json()).rooms.find((room: { roomId: string }) => room.roomId === id);
-    expect(listed).toMatchObject({ mode: 'HARDCORE', playerCount: 2, capacity: 10 });
+    expect(listed).toMatchObject({ mode: 'HARDCORE', mapLevel: 3, playerCount: 2, capacity: 10 });
     await b.screenshot({ path: info.outputPath('public-room-lobby.png') });
     await b.getByRole('button', { name: 'Leave', exact: true }).click(); await a.getByRole('button', { name: 'Leave', exact: true }).click();
   } finally {

@@ -46,7 +46,7 @@ export function HistoryList({ profile, authenticated, hasIdentity, revision, onS
   const items = [...merged.values()].sort((a, b) => b.endedAt.localeCompare(a.endedAt) || a.kind.localeCompare(b.kind) || b.id.localeCompare(a.id));
   return <div className="history-list" aria-label="Game history">
     {items.map(item => <button key={item.kind + ':' + item.id} onClick={() => onSelect(item, item.kind === 'SOLO' && !remote.some(row => row.kind === item.kind && row.id === item.id))}>
-      <span className="kind-label">{item.kind}</span><span>{new Date(item.endedAt).toLocaleDateString()} · {item.status}{pendingIds.has(item.id) && item.kind === 'SOLO' ? ' · Pending sync' : ''}</span><span>{duration(item.finishTimeMs ?? item.playTimeMs)}</span>
+      <span className="kind-label">{item.kind}{item.room && ` · Map ${item.room.mapLevel}`}</span><span>{new Date(item.endedAt).toLocaleDateString()} · {item.status}{pendingIds.has(item.id) && item.kind === 'SOLO' ? ' · Pending sync' : ''}</span><span>{duration(item.finishTimeMs ?? item.playTimeMs)}</span>
     </button>)}
     {loading && <p role="status">Loading…</p>}
     {!loading && !items.length && !error && <p>No completed games.</p>}

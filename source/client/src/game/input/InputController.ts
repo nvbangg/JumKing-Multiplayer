@@ -13,11 +13,17 @@ export class InputController {
   constructor(private onActivity: () => void, private onMenu: () => void, private onCancelInput: () => void = () => {}, private onJumpPress: (now: number) => void = () => {}) {
     window.addEventListener('keydown', this.keyDown);
     window.addEventListener('keyup', this.keyUp);
+    window.addEventListener('focusin', this.focusIn);
   }
+  private focusIn = (event: FocusEvent) => {
+    if (!(event.target instanceof Element) || !event.target.closest('summary')) return;
+    this.keys.clear(); this.pointers.clear(); this.padBlocked = true; this.onCancelInput();
+  };
   private keyDown = (event: KeyboardEvent) => {
     if (event.defaultPrevented) return;
     if (event.target instanceof Element && event.target.closest('input,textarea,select,[contenteditable="true"]')) return;
     if (event.code === 'Escape' && !event.repeat) { this.onMenu(); return; }
+    if (event.target instanceof Element && event.target.closest('summary')) return;
     if (!relevant.has(event.code)) return;
     event.preventDefault();
     if (!event.repeat && !this.keys.has(event.code)) { this.keys.add(event.code); this.onActivity(); if (event.code === 'Space' && !this.canceled) this.onJumpPress(performance.now()); }
@@ -72,5 +78,5 @@ export class InputController {
   }
   cancel(): void { this.keys.clear(); this.pointers.clear(); this.padBlocked = true; this.canceled = true; }
   resume(): void { this.keys.clear(); this.pointers.clear(); this.padBlocked = true; this.canceled = false; this.onActivity(); }
-  dispose(): void { window.removeEventListener('keydown', this.keyDown); window.removeEventListener('keyup', this.keyUp); this.keys.clear(); this.pointers.clear(); }
+  dispose(): void { window.removeEventListener('keydown', this.keyDown); window.removeEventListener('keyup', this.keyUp); window.removeEventListener('focusin', this.focusIn); this.keys.clear(); this.pointers.clear(); }
 }

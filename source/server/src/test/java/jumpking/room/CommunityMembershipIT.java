@@ -35,6 +35,12 @@ class CommunityMembershipIT {
             assertThat(target).isNotEqualTo(full); assertThat(directory.find(full).joinable()).isFalse();
             var fullState = first.ok("GET_ROOM_STATE", Map.of());
             assertThat(fullState.path("members")).hasSize(10);
+            first.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT") && message.path("payload").path("players").size() == 10);
+            var standings = first.snapshot().path("players");
+            assertThat(standings).hasSize(10);
+            var ids = new HashSet<String>();
+            for (var row : standings) { assertThat(row.path("rank").asInt()).isEqualTo(1); ids.add(row.path("playerId").asText()); assertThat(row.has("owner")).isFalse(); }
+            assertThat(ids).hasSize(10);
             var colors = new HashSet<Integer>(); fullState.path("members").forEach(member -> colors.add(member.path("colorSlot").asInt())); assertThat(colors).hasSize(10);
             assertThat(last.command("JOIN_ROOM", Map.of("roomId", full)).path("payload").path("code").asText()).isEqualTo("ROOM_FULL");
             assertThat(memberships.find(last.owner).roomId()).isEqualTo(target);

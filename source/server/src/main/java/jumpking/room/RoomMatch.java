@@ -101,6 +101,14 @@ final class RoomMatch {
         }).toList();
         return Map.of("playId", id, "reason", reason, "mapLevel", settings.mapLevel(), "durationMs", ms(ticks), "results", rows, "saveStatus", saveStatus);
     }
+    List<jumpking.dto.PlayerStanding> standings(Set<String> members) {
+        var scores = players.values().stream().filter(player -> members.contains(player.spec.playerId))
+            .map(player -> new RoomRanking.Score(player.spec.playerId, player.spec.nickname, player.status, player.game.physics().progress(), player.maximum, player.finish)).toList();
+        return RoomRanking.rank(scores, settings.mode(), false).stream().map(row -> {
+            var spec = players.get(row.score().playerId()).spec;
+            return new jumpking.dto.PlayerStanding(spec.playerId, spec.nickname, spec.color, row.rank(), row.score().currentProgress());
+        }).toList();
+    }
     long ms(long ticks) { return ticks / tickRate * 1000 + ticks % tickRate * 1000 / tickRate; }
     Long remainingMs() { return limitTicks == 0 ? null : ms(Math.max(0, limitTicks - ticks)); }
     private static Instant millis(Instant value) { return value.truncatedTo(java.time.temporal.ChronoUnit.MILLIS); }

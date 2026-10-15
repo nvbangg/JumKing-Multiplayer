@@ -15,4 +15,5 @@ export interface LeaderboardEntry {
   currentProgress: number; maxProgress: number; elapsedTimeMs: number;
   peakReachedTimeMs: number; finishTimeMs: number | null;
 }
+export interface PlayerStanding { playerId: string; nickname: string; colorSlot: number; rank: number; currentProgress: number }
 export const EMPTY_STATS: Readonly<Statistics> = Object.freeze({ totalPlayTimeMs: 0, totalJumps: 0, totalFalls: 0, finishes: 0, matchesPlayed: 0, wins: 0, bestFinishTimeMs: null });

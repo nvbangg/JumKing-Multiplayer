@@ -6,6 +6,14 @@ import org.junit.jupiter.api.Test;
 
 class RoomRankingTest {
     private RoomRanking.Score score(String id, String status, double current, double peak, Long finish) { return new RoomRanking.Score(id, id, status, current, peak, finish); }
+    @Test void liveCommunityUsesOnlyCurrentHeightAndRoomRetainsItsModeComparator() {
+        var scores = List.of(score("b", "ACTIVE", 20, 50, null), score("a", "ACTIVE", 20, 40, null), score("c", "FINISHED", 10, 100, 600L));
+        var height = RoomRanking.currentHeight(scores);
+        assertThat(height).extracting(row -> row.score().playerId()).containsExactly("a", "b", "c");
+        assertThat(height).extracting(RoomRanking.Ranked::rank).containsExactly(1, 1, 3);
+        assertThat(height).noneMatch(RoomRanking.Ranked::winner);
+        assertThat(RoomRanking.rank(scores, "TIME_LIMIT", false)).extracting(row -> row.score().playerId()).containsExactly("c", "b", "a");
+    }
     @Test void finishesWinAtTheSameTickAndTiesAreNotBrokenByIdentifiers() {
         var scores = List.of(score("z", "FINISHED", 100, 100, 600L), score("a", "FINISHED", 100, 100, 600L), score("b", "UNFINISHED", 99, 100, null), score("c", "DNF", 99, 100, null));
         for (String mode : List.of("RACE", "HARDCORE", "TIME_LIMIT", "NO_WALK")) {

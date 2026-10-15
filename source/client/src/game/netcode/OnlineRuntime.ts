@@ -9,8 +9,10 @@ import { Prediction } from './Prediction';
 import { PeerInterpolation } from './PeerInterpolation';
 import { roomMap } from '../simulation/roomMaps';
 import { NETWORK } from '../../network/config';
+import type { PlayerStanding } from '../../network/contracts';
 
 export interface OnlineSnapshot {
+  players?: PlayerStanding[];
   roomId: string; serverTick: number; playId: string; generation: number; elapsedTimeMs: number; remainingTimeMs: number | null;
   self: { lastProcessedInputSeq: number; status: string; paused: boolean; simulation: GameSnapshot; metrics: Record<string, unknown> };
   peers: { playerId: string; nickname: string; colorSlot: number; state: RenderPose; crowned: boolean; status: string }[];

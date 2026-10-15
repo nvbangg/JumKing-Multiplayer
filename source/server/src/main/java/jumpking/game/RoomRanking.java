@@ -7,7 +7,7 @@ public final class RoomRanking {
     private RoomRanking() {}
     public record Score(String playerId, String nickname, String status, double currentProgress, double maxProgress, Long finishTicks) {
         public Score {
-            if (!Set.of("FINISHED", "UNFINISHED", "DNF").contains(status) || !Double.isFinite(currentProgress) || !Double.isFinite(maxProgress)
+            if (!Set.of("ACTIVE", "FINISHED", "UNFINISHED", "DNF").contains(status) || !Double.isFinite(currentProgress) || !Double.isFinite(maxProgress)
                     || currentProgress < 0 || maxProgress < currentProgress || (status.equals("FINISHED") != (finishTicks != null)) || finishTicks != null && finishTicks < 0) throw new IllegalArgumentException("Invalid Room score");
         }
     }
@@ -23,6 +23,12 @@ public final class RoomRanking {
             int progress = Double.compare(b.currentProgress, a.currentProgress);
             return progress != 0 || !mode.equals("TIME_LIMIT") ? progress : Double.compare(b.maxProgress, a.maxProgress);
         };
+        return order(scores, comparator, allowWinners);
+    }
+    public static List<Ranked> currentHeight(List<Score> scores) {
+        return order(scores, Comparator.comparingDouble(Score::currentProgress).reversed(), false);
+    }
+    private static List<Ranked> order(List<Score> scores, Comparator<Score> comparator, boolean allowWinners) {
         var sorted = scores.stream().sorted(comparator.thenComparing(Score::playerId)).toList();
         var result = new ArrayList<Ranked>(); int rank = 0;
         for (int index = 0; index < sorted.size(); index++) {

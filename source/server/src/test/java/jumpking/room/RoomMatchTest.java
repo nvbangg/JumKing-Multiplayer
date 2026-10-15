@@ -46,6 +46,13 @@ class RoomMatchTest {
         var write = match.write(1); assertThat(write.duration()).isEqualTo(7); assertThat(write.runs().get(1).status()).isEqualTo("DNF"); assertThat(write.runs().get(1).endedAt()).isEqualTo(start.plusSeconds(1));
         match.tick(3_000_000_000L, start.plusSeconds(3)); assertThat(match.ticks).isEqualTo(7);
     }
+    @Test void liveStandingsKeepTiesAndExcludeMembersWhoHaveLeft() {
+        var match = match();
+        var everyone = match.standings(java.util.Set.of("first", "second"));
+        assertThat(everyone).extracting(jumpking.dto.PlayerStanding::rank).containsExactly(1, 1);
+        assertThat(match.standings(java.util.Set.of("first"))).extracting(jumpking.dto.PlayerStanding::playerId).containsExactly("first");
+        assertThat(match.standings(java.util.Set.of())).isEmpty();
+    }
     @Test void allPlayersOfTheFinishingTickAreProcessedBeforeResultsAndTies() throws Exception {
         var match = match(); var before = MainBabeRoute.beforeFinish(shared, json); var start = Instant.parse("2026-01-01T00:00:00Z");
         match.start(start); match.ticks = before.physics().ticks;

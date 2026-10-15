@@ -15,6 +15,8 @@ import { PlayerEffects } from '../../game/netcode/PlayerEffects';
 import { PRESENTATION } from '../../game/presentation/config';
 import { useRoomChat } from '../rooms/useRoomChat';
 import { ChatOverlay } from '../rooms/ChatOverlay';
+import { PlayersPanel } from '../rooms/PlayersPanel';
+import type { PlayerStanding } from '../../network/contracts';
 import rules from '../../../../common/rules.json';
 import { FlightToggle } from '../../game/input/FlightToggle';
 import { AdventureEffects } from '../../game/netcode/AdventureEffects';
@@ -28,6 +30,7 @@ export function OnlineGame({ socket, room, onHome, onResults }: { socket: GameSo
   const [error, setError] = useState(''), [pending, setPending] = useState(false), [elapsed, setElapsed] = useState(0), [jumps, setJumps] = useState(0), [saveStatus, setSaveStatus] = useState('SAVED');
   const [transferId, setTransferId] = useState('');
   const [remaining, setRemaining] = useState<number | null>(null);
+  const [players, setPlayers] = useState<PlayerStanding[]>([]);
   const [disconnected, setDisconnected] = useState(false);
   const [ending, setEnding] = useState<'playing' | 'picture' | null>(null), [pictureReady, setPictureReady] = useState(false);
   const endingActive = useRef(false), skipEnding = useRef<(() => void) | null>(null);
@@ -82,7 +85,7 @@ export function OnlineGame({ socket, room, onHome, onResults }: { socket: GameSo
       if (disposed) return;
       cueManifest = manifest; setFlyAllowed(config.features.flyEnabled); audio.current = new AudioBus(manifest, readOptions().sound, setError);
       const session = new OnlineRuntime(parseMap(mapData), socket, latestRoom.current, () => controls.read(), (state, snapshot) => {
-        setElapsed(snapshot.elapsedTimeMs); setRemaining(snapshot.remainingTimeMs); setJumps(state.jumps); setFlying(state.freeFlight); audio.current?.setScreen(state.screen);
+        setElapsed(snapshot.elapsedTimeMs); setRemaining(snapshot.remainingTimeMs); setJumps(state.jumps); setFlying(state.freeFlight); setPlayers(snapshot.players || []); audio.current?.setScreen(state.screen);
         if (!readOptions().fly && state.freeFlight) session.setFlight(false);
         if (snapshot.self.paused && !session.menu) { session.menu = true; controls.cancel(); setMenu('pause'); audio.current?.pause(true); }
       }, config.features.flyEnabled, message => { setError(message); setMenu('pause'); controls.cancel(); });
@@ -148,6 +151,7 @@ export function OnlineGame({ socket, room, onHome, onResults }: { socket: GameSo
       ? <button disabled={!pictureReady} onClick={onResults}>View Results</button>
       : <button disabled={!pictureReady || pending} onClick={() => { void newGame(); }}>New Game</button>}<button disabled={!pictureReady || pending || disconnected} onClick={() => { void command('LEAVE_ROOM'); }}>Back to Menu</button></>}</div>}
     {ready && !ending && <ChatOverlay chat={chat} socket={socket} />}
+    {ready && !ending && <aside className="in-game-panels"><PlayersPanel players={players} selfId={socket.selfId} /></aside>}
     {menu && <section className="game-overlay" aria-label="Game menu"><MenuPanel title={menu === 'pause' ? disconnected ? 'Disconnected' : room.kind === 'ROOM' ? room.state === 'PAUSED' ? 'Room Paused' : 'Game Menu' : 'Paused' : menu === 'options' ? 'Options' : 'Controls'} onBack={menu === 'pause' ? undefined : () => setMenu(menu === 'controls' ? 'options' : 'pause')}>
       {menu === 'pause' && <>{disconnected ? <><button disabled={pending} onClick={() => { setPending(true); void socket.reconnect().catch(cause => setError(cause.message)).finally(() => setPending(false)); }}>Reconnect</button><button onClick={onHome}>Back to Menu</button></> : <button disabled={pending || (room.state === 'PAUSED' && room.hostPlayerId !== socket.selfId)} onClick={() => { void resume(); }}>{room.kind === 'ROOM' && room.state === 'PAUSED' ? room.hostPlayerId === socket.selfId ? 'Resume Room' : 'Room Paused' : 'Resume'}</button>}<button onClick={() => setMenu('options')}>Options</button><button aria-keyshortcuts="Enter" onClick={chat.openChat}>Open Chat</button>
         {room.kind === 'COMMUNITY' && <button disabled={pending || disconnected} onClick={() => { void newGame(); }}>New Game</button>}

@@ -58,6 +58,11 @@ test('two Accounts share server simulation, see each other jump, leave and Conti
     await expect.poll(() => observedA.rosters.at(-1)?.members.length).toBe(2); await expect.poll(() => observedB.rosters.at(-1)?.members.length).toBe(2);
     expect(observedA.rosters.at(-1)!.members.map(member => member.nickname).sort()).toEqual([nameA, nameB].sort());
     expect(new Set(observedA.rosters.at(-1)!.members.map(member => member.colorSlot)).size).toBe(2);
+    await expect.poll(() => observedB.snapshots.at(-1)?.players?.length).toBe(2);
+    await b.locator('summary').filter({ hasText: /^Players$/ }).click();
+    await expect(b.getByRole('list', { name: 'Current players' }).locator('li')).toHaveCount(2);
+    expect(observedB.snapshots.at(-1)!.players!.map(player => player.rank)).toEqual([1, 1]);
+    await b.locator('canvas').click(); await expect(b.locator('canvas')).toBeFocused();
     await jump(a); await expect.poll(() => observedA.snapshots.at(-1)?.self.simulation.physics.jumps).toBeGreaterThan(0);
     await expect.poll(() => observedB.snapshots.at(-1)?.peers[0]?.state.jumps).toBeGreaterThan(0);
     await jump(b); await expect.poll(() => observedB.snapshots.at(-1)?.self.simulation.physics.jumps).toBeGreaterThan(0);

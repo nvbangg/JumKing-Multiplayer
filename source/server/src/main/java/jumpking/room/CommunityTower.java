@@ -434,9 +434,16 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
     private Map<String, Object> runPayload(Member player) { return Map.of("run", summary(player), "generation", player.generation, "paused", player.paused, "pausePending", player.pausePending, "saveStatus", player.saveStatus); }
     private void runState(Member player) { if (player.connection != null && !player.loading) player.connection.send("COMMUNITY_RUN_STATE", runPayload(player)); }
     private void snapshots(Tower tower) {
+        var scores = tower.players.values().stream().filter(player -> !player.loading).map(player -> new RoomRanking.Score(player.id, player.identity.username(),
+            player.finished ? "FINISHED" : "ACTIVE", player.game.physics().progress(), player.maximum, player.finished ? player.game.physics().snapshot().ticks : null)).toList();
+        var standings = json.valueToTree(RoomRanking.currentHeight(scores).stream().map(row -> {
+            var player = tower.players.get(row.score().playerId());
+            return new jumpking.dto.PlayerStanding(player.id, player.identity.username(), player.slot.color(), row.rank(), row.score().currentProgress());
+        }).toList());
         for (Member self : tower.players.values()) {
             if (self.loading || self.connection == null) continue;
             var value = json.createObjectNode().put("roomId", tower.id).put("serverTick", tower.serverTick).put("playId", self.stored.id()).put("generation", self.generation).put("elapsedTimeMs", ms(self.game.physics().snapshot().ticks)).putNull("remainingTimeMs");
+            value.set("players", standings);
             var state = value.putObject("self").put("lastProcessedInputSeq", self.input.processed()).put("status", self.finished ? "FINISHED" : "ACTIVE").put("paused", self.paused || self.pausePending);
             state.set("simulation", json.valueToTree(self.game.snapshot())); state.set("metrics", json.valueToTree(summary(self)));
             var peers = value.putArray("peers");

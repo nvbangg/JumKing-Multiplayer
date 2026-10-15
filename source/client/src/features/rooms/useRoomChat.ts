@@ -33,12 +33,15 @@ export function useRoomChat(socket: GameSocket, enabled = true, onOpen?: () => v
       }
       lastId = id;
     });
+    // History có thể tới giữa render và lúc đăng ký listener, nhất là sau reconnect.
+    setMessages(socket.chatHistory as unknown as ChatMessage[]);
+    lastId = socket.chatHistory.at(-1)?.id;
     return () => { unsubscribe(); clearTimeout(timer); };
   }, [socket, closeChat]);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat || event.key !== 'Enter'
-          || event.target instanceof Element && event.target.closest('input,textarea,select,button,a,[contenteditable="true"]')) return;
+          || event.target instanceof Element && event.target.closest('input,textarea,select,button,a,summary,[contenteditable="true"]')) return;
       if (callbacks.current.enabled) { event.preventDefault(); openChat(); }
     };
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);

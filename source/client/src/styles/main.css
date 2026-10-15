@@ -84,3 +84,10 @@ button { cursor: pointer; }
 }
 
 .chat-preview { pointer-events: none; }
+.in-game-panels { position: absolute; top: 62px; right: 12px; width: min(280px, calc(100vw - 24px)); z-index: 2; font-size: .75rem; }
+.in-game-panel { margin-bottom: 6px; padding: 8px; background: #08090cef; border: 1px solid #6b6250; }
+.in-game-panel summary { cursor: pointer; }
+.in-game-panel ol { list-style: none; margin: 8px 0 0; padding: 0; max-height: 28dvh; overflow-y: auto; }
+.in-game-panel li { display: flex; justify-content: space-between; gap: 12px; padding: 5px 2px; }
+.in-game-panel li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.in-game-panel li strong { white-space: nowrap; }

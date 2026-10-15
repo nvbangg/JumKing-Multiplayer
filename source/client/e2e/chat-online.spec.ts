@@ -27,6 +27,9 @@ test('chat shortcuts, passive ten-second messages and touch work without launchi
     if (await a.getByRole('button', { name: 'Resume', exact: true }).isVisible()) await a.getByRole('button', { name: 'Resume', exact: true }).click();
     await a.locator('canvas').click();
     const jumps = snapshots.at(-1)!.self.simulation.physics.jumps;
+    const players = a.locator('summary').filter({ hasText: /^Players$/ });
+    await players.focus(); await a.keyboard.press('Enter'); await expect(a.getByRole('list', { name: 'Current players' }).locator('li')).toHaveCount(2);
+    await a.keyboard.press('Space'); expect(snapshots.at(-1)!.self.simulation.physics.jumps).toBe(jumps); await a.locator('canvas').click(); await expect(a.locator('canvas')).toBeFocused();
     await a.keyboard.down('Space'); await expect.poll(() => snapshots.at(-1)?.self.simulation.physics.charge, { intervals: [20] }).toBeGreaterThan(0);
     await a.keyboard.press('Enter'); await expect(a.getByLabel('Message', { exact: true })).toBeFocused(); await a.keyboard.up('Space');
     await a.locator('canvas').click(); await a.keyboard.press('Enter'); await expect(a.getByLabel('Message', { exact: true })).toBeFocused();
@@ -38,6 +41,9 @@ test('chat shortcuts, passive ten-second messages and touch work without launchi
     await a.keyboard.press('Escape'); await expect(a.getByRole('region', { name: 'Room chat', exact: true })).toHaveCount(0);
     await expect.poll(() => snapshots.at(-1)?.elapsedTimeMs ?? 0).toBeGreaterThan(elapsed);
     expect(snapshots.at(-1)!.self.simulation.physics.jumps).toBe(jumps);
+    await a.keyboard.down('Space'); await a.waitForTimeout(180); await a.keyboard.up('Space');
+    await expect.poll(() => snapshots.at(-1)?.players?.find(player => player.nickname === 'Touch Peer')?.rank, { intervals: [20] }).toBe(2);
+    await players.click(); await expect(a.getByRole('list', { name: 'Current players' }).locator('li').first()).toContainText('1. Chat Host');
     await a.getByRole('button', { name: 'Menu', exact: true }).click(); await a.getByRole('button', { name: 'End Match', exact: true }).click();
     await expect(a.getByRole('button', { name: 'Play Again', exact: true })).toBeEnabled(); expect(errors).toEqual([]);
     await a.getByRole('button', { name: 'Leave', exact: true }).click(); await b.getByRole('button', { name: 'Leave', exact: true }).click();

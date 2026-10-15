@@ -9,9 +9,15 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/leaderboard")
 public class LeaderboardController {
-    private final RecordsService records;
-    public LeaderboardController(RecordsService records) { this.records=records; }
-    @GetMapping Map<String,List<RecordsDto.LeaderboardEntry>> leaderboard(@RequestParam(defaultValue="100") int limit) {
-        return Map.of("entries",records.leaderboard(limit));
-    }
+  private final RecordsService records;
+
+  public LeaderboardController(RecordsService records) {
+    this.records = records;
+  }
+
+  @GetMapping
+  Map<String, List<RecordsDto.LeaderboardEntry>> leaderboard(
+      @RequestParam(defaultValue = "100") int limit) {
+    return Map.of("entries", records.leaderboard(limit));
+  }
 }

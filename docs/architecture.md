@@ -46,6 +46,7 @@ source/
     e2e/
     package.json
     package-lock.json
+    biome.json
     vite.config.ts
   server/                         # Spring Boot
     config/                       # file mẫu và cấu hình riêng được ignore

@@ -10,8 +10,18 @@ import org.springframework.stereotype.Component;
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class SchemaValidator implements ApplicationRunner {
-    private final SchemaRepository schema;
-    public SchemaValidator(SchemaRepository schema) { this.schema = schema; }
-    @Override public void run(ApplicationArguments args) { validate(); }
-    public void validate() { schema.validate(); }
+  private final SchemaRepository schema;
+
+  public SchemaValidator(SchemaRepository schema) {
+    this.schema = schema;
+  }
+
+  @Override
+  public void run(ApplicationArguments args) {
+    validate();
+  }
+
+  public void validate() {
+    schema.validate();
+  }
 }

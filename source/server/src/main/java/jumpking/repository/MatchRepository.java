@@ -8,8 +8,9 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 public interface MatchRepository extends JpaRepository<Match, String> {
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select m from Match m where m.id = :id")
-    Optional<Match> lockById(@Param("id") String id);
-    List<Match> findByEndedAtIsNullOrderById();
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select m from Match m where m.id = :id")
+  Optional<Match> lockById(@Param("id") String id);
+
+  List<Match> findByEndedAtIsNullOrderById();
 }

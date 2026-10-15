@@ -7,12 +7,20 @@ Kiểm tra theo tài liệu sở hữu; báo PASS/FAIL/BLOCKED/NOT RUN đúng th
 | Phần thay đổi | Checks bắt buộc |
 | --- | --- |
 | Frontend | npm run check, npm test, npm run build; E2E khi đổi luồng UI/gameplay |
-| Backend | Maven test; verify -Pintegration khi đổi persistence/security/HTTP/WS |
+| Backend | Maven verify; verify -Pintegration khi đổi persistence/security/HTTP/WS |
 | Shared map/physics/rules/adventure | Fixtures và route replay TypeScript/Java; build cả hai phía |
 | Luồng online/save/lifecycle | Playwright với backend/MySQL thật và hai identities |
 | Tài liệu | Source of Truth, links/anchors, examples, scope và git diff --check |
 
 Khi đổi dependency: frontend chạy `npm audit`; backend lấy version bằng `.\mvnw.cmd dependency:list -DincludeScope=runtime` rồi đối chiếu [OSV](https://google.github.io/osv.dev/post-v1-querybatch/) và advisory của nhà cung cấp. Báo kết quả cùng điều kiện ảnh hưởng/ngoại lệ có nguồn; không coi kết quả quét thô là bằng chứng khai thác được.
+
+## Format và lint
+
+Frontend dùng Biome mặc định cho format, lint và imports; `npm run check` chạy Biome rồi TypeScript (`tsc --noEmit`), không sửa file. `npm run check:fix` áp dụng format và các sửa lỗi an toàn rồi kiểm tra kiểu; lỗi còn lại cần xử lý thủ công. Cấu hình ở `source/client/biome.json`, chỉ quét `src/`, `e2e/` và cấu hình ở root frontend; không quét assets hoặc output sinh tự động. Warning/info giữ mức mặc định và cần được review, không đồng nghĩa lỗi chặn build.
+
+Backend dùng Spotless với google-java-format mặc định, cấu hình trong `source/server/pom.xml`. `verify` kiểm tra format, compile và unit tests; không sửa source. Chạy `.\mvnw.cmd spotless:apply` trong `source/server/` để format, hoặc `spotless:check` để chỉ kiểm tra format. Spotless không thay thế compiler hoặc tests.
+
+`.gitattributes` thống nhất text LF; `.bat`/`.cmd` dùng CRLF khi checkout, ảnh/âm thanh/font giữ binary. Phiên bản tools được pin để các máy cho cùng kết quả. Sau khi fix, review diff và chạy checks theo phần bị ảnh hưởng; không dùng tự sửa unsafe hoặc nới rules để bỏ qua lỗi.
 
 ## Lệnh kiểm thử
 
@@ -32,8 +40,8 @@ Backend:
 
 ```powershell
 cd source/server
-.\mvnw.cmd clean test
-.\mvnw.cmd clean verify -Pintegration
+.\mvnw.cmd verify
+.\mvnw.cmd verify -Pintegration
 ```
 
 Linux/macOS dùng `sh mvnw`; cài Chromium cho E2E bằng `npx playwright install chromium`.

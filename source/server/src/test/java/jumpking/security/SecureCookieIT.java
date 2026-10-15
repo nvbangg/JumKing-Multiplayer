@@ -1,6 +1,7 @@
 package jumpking.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -14,26 +15,47 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
-@SpringBootTest(classes = JumpKingApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+@SpringBootTest(
+    classes = JumpKingApplication.class,
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = "server.servlet.session.cookie.secure=true")
 class SecureCookieIT {
-    @DynamicPropertySource static void database(DynamicPropertyRegistry properties) {
-        var db = TestDatabase.get().dataSource;
-        properties.add("spring.datasource.url", db::getUrl); properties.add("spring.datasource.username", db::getUsername); properties.add("spring.datasource.password", db::getPassword);
+  @DynamicPropertySource
+  static void database(DynamicPropertyRegistry properties) {
+    var db = TestDatabase.get().dataSource;
+    properties.add("spring.datasource.url", db::getUrl);
+    properties.add("spring.datasource.username", db::getUsername);
+    properties.add("spring.datasource.password", db::getPassword);
+  }
+
+  @LocalServerPort int port;
+
+  @Test
+  void httpsConfigurationMarksBothCookiesSecureWithoutDomain() throws Exception {
+    try (var http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()) {
+      String origin = "http://127.0.0.1:" + port;
+      var csrf =
+          http.send(
+              HttpRequest.newBuilder(URI.create(origin + "/api/auth/csrf")).build(),
+              HttpResponse.BodyHandlers.ofString());
+      String cookie = csrf.headers().firstValue("set-cookie").orElseThrow();
+      assertThat(cookie)
+          .contains("Secure", "HttpOnly", "SameSite=Lax", "Path=/")
+          .doesNotContain("Domain=");
+      String token = new ObjectMapper().readTree(csrf.body()).path("token").asText();
+      // HTTP loopback chỉ dùng kiểm tra headers; gửi cookie thủ công vì browser sẽ đòi HTTPS.
+      var guest =
+          http.send(
+              HttpRequest.newBuilder(URI.create(origin + "/api/auth/guest"))
+                  .header("Cookie", cookie.split(";", 2)[0])
+                  .header("X-CSRF-TOKEN", token)
+                  .POST(HttpRequest.BodyPublishers.noBody())
+                  .build(),
+              HttpResponse.BodyHandlers.ofString());
+      assertThat(guest.statusCode()).isEqualTo(200);
+      assertThat(guest.headers().firstValue("set-cookie").orElseThrow())
+          .contains("JK_GUEST=", "Secure", "HttpOnly", "SameSite=Lax", "Path=/")
+          .doesNotContain("Domain=");
     }
-    @LocalServerPort int port;
-    @Test void httpsConfigurationMarksBothCookiesSecureWithoutDomain() throws Exception {
-        try (var http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()) {
-            String origin = "http://127.0.0.1:" + port;
-            var csrf = http.send(HttpRequest.newBuilder(URI.create(origin + "/api/auth/csrf")).build(), HttpResponse.BodyHandlers.ofString());
-            String cookie = csrf.headers().firstValue("set-cookie").orElseThrow();
-            assertThat(cookie).contains("Secure", "HttpOnly", "SameSite=Lax", "Path=/").doesNotContain("Domain=");
-            String token = new ObjectMapper().readTree(csrf.body()).path("token").asText();
-            // HTTP loopback chỉ dùng kiểm tra headers; gửi cookie thủ công vì browser sẽ đòi HTTPS.
-            var guest = http.send(HttpRequest.newBuilder(URI.create(origin + "/api/auth/guest")).header("Cookie", cookie.split(";", 2)[0])
-                .header("X-CSRF-TOKEN", token).POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
-            assertThat(guest.statusCode()).isEqualTo(200);
-            assertThat(guest.headers().firstValue("set-cookie").orElseThrow()).contains("JK_GUEST=", "Secure", "HttpOnly", "SameSite=Lax", "Path=/").doesNotContain("Domain=");
-        }
-    }
+  }
 }

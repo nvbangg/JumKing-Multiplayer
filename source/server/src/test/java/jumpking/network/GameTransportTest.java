@@ -56,6 +56,25 @@ class GameTransportTest {
         assertThat(frames.poll(now).seq()).isEqualTo(1);
         assertThatThrownBy(() -> frames.offer(input(2, ",\"up\":1"), now, false)).isInstanceOf(ApiException.class);
     }
+    @Test void backlogAgeIsBoundedEvenWhenFreshInputKeepsArriving() {
+        var frames = new InputFrames(120, 500); frames.reset("run", 1); long now = 1_000_000_000L;
+        frames.offer(input(1, ""), now, false);
+        frames.offer(input(2, ""), now + 499_000_000L, false);
+        assertThat(frames.requiresResync(now + 499_999_999L)).isFalse();
+        assertThat(frames.requiresResync(now + 500_000_000L)).isTrue();
+        assertThat(frames.processed()).isZero();
+        frames.clear(); assertThat(frames.requiresResync(now + 500_000_000L)).isFalse();
+        frames.reset("run", 2); assertThat(frames.pending()).isZero(); assertThat(frames.processed()).isZero();
+    }
+    @Test void fifoConsumptionMovesBacklogDeadlineWithoutDroppingAJumpEdge() {
+        var frames = new InputFrames(120, 500); frames.reset("run", 1); long now = 1_000_000_000L;
+        frames.offer(input(1, ""), now, false); frames.offer(input(2, ""), now + 100_000_000L, false);
+        assertThat(frames.poll(now + 400_000_000L).seq()).isEqualTo(1);
+        assertThat(frames.requiresResync(now + 500_000_000L)).isFalse();
+        frames.offer(input(3, ""), now + 590_000_000L, false);
+        assertThat(frames.requiresResync(now + 600_000_000L)).isTrue();
+        assertThat(frames.requiresResync(now + 1_090_000_000L)).isFalse();
+    }
     @Test void explicitCancelDiscardsQueuedMovementAndAckAdvancesOnlyWhenCancelIsConsumed() {
         var frames = new InputFrames(3, 500); frames.reset("run", 1); long now = 1_000_000L;
         frames.offer(input(1, ""), now, false); frames.offer(input(2, ""), now, false);

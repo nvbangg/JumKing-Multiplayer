@@ -42,6 +42,24 @@ class CommunityLifecycleIT {
         long before = client.snapshot().path("serverTick").asLong(); time.advance(milliseconds);
         client.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT") && message.path("payload").path("serverTick").asLong() > before);
     }
+    @Test void inputBacklogResyncKeepsCommunityRunAndDoesNotReleaseJump() throws Exception {
+        try (var client = new GameClient(port)) {
+            client.register(); client.connect(); var join = client.ok("JOIN_COMMUNITY", Map.of());
+            client.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT"));
+            String play = join.path("playId").asText();
+            for (int seq = 1; seq <= 40; seq++) client.input(Map.of("playId", play, "generation", 1, "seq", seq, "left", false, "right", false, "jump", true));
+            client.ok("GET_ROOM_STATE", Map.of()); step(client, 499);
+            client.input(Map.of("playId", play, "generation", 1, "seq", 41, "left", false, "right", false, "jump", false));
+            client.ok("GET_ROOM_STATE", Map.of()); time.advance(1); GameClient.until(client.socket::isInputClosed);
+            client.connect(); var context = client.ok("RECONNECT", Map.of("roomId", join.path("roomId").asText(), "playerId", join.path("playerId").asText(), "reconnectToken", join.path("reconnectToken").asText()));
+            assertThat(context.path("generation").asInt()).isEqualTo(2); assertThat(context.path("playId").asText()).isEqualTo(play);
+            var state = client.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT") && message.path("payload").path("generation").asInt() == 2).path("payload");
+            assertThat(state.path("self").path("paused").asBoolean()).isTrue();
+            assertThat(state.path("self").path("simulation").path("physics").path("jumps").asInt()).isZero();
+            assertThat(state.path("self").path("simulation").path("physics").path("charge").asInt()).isZero();
+            client.ok("LEAVE_ROOM", Map.of());
+        }
+    }
     @Test void disabledFlightAndClientPositionsCannotChangeAuthoritativeState() throws Exception {
         try (var client = new GameClient(port)) {
             client.register(); client.connect(); var join = client.ok("JOIN_COMMUNITY", Map.of());

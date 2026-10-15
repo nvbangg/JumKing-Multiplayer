@@ -22,9 +22,9 @@ export class GameSimulation {
       || !Array.isArray(saved.world.registeredScreens) || new Set(saved.world.registeredScreens).size !== saved.world.registeredScreens.length
       || saved.world.registeredScreens.some(screen => !Number.isInteger(screen) || screen < 0 || screen >= this.map.screens.length)
       || ADVENTURE.walls.some(wall => { const s = saved.world.walls?.[wall.id]; return !s || typeof s.touching !== 'boolean' || typeof s.canPlay !== 'boolean' || !Number.isInteger(s.fadeTicks) || s.fadeTicks < 0 || s.fadeTicks > ADVENTURE.tuning.wallFadeTicks; })) throw new Error('Invalid world snapshot');
-    const candidate = new GameSimulation(this.map, this.physics.flyAllowed, this.physics.noWalk);
-    candidate.physics.restore(saved.physics); candidate.adventure.restore(saved.adventure);
-    this.physics.restore(candidate.physics.snapshot()); this.adventure.restore(candidate.adventure.snapshot()); this.world = structuredClone(saved.world);
+    // Chuẩn bị đủ ba phần trước khi ghi state, giữ restore nguyên vẹn nếu validation lỗi.
+    const physics = this.physics.prepareRestore(saved.physics), adventure = this.adventure.prepareRestore(saved.adventure), world = structuredClone(saved.world);
+    physics(); adventure(); this.world = world;
   }
   tick(input: PlayerInput, respawnOnSplat = false) {
     const movement = this.physics.tick(input);

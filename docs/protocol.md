@@ -156,7 +156,7 @@ kind COMMUNITY/ROOM; host/settings null cho Community. Member={playerId,nickname
 
 Room state là WAITING/COUNTDOWN/PLAYING/PAUSED/FINISHED; Community state=PLAYING, Pause thuộc từng lượt. pauseExpiresAt là UTC ISO-8601 chỉ khi Room PAUSED, còn lại null. currentPlay chứa metadata và kết quả nếu đã finalize; chưa có membership thì fields null, members=[]. Xác nhận/Host theo [gameplay](gameplay.md#room-và-xếp-hạng).
 
-self gồm lastProcessedInputSeq, status, metrics và full simulation để restore/replay: position/velocity, grounded/charge, direction/buffers, splat/knocked, terrain/wind, freeFlight/phasingFall, screen/ticks/jumps/falls/airChargeTicks và adventure. Mỗi peer gồm {playerId,nickname,colorSlot,state,crowned,status}; không broadcast checkpoint/secrets.
+self gồm lastProcessedInputSeq, status, metrics và full simulation để restore/replay: position/velocity, grounded/charge, direction/buffers, splat/knocked, terrain/wind, freeFlight/phasingFall, screen/ticks/jumps/falls/airChargeTicks và adventure. peers chỉ gồm người ở screen hiện tại hoặc liền kề, mỗi người có {playerId,nickname,colorSlot,state,crowned,status}; không broadcast checkpoint/secrets. players vẫn gồm toàn phòng.
 
 players=[{playerId,nickname,colorSlot,rank,currentProgress}] gồm các thành viên còn trong phòng, tối đa capacity. Server tính từ cùng state RAM với snapshot; Room dùng comparator mode, Community chỉ so độ cao hiện tại. Giữ đồng hạng, ID chỉ ổn định thứ tự; không truy vấn database theo tick.
 
@@ -168,9 +168,9 @@ Chat giữ trong RAM của từng sảnh, mất khi sảnh đóng/restart. Effec
 
 ## Prediction và lỗi
 
-Client gửi full input frame mỗi tick, kể cả không đổi phím. Server xử lý tối đa một frame/player/tick FIFO; thiếu frame dùng input cuối và không tăng ACK. Hết input timeout xóa queue/cancel charge; reconnect/resync nếu cần, không biến mất input thành release-jump.
+Client gửi full input frame mỗi tick, kể cả không đổi phím. Server xử lý tối đa một frame/player/tick FIFO; thiếu frame dùng input cuối và không tăng ACK. Hết input timeout xóa queue/cancel charge. Nếu vẫn nhận input mới nhưng frame cũ chờ quá input timeout (mặc định 500 ms), đóng socket với code 1013, hủy charge và dùng luồng reconnect để resync; không ACK frame bị hủy hoặc biến mất input thành release-jump.
 
-ACK và state lấy cùng tick. Client restore snapshot mới hơn, bỏ frames đã ACK rồi replay frames còn lại; remote interpolation theo serverTick. Replay không phát lại âm thanh, hội thoại hoặc ending. Pause yêu cầu cancel/xóa queued input; pausePending không nhận movement mới. Resume Community/Room trả full state và generation mới cho players chịu tác động; Room Resume broadcast state. Server vẫn xử lý heartbeat/chat/reconnect/Leave và deadline khi PAUSED. Đổi playId/generation phải xóa prediction buffers; heartbeat không tăng active clock.
+ACK và state lấy cùng tick. Client restore snapshot mới hơn, bỏ frames đã ACK rồi replay frames còn lại. Peers dùng bộ đệm theo serverTick, mặc định trễ hiển thị 100 ms để hấp thụ jitter; hiệu chỉnh clock từ từ, không extrapolate, không nội suy xuyên screen/respawn. Các giá trị tập trung tại network/config.ts. Replay không phát lại âm thanh, hội thoại hoặc ending. Pause yêu cầu cancel/xóa queued input; pausePending không nhận movement mới. Resume Community/Room trả full state và generation mới cho players chịu tác động; Room Resume broadcast state. Server vẫn xử lý heartbeat/chat/reconnect/Leave và deadline khi PAUSED. Đổi playId/generation phải xóa prediction buffers; heartbeat không tăng active clock.
 
 Control timeout: GET_ROOM_STATE/reconnect, không tự gửi lại Start/New Run/End. Duplicate requestId trả kết quả cũ; New Run kiểm tra thêm expectedRunId. Bỏ message socket/context cũ; đóng connection phải kết thúc pending promises.
 

@@ -38,6 +38,49 @@ class RoomRaceIT {
         long previous = client.ok("GET_ROOM_STATE", Map.of()).path("currentPlay").path("elapsedTimeMs").asLong(); time.advance(milliseconds);
         client.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT") && message.path("payload").path("elapsedTimeMs").asLong() > previous);
     }
+    @Test void staleInputDisconnectsOnlyTheAffectedPlayerAndReconnectCancelsCharge() throws Exception {
+        try (var a = new GameClient(port); var b = new GameClient(port)) {
+            a.guest(); b.guest(); a.connect(); b.connect();
+            var join = a.ok("CREATE_ROOM", Map.of("nickname", "Host")); String id = join.path("roomId").asText();
+            b.ok("JOIN_ROOM", Map.of("roomId", id, "nickname", "Peer")); a.ok("START_GAME", Map.of());
+            time.advance(3000); String play = a.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT")).path("payload").path("playId").asText();
+            for (int seq = 1; seq <= 40; seq++) a.input(Map.of("playId", play, "generation", 1, "seq", seq, "left", false, "right", false, "jump", true));
+            a.ok("GET_ROOM_STATE", Map.of()); step(b, 499);
+            a.input(Map.of("playId", play, "generation", 1, "seq", 41, "left", false, "right", false, "jump", false));
+            a.ok("GET_ROOM_STATE", Map.of()); time.advance(1);
+            GameClient.until(a.socket::isInputClosed);
+            assertThat(b.ok("GET_ROOM_STATE", Map.of()).path("state").asText()).isEqualTo("PLAYING");
+            a.connect(); var context = a.ok("RECONNECT", Map.of("roomId", id, "playerId", join.path("playerId").asText(), "reconnectToken", join.path("reconnectToken").asText()));
+            assertThat(context.path("generation").asInt()).isEqualTo(2);
+            var state = a.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT") && message.path("payload").path("generation").asInt() == 2).path("payload");
+            assertThat(state.path("self").path("lastProcessedInputSeq").asLong()).isZero();
+            assertThat(state.path("self").path("simulation").path("physics").path("charge").asInt()).isZero();
+            assertThat(state.path("self").path("simulation").path("physics").path("jumps").asInt()).isZero();
+            b.ok("END_MATCH", Map.of()); a.ok("LEAVE_ROOM", Map.of()); b.ok("LEAVE_ROOM", Map.of());
+        }
+    }
+    @Test void distantPlayersRemainRankedWithoutBroadcastingTheirPose() throws Exception {
+        try (var a = new GameClient(port); var b = new GameClient(port)) {
+            a.guest(); b.guest(); a.connect(); b.connect();
+            String id = a.ok("CREATE_ROOM", Map.of("nickname", "Host")).path("roomId").asText();
+            String peer = b.ok("JOIN_ROOM", Map.of("roomId", id, "nickname", "Peer")).path("playerId").asText();
+            a.ok("START_GAME", Map.of()); time.advance(3000); a.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT"));
+            var room = ((Map<?, ?>) org.springframework.test.util.ReflectionTestUtils.getField(server, "rooms")).get(id);
+            var actor = (jumpking.network.SerialExecutor) org.springframework.test.util.ReflectionTestUtils.getField(room, "actor");
+            var restored = new java.util.concurrent.CompletableFuture<Void>();
+            actor.execute(() -> {
+                try {
+                    var match = (RoomMatch) org.springframework.test.util.ReflectionTestUtils.getField(room, "match");
+                    var game = match.players.get(peer).game; var state = game.physics().snapshot(); state.x = 200; state.y = -1000; state.screen = 3; state.grounded = false;
+                    game.physics().restore(state); restored.complete(null);
+                } catch (Throwable error) { restored.completeExceptionally(error); }
+            }); restored.get(8, TimeUnit.SECONDS);
+            time.advance(50);
+            var snapshot = a.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT") && message.path("payload").path("peers").isEmpty()).path("payload");
+            assertThat(snapshot.path("players").size()).isEqualTo(2);
+            a.ok("END_MATCH", Map.of()); a.ok("LEAVE_ROOM", Map.of()); b.ok("LEAVE_ROOM", Map.of());
+        }
+    }
     @Test void minimumPlayersPermissionsAndCountdownCancellationDoNotCreateHistory() throws Exception {
         try (var a = new GameClient(port); var b = new GameClient(port); var extra = new GameClient(port)) {
             for (var client : List.of(a, b, extra)) { client.guest(); client.connect(); }

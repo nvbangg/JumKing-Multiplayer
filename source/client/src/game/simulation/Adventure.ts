@@ -72,6 +72,10 @@ export class Adventure {
     return events;
   }
   restore(value: unknown): void {
+    this.prepareRestore(value)();
+  }
+
+  prepareRestore(value: unknown): () => void {
     if (!value || typeof value !== 'object') throw new Error('Invalid adventure snapshot');
     const version = (value as { codecVersion?: unknown }).codecVersion;
     const saved = value as AdventureState;
@@ -87,6 +91,7 @@ export class Adventure {
       if (!s || [s.wait, s.line, s.ticks].some(value => !count(value)) || s.wait > T.readableWaitTicks || s.line >= definition.lineLengths.length || typeof s.done !== 'boolean') throw new Error('Invalid readable snapshot');
     }
     // Save v1 giữ tiến độ hội thoại; các trường vật phẩm đã bỏ không đi vào snapshot mới.
-    this.state = structuredClone({ codecVersion: 2, flags: saved.flags.filter(flag => flag === 'CompletedNormalGame'), dialogue: saved.dialogue, readables: saved.readables });
+    const restored: AdventureState = structuredClone({ codecVersion: 2, flags: saved.flags.filter(flag => flag === 'CompletedNormalGame'), dialogue: saved.dialogue, readables: saved.readables });
+    return () => { this.state = restored; };
   }
 }

@@ -86,7 +86,8 @@ public final class GameConnection {
     public synchronized void send(String type, Object payload) { enqueue(envelope(type, payload), false); }
     public synchronized void snapshot(Object payload) { enqueue(envelope("GAME_SNAPSHOT", payload), true); }
     private ObjectNode envelope(String type, Object payload) {
-        var result = json.createObjectNode().put("v", 1).put("type", type); result.set("payload", json.valueToTree(payload)); return result;
+        var result = json.createObjectNode().put("v", 1).put("type", type);
+        result.set("payload", payload instanceof JsonNode node ? node : json.valueToTree(payload)); return result;
     }
     private void enqueue(ObjectNode envelope, boolean snapshot) {
         if (!open()) return;

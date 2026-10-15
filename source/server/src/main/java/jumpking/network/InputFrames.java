@@ -7,9 +7,10 @@ import jumpking.game.PlayerInput;
 /** Chỉ ACK frame đã xử lý; timeout hủy charge, không giả lập thả Jump. */
 public final class InputFrames {
     public record Frame(long seq, PlayerInput input, boolean cancel) {}
+    private record Queued(Frame frame, long receivedAt) {}
     private final int capacity;
     private final long timeoutNs;
-    private final ArrayDeque<Frame> queue = new ArrayDeque<>();
+    private final ArrayDeque<Queued> queue = new ArrayDeque<>();
     private String playId;
     private long generation, accepted, processed, lastReceived;
     private PlayerInput held = PlayerInput.NEUTRAL;
@@ -30,15 +31,19 @@ public final class InputFrames {
         if (Boolean.TRUE.equals(input.freeFlight()) && !flyAllowed) throw new ApiException(400, "INVALID_INPUT", "Flight is disabled");
         if (cancel) queue.clear();
         if (queue.size() >= capacity) throw new ApiException(429, "RATE_LIMITED", "Input queue is full; reconnect to resync");
-        queue.add(new Frame(seq, input, cancel)); accepted = seq; lastReceived = now;
+        queue.add(new Queued(new Frame(seq, input, cancel), now)); accepted = seq; lastReceived = now;
     }
     public Frame poll(long now) {
         if (lastReceived == 0 || now - lastReceived >= timeoutNs) { clear(); return new Frame(processed, held, true); }
-        Frame next = queue.poll();
+        Queued queued = queue.poll();
+        Frame next = queued == null ? null : queued.frame();
         if (next == null) return new Frame(processed, held, false);
         processed = next.seq(); held = next.cancel() ? PlayerInput.NEUTRAL : next.input(); return next;
     }
     public long processed() { return processed; }
     public int pending() { return queue.size(); }
+    public boolean requiresResync(long now) {
+        return !queue.isEmpty() && now - lastReceived < timeoutNs && now - queue.peek().receivedAt() >= timeoutNs;
+    }
     public void clear() { queue.clear(); held = PlayerInput.NEUTRAL; }
 }

@@ -25,6 +25,10 @@ export class Simulation {
   snapshot(): PlayerState { return { ...this.state, directions: [...this.state.directions] }; }
 
   restore(state: PlayerState): void {
+    this.prepareRestore(state)();
+  }
+
+  prepareRestore(state: PlayerState): () => void {
     if (state.codecVersion !== 1 || !Array.isArray(state.directions) || state.directions.length > P.directionBuffer
       || state.directions.some(value => ![-1, 0, 1].includes(value))) throw new Error('Invalid simulation snapshot');
     const booleans = ['grounded', 'prevJump', 'jumpConsumed', 'knocked', 'ice', 'snow', 'wind', 'freeFlight', 'phasingFall'] as const;
@@ -36,8 +40,11 @@ export class Simulation {
       || state.charge > P.chargeTicks || state.splat > P.splatTicks
       || state.x < -P.bodyWidth / 2 || state.x > this.map.width - P.bodyWidth / 2
       || state.y < -this.map.screenHeight * this.map.screens.length || state.y > this.map.screenHeight) throw new Error('Invalid simulation snapshot');
-    this.state = { ...state, directions: [...state.directions] };
-    if (!this.flyAllowed && this.state.freeFlight) this.setFlight(false);
+    const restored = { ...state, directions: [...state.directions] };
+    return () => {
+      this.state = restored;
+      if (!this.flyAllowed && this.state.freeFlight) this.setFlight(false);
+    };
   }
 
   cancelInput(): void {

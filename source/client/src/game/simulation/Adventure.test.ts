@@ -44,6 +44,16 @@ test('old save retains dialogue and completion while dropping removed item state
   expect(adventure.snapshot()).toEqual({ ...saved, flags: ['CompletedNormalGame'] });
   expect(Object.keys(adventure.snapshot()).sort()).toEqual(['codecVersion', 'dialogue', 'flags', 'readables']);
 });
+
+test('game restore validates every component before applying and copies caller-owned data', () => {
+  const game = new GameSimulation(map); game.tick(NEUTRAL_INPUT); const before = game.snapshot();
+  const invalid = structuredClone(before); invalid.physics.x += 10; invalid.adventure.dialogue.old_man!.wait = -1;
+  expect(() => game.restore(invalid)).toThrow(); expect(game.snapshot()).toEqual(before);
+  const saved = structuredClone(before); saved.physics.x += 5; saved.adventure.flags = ['CompletedNormalGame'];
+  game.restore(saved); const restored = game.snapshot();
+  saved.physics.x = 0; saved.physics.directions.push(1); saved.adventure.flags.length = 0; saved.world.registeredScreens.push(42);
+  expect(game.snapshot()).toEqual(restored);
+});
 test('full game restores adventure and environment without changing the legitimate physics route', () => {
   const game = new GameSimulation(map);
   for (let i = 0; i < 30; i++) game.tick(NEUTRAL_INPUT);

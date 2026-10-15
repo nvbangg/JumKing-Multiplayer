@@ -98,6 +98,8 @@ Chơi toàn tuyến bằng input hợp lệ để nghiệm thu platform/charge/c
 ## Lỗi mạng, database và bảo mật
 
 - Ngắt mạng lúc charge/nhảy/countdown/Pause/Finish/save; reconnect trước/sau deadline, socket cũ/seq cũ, duplicate commands và server restart.
+- Snapshot đến muộn/dồn: peers đi đều không giật tại thời điểm nhận packet; bộ đệm có giới hạn, không extrapolate hoặc phục hồi peer đã rời. Chuyển screen/respawn/reconnect không kéo nhân vật qua map. Pose chỉ gửi trong screen hiện tại/liền kề; Players vẫn đủ toàn phòng.
+- Input FIFO giữ cạnh nhấn/thả và chỉ ACK khi consume. Input mới không che backlog quá hạn: socket bị đóng/resync, charge bị hủy an toàn và generation đổi khi reconnect; input timeout thông thường vẫn cancel. Restore lỗi ở bất kỳ phần physics/adventure/world không được sửa state đang chạy.
 - Community đang rơi vẫn chịu physics trước Pause; Resume không mất velocity/buffers hoặc tăng peak giả. Room disconnect không tạo release-jump hoặc reset đồng hồ.
 - Trì hoãn/lặp/đảo callbacks của checkpoint/Room writer và Solo sync: revision cũ, Finish/New Run/transfer/Leave/Merge không phục hồi lượt đã kết thúc, ghi sai owner hoặc tạo thêm rows. Cùng revision khác nội dung phải CONFLICT; UUID của identity/kind khác bị từ chối.
 - Tắt MySQL trong instance test: Room tick không block, Community báo lỗi/tạm dừng, không phát SAVED trước commit; retry có giới hạn và transaction atomic.

@@ -310,6 +310,13 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
             room.match.start(clock.instant()); room.state = "PLAYING"; room.nextTick = now; save(room, true); broadcast(room); snapshots(room);
         }
         if (!room.state.equals("PLAYING")) return;
+        for (var member : room.players.values()) {
+            var racer = room.match.players.get(member.id);
+            if (member.connection != null && racer != null && racer.input.requiresResync(now)) {
+                member.connection.close(new org.springframework.web.socket.CloseStatus(1013, "Input backlog; reconnect to resync"));
+                dropConnection(room, member);
+            }
+        }
         long step = 1_000_000_000L / room.match.tickRate;
         if (room.players.values().stream().noneMatch(player -> player.connection != null)) { room.nextTick = now + step; return; }
         int steps = 0;
@@ -384,6 +391,14 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         // Commands có thể đổi state mà không chạy physics; snapshot mới vẫn phải có thứ tự riêng.
         room.serverTick = Math.max(room.serverTick, room.lastSnapshotTick + 1); room.lastSnapshotTick = room.serverTick;
         var standings = json.valueToTree(match.standings(room.players.keySet()));
+        var publicStates = new HashMap<String, ObjectNode>();
+        for (var other : room.players.values()) {
+            var peer = match.players.get(other.id); if (peer == null) continue;
+            var view = json.createObjectNode().put("playerId", other.id).put("nickname", other.nickname).put("colorSlot", other.slot.color()).put("status", peer.status);
+            ObjectNode pose = json.valueToTree(peer.game.physics().snapshot());
+            pose.retain(List.of("x", "y", "vx", "vy", "grounded", "charge", "direction", "splat", "knocked", "ice", "snow", "wind", "screen", "ticks", "jumps", "falls"));
+            view.set("state", pose); view.put("crowned", peer.game.adventure().completed()); publicStates.put(other.id, view);
+        }
         for (var member : room.players.values()) {
             var self = match.players.get(member.id); if (member.connection == null || self == null) continue;
             var snapshot = json.createObjectNode().put("roomId", room.id).put("serverTick", room.serverTick).put("playId", match.id).put("generation", member.generation).put("elapsedTimeMs", match.ms(match.ticks)).put("remainingTimeMs", match.remainingMs());
@@ -391,12 +406,8 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
             var own = snapshot.putObject("self").put("lastProcessedInputSeq", self.input.processed()).put("status", self.status).put("paused", !room.state.equals("PLAYING"));
             own.set("simulation", json.valueToTree(self.game.snapshot())); own.putObject("metrics").put("currentProgress", self.game.physics().progress()).put("maxProgress", self.maximum);
             var peers = snapshot.putArray("peers");
-            for (var other : room.players.values()) {
-                var peer = match.players.get(other.id); if (peer == null || other == member) continue;
-                var publicState = peers.addObject().put("playerId", other.id).put("nickname", other.nickname).put("colorSlot", other.slot.color()).put("status", peer.status);
-                ObjectNode pose = json.valueToTree(peer.game.physics().snapshot()); pose.retain(List.of("x", "y", "vx", "vy", "grounded", "charge", "direction", "splat", "knocked", "ice", "snow", "wind", "screen", "ticks", "jumps", "falls"));
-                publicState.set("state", pose); publicState.put("crowned", peer.game.adventure().completed());
-            }
+            int screen = own.path("simulation").path("physics").path("screen").asInt();
+            publicStates.forEach((id, view) -> { if (!id.equals(member.id) && Math.abs(view.path("state").path("screen").asInt() - screen) <= 1) peers.add(view); });
             member.connection.snapshot(snapshot);
         }
     }

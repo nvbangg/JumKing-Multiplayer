@@ -95,6 +95,8 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
             long now = time.nanos(); int steps = 0;
             boolean changed = false;
             for (Member player : List.copyOf(players.values())) {
+                if (player.connection != null && player.input.requiresResync(now))
+                    player.connection.close(new org.springframework.web.socket.CloseStatus(1013, "Input backlog; reconnect to resync"));
                 if (player.connection != null && !player.connection.open()) { dropConnection(this, player); changed = true; }
                 if (player.loading || player.operation || player.leaving) continue;
                 if ((player.connection == null && now - player.disconnectedAt >= rules.path("reconnectMs").asLong() * 1_000_000L)
@@ -440,6 +442,13 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
             var player = tower.players.get(row.score().playerId());
             return new jumpking.dto.PlayerStanding(player.id, player.identity.username(), player.slot.color(), row.rank(), row.score().currentProgress());
         }).toList());
+        var publicStates = new HashMap<String, ObjectNode>();
+        for (Member peer : tower.players.values()) if (!peer.loading) {
+            var view = json.createObjectNode().put("playerId", peer.id).put("nickname", peer.identity.username()).put("colorSlot", peer.slot.color()).put("status", peer.finished ? "FINISHED" : "ACTIVE");
+            ObjectNode pose = json.valueToTree(peer.game.physics().snapshot());
+            pose.retain(List.of("x", "y", "vx", "vy", "grounded", "charge", "direction", "splat", "knocked", "ice", "snow", "wind", "screen", "ticks", "jumps", "falls"));
+            view.set("state", pose); view.put("crowned", peer.game.adventure().completed()); publicStates.put(peer.id, view);
+        }
         for (Member self : tower.players.values()) {
             if (self.loading || self.connection == null) continue;
             var value = json.createObjectNode().put("roomId", tower.id).put("serverTick", tower.serverTick).put("playId", self.stored.id()).put("generation", self.generation).put("elapsedTimeMs", ms(self.game.physics().snapshot().ticks)).putNull("remainingTimeMs");
@@ -447,12 +456,8 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
             var state = value.putObject("self").put("lastProcessedInputSeq", self.input.processed()).put("status", self.finished ? "FINISHED" : "ACTIVE").put("paused", self.paused || self.pausePending);
             state.set("simulation", json.valueToTree(self.game.snapshot())); state.set("metrics", json.valueToTree(summary(self)));
             var peers = value.putArray("peers");
-            for (Member peer : tower.players.values()) if (peer != self && !peer.loading) {
-                var p = peers.addObject().put("playerId", peer.id).put("nickname", peer.identity.username()).put("colorSlot", peer.slot.color()).put("status", peer.finished ? "FINISHED" : "ACTIVE");
-                ObjectNode pose = json.valueToTree(peer.game.physics().snapshot());
-                pose.retain(List.of("x", "y", "vx", "vy", "grounded", "charge", "direction", "splat", "knocked", "ice", "snow", "wind", "screen", "ticks", "jumps", "falls"));
-                p.set("state", pose); p.put("crowned", peer.game.adventure().completed());
-            }
+            int screen = state.path("simulation").path("physics").path("screen").asInt();
+            publicStates.forEach((id, view) -> { if (!id.equals(self.id) && Math.abs(view.path("state").path("screen").asInt() - screen) <= 1) peers.add(view); });
             self.connection.snapshot(value);
         }
     }

@@ -16,7 +16,7 @@ Tạo Guest khi cần chơi Room; GET me không tạo identity. Đổi identity 
 
 Session mặc định idle 30 phút, absolute 24 giờ; backend kiểm tra cả HTTP/WS. Hoạt động hợp lệ làm mới idle, heartbeat đơn thuần không làm mới; absolute không gia hạn. Hết session không xóa Room PAUSED trước hạn của Room; đăng nhập lại rồi reconnect theo identity/token cũ.
 
-Guest/Register/Login/Merge: 20 requests/phút theo IP và identity, đổi session không reset bucket IP. Password BCrypt; Guest token ngẫu nhiên 256 bit, lưu SHA-256 hash. Lỗi credentials không tiết lộ Account tồn tại. Reconnect token ngẫu nhiên 256 bit, hết hiệu lực khi membership kết thúc; kiểm tra owner/token bằng constant-time và thu hồi socket cũ.
+Guest/Register/Login/Merge/crown claim: 20 requests/phút theo IP và identity, đổi session không reset bucket IP. Password BCrypt; Guest token ngẫu nhiên 256 bit, lưu SHA-256 hash. Lỗi credentials không tiết lộ Account tồn tại. Reconnect token ngẫu nhiên 256 bit, hết hiệu lực khi membership kết thúc; kiểm tra owner/token bằng constant-time và thu hồi socket cũ.
 
 Client giữ context reconnect (roomId/playerId/token) trong IndexedDB theo backend origin và identity để quay lại sau đóng tab; xóa khi Leave đã xác nhận hoặc server báo hết hạn. Không chia sẻ token qua room code.
 
@@ -29,10 +29,11 @@ Các path có prefix `/api`. Auth/private responses dùng Cache-Control:no-store
 | Method/path | Request → response |
 | --- | --- |
 | GET /auth/csrf | → {token,headerName} |
-| GET /auth/me | → {authenticated,guest,account:null hoặc {id,username,email}}; id là chuỗi ID của chính Account |
+| GET /auth/me | → {authenticated,guest,crownUnlocked,account:null hoặc {id,username,email,crownUnlocked}}; id là chuỗi ID của chính Account |
 | POST /auth/guest | → cùng shape me |
 | POST /auth/register | {email,username,password} → me |
-| POST /auth/login | {email,password} → me + guestHistoryAvailable |
+| POST /auth/login | {email,password} → {authenticated,guest,account,guestHistoryAvailable} |
+| POST /profile/crown | Guest cookie + CSRF, không body → {crownUnlocked:true}; chỉ quyền ngoại hình |
 | POST /auth/logout | → {ok:true} |
 | POST /auth/guest-history/merge | → {merged:true}; bỏ qua bằng cách không gọi |
 | GET /game-config | → {physics,rules,appearances,features:{flyEnabled:boolean}} |

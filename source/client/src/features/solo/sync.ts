@@ -1,6 +1,6 @@
 import { api, ApiError, backendOrigin } from '../../network/api';
 import type { Identity } from '../../network/contracts';
-import { pendingSoloRuns, acknowledgeSolo, SOLO_SAVE_EVENT, type SoloRun } from './storage';
+import { pendingSoloRuns, acknowledgeSolo, rememberCrown, SOLO_SAVE_EVENT, type SoloRun } from './storage';
 import rules from '../../../../common/rules.json';
 const SYNC = Object.freeze({ batchSize: 5, rateBackoffMs: 60_000 });
 
@@ -11,10 +11,11 @@ export function soloMetrics(run: SoloRun) {
 }
 export async function syncSolo(profile: string, accountId: string): Promise<number> {
   if (profile !== backendOrigin() + ':account:' + accountId) throw new ApiError('CONFLICT', 'Solo profile does not match this account');
-  const pending = (await pendingSoloRuns(profile)).sort((a, b) => a.startedAt.localeCompare(b.startedAt) || a.id.localeCompare(b.id)).slice(0, SYNC.batchSize);
+  const pending = (await pendingSoloRuns(profile)).sort((a, b) => Number(b.status === 'FINISHED') - Number(a.status === 'FINISHED') || a.startedAt.localeCompare(b.startedAt) || a.id.localeCompare(b.id)).slice(0, SYNC.batchSize);
   if (!pending.length) return 0;
   const identity = await api<Identity>('/auth/me');
   if (!identity.authenticated || identity.account?.id !== accountId) throw new ApiError('UNAUTHENTICATED', 'Sign in again to sync this Solo profile');
+  if (identity.account.crownUnlocked) await rememberCrown(profile);
   for (const run of pending) {
     const ack = await api<{ revision: number; syncStatus: string }>('/solo/runs/' + run.id, 'PUT', soloMetrics(run), accountId);
     if (ack.syncStatus !== 'SAVED' || ack.revision !== run.revision) throw new ApiError('PROTOCOL_ERROR', 'The server returned an invalid Solo acknowledgement');

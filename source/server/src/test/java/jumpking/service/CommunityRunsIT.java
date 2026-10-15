@@ -77,4 +77,21 @@ class CommunityRunsIT {
         assertThatThrownBy(() -> records.save(new CommunityRuns.Write(initial.id(), owner, 20, "ACTIVE", write.snapshot(), write.progress(), write.maximum(), write.peak(), null))).isInstanceOf(ApiException.class);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM play_runs WHERE user_id=? AND kind='COMMUNITY' AND status='ACTIVE'", Integer.class, owner)).isEqualTo(1);
     }
+    @Test void finishUnlocksCrownInTheSameTransactionAndNewRunKeepsIt() throws Exception {
+        long owner = account(); var initial = records.open(owner, false, null, game().snapshot());
+        var finished = game(); finished.restore(jumpking.support.MainBabeRoute.beforeFinish(shared, json)); finished.tick(PlayerInput.NEUTRAL);
+        assertThat(finished.finished()).isTrue();
+        var write = new CommunityRuns.Write(initial.id(), owner, 2, "FINISHED", finished.snapshot(), finished.physics().progress(), finished.physics().progress(), finished.physics().snapshot().ticks, java.time.Instant.now());
+        String trigger = "crown_" + UUID.randomUUID().toString().replace("-", "");
+        jdbc.execute("CREATE TRIGGER " + trigger + " BEFORE UPDATE ON users FOR EACH ROW BEGIN IF NEW.id=" + owner + " AND NEW.crown_unlocked THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='injected crown failure'; END IF; END");
+        try { assertThatThrownBy(() -> records.save(write)).isInstanceOf(org.springframework.dao.DataAccessException.class); }
+        finally { jdbc.execute("DROP TRIGGER " + trigger); }
+        assertThat(jdbc.queryForObject("SELECT status FROM play_runs WHERE id=?", String.class, initial.id())).isEqualTo("ACTIVE");
+        assertThat(jdbc.queryForObject("SELECT crown_unlocked FROM users WHERE id=?", Boolean.class, owner)).isFalse();
+        records.save(write); records.save(write);
+        assertThat(jdbc.queryForObject("SELECT crown_unlocked FROM users WHERE id=?", Boolean.class, owner)).isTrue();
+        records.open(owner, false, null, game().snapshot());
+        assertThat(jdbc.queryForObject("SELECT crown_unlocked FROM users WHERE id=?", Boolean.class, owner)).isTrue();
+    }
+
 }

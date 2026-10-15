@@ -40,10 +40,9 @@ Các lệnh là contract của Maven/npm configuration và được nghiệm thu
 
 E2E (end-to-end) dùng Playwright thao tác trình duyệt qua UI → HTTP/WS → backend/MySQL để kiểm tra cả luồng. Chạy riêng vì cần ứng dụng đang chạy và trình duyệt, khác unit tests kiểm tra từng hàm/module.
 
-Fly dev: chạy trong terminal riêng tại `source/client/`; cổng test riêng tránh dùng nhầm server đang chạy. Các E2E mặc định kiểm tra tính năng bị khóa.
+Vite do Playwright khởi tạo lấy cờ Fly từ `E2E_FLY_ENABLED`, mặc định false, độc lập với `.env.local`. Fly dev: chạy trong terminal riêng tại `source/client/`; cổng test riêng tránh dùng nhầm server đang chạy. Các E2E mặc định kiểm tra tính năng bị khóa.
 
 ```powershell
-$env:FLY_ENABLED = 'true'
 $env:E2E_FLY_ENABLED = 'true'
 $env:E2E_PORT = '5174'
 npm run test:e2e -- e2e/fly.spec.ts

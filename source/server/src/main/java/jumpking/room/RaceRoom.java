@@ -37,14 +37,15 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     private final SharedData shared;
     private final FeatureFlags flags;
     private final PersistenceWorkers database;
+    private final jumpking.service.CrownService crowns;
     private final RoomRuns records;
     private final long saveIntervalNs;
     private final Map<String, Room> rooms = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(Thread.ofPlatform().daemon().name("room-clock").factory());
     public RaceRoom(RoomDirectory directory, Memberships memberships, GameWorkers workers, NetworkSettings limits, SessionAuthority sessions, MonotonicTime time, ObjectMapper json, SharedData shared, Clock clock,
-            FeatureFlags flags, PersistenceWorkers database, RoomRuns records, @Value("${app.checkpoint-interval-ms:1000}") long saveIntervalMs) {
+            FeatureFlags flags, PersistenceWorkers database, RoomRuns records, jumpking.service.CrownService crowns, @Value("${app.checkpoint-interval-ms:1000}") long saveIntervalMs) {
         this.directory = directory; this.memberships = memberships; this.workers = workers; this.limits = limits; this.sessions = sessions; this.time = time; this.json = json; rules = shared.rules(); this.clock = clock;
-        this.shared = shared; this.flags = flags; this.database = database; this.records = records; saveIntervalNs = saveIntervalMs * 1_000_000L;
+        this.shared = shared; this.flags = flags; this.database = database; this.records = records; this.crowns = crowns; saveIntervalNs = saveIntervalMs * 1_000_000L;
         if (saveIntervalMs < 1) throw new IllegalArgumentException("Room save interval must be positive");
     }
     private final class Member {
@@ -54,7 +55,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         final String nickname;
         final long order;
         GameConnection connection;
-        boolean confirmed = true;
+        boolean confirmed = true, crowned;
         String endingNotifiedPlay;
         long disconnectedAt, generation;
         Member(GameConnection connection, RoomDirectory.Slot slot, String nickname, long order) { this.connection = connection; identity = connection.identity(); this.slot = slot; this.nickname = nickname; this.order = order; }
@@ -152,10 +153,11 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         if (nickname.codePointCount(0, nickname.length()) > 16 || !nickname.matches("[\\p{L}\\p{M}\\p{N} _-]+")) throw new ApiException(400, "VALIDATION", "Nickname must contain 1–16 letters, numbers, spaces, underscores or hyphens");
         var settings = create && command.payload().has("settings") ? RoomSettings.parse(command.payload().get("settings"), rules) : RoomSettings.defaults();
         if (memberships.find(connection.identity().owner()) != null) throw new ApiException(409, "ALREADY_IN_ROOM", "Leave your current room first");
+        boolean crowned = crowns.unlocked(connection.identity().owner());
         var slot = create ? directory.createRoom() : directory.room(GameEnvelope.text(command.payload(), "roomId"));
         try {
             var room = rooms.computeIfAbsent(slot.roomId(), Room::new);
-            var player = new Member(connection, slot, nickname, ++room.joinOrder);
+            var player = new Member(connection, slot, nickname, ++room.joinOrder); player.crowned = crowned;
             memberships.claim(player.identity.owner(), new Memberships.Membership(room.id, player.id));
             try { room.actor.execute(() -> {
                 if (rooms.get(room.id) != room || !room.state.equals("WAITING")) {
@@ -247,6 +249,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         for (var player : List.copyOf(room.players.values())) if (!roster.contains(player)) remove(room, player, null);
         var specs = roster.stream().map(player -> new RoomMatch.Spec(player.id, player.identity.owner(), player.nickname, player.slot.color(), ++player.generation)).toList();
         room.match = new RoomMatch(room.id, room.settings, specs, shared, json, limits, flags.flyEnabled()); room.writer = database.writer(records::save);
+        for (var player : roster) if (player.crowned) room.match.players.get(player.id).game.adventure().complete();
         room.state = "COUNTDOWN"; room.countdownAt = time.nanos() + rules.path("countdownMs").asLong() * 1_000_000L; directory.joinable(room.id, false);
         for (var player : roster) player.connection.send("GAME_STARTED", Map.of("playId", room.match.id, "generation", player.generation, "countdownMs", rules.path("countdownMs").asLong()));
         broadcast(room);
@@ -335,6 +338,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         var match = room.match; if (match == null || !match.saveStatus.equals("SAVED") || member.connection == null || match.id.equals(member.endingNotifiedPlay)) return;
         var player = match.players.get(member.id);
         if (player == null || !player.winner || player.ending == null) return;
+        member.crowned = true;
         member.connection.send("PLAYER_FINISHED", Map.of("playerId", member.id, "playId", match.id, "result", match.results(), "showEnding", true, "ending", player.ending));
         member.endingNotifiedPlay = match.id;
     }

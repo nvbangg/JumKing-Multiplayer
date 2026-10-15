@@ -48,11 +48,11 @@ test('Guest Room history offers Skip and merges only after explicit confirmation
     await page.getByRole('button', { name: 'Sign In', exact: true }).click();
     await page.getByLabel('Email', { exact: true }).fill(email); await page.getByLabel('Password', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Sign In', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Merge Guest Room History', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Merge Guest Progress', exact: true })).toBeVisible();
   };
   await page.goto('/'); await signIn(); await page.getByRole('button', { name: 'Skip', exact: true }).click();
   await page.getByRole('button', { name, exact: true }).click(); await page.getByRole('button', { name: 'Sign Out', exact: true }).click();
-  await signIn(); await page.getByRole('button', { name: 'Merge Guest Room History', exact: true }).click();
+  await signIn(); await page.getByRole('button', { name: 'Merge Guest Progress', exact: true }).click();
   await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
   expect((await context.cookies()).find(cookie => cookie.name === 'JK_GUEST')).toBeUndefined();
 });

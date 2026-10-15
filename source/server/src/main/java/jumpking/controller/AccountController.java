@@ -44,7 +44,7 @@ public class AccountController {
         if (identity.account() != null) throw new ApiException(409, "CONFLICT", "Sign out before creating another account");
         var account = accounts.register(form, guests.resolve(request), value -> signIn(value, request, response));
         guests.clear(response);
-        return new AccountDto.Me(true, false, account);
+        return new AccountDto.Me(true, false, account, account.crownUnlocked());
     }
     @PostMapping("/login") public LoginResponse login(@Valid @RequestBody AccountCredentials.Login form,
             HttpServletRequest request, HttpServletResponse response) {

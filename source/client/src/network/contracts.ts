@@ -1,5 +1,5 @@
-export interface Account { id: string; username: string; email: string }
-export interface Identity { authenticated: boolean; guest: boolean; account: Account | null; guestHistoryAvailable?: boolean }
+export interface Account { id: string; username: string; email: string; crownUnlocked: boolean }
+export interface Identity { authenticated: boolean; guest: boolean; account: Account | null; guestHistoryAvailable?: boolean; crownUnlocked?: boolean }
 export interface Statistics {
   totalPlayTimeMs: number; totalJumps: number; totalFalls: number; finishes: number;
   matchesPlayed: number; wins: number; bestFinishTimeMs: number | null;

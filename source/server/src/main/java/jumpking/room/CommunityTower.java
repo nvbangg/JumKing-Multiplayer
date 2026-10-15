@@ -40,11 +40,12 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
     private final Map<String, Tower> towers = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(Thread.ofPlatform().daemon().name("world-clock").factory());
     private final PersistenceWorkers database;
+    private final jumpking.service.CrownService crowns;
     private final long checkpointMs;
     public CommunityTower(GameWorkers workers, PersistenceWorkers database, RoomDirectory directory, Memberships memberships, CommunityRuns records,
-            ObjectMapper json, NetworkSettings limits, SharedData shared, FeatureFlags flags, SessionAuthority sessions, Clock clock, MonotonicTime time,
+            ObjectMapper json, NetworkSettings limits, SharedData shared, FeatureFlags flags, SessionAuthority sessions, Clock clock, MonotonicTime time, jumpking.service.CrownService crowns,
             @Value("${app.checkpoint-interval-ms:1000}") long checkpointMs) {
-        this.workers = workers; this.database = database; this.directory = directory; this.memberships = memberships; this.records = records; this.json = json;
+        this.workers = workers; this.database = database; this.directory = directory; this.memberships = memberships; this.records = records; this.crowns = crowns; this.json = json;
         this.limits = limits; this.flags = flags; this.sessions = sessions; this.clock = clock; this.time = time; this.checkpointMs = checkpointMs;
         if (checkpointMs < 1) throw new IllegalArgumentException("Checkpoint interval must be positive");
         map = json.convertValue(shared.map(), GameMap.class); physics = new Physics(json.convertValue(shared.physics(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Number>>() {}));
@@ -228,6 +229,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
             try { database.execute(() -> {
                 try {
                     var game = new GameSimulation(map, physics, adventure, flags.flyEnabled(), false);
+                    if (crowns.unlocked(player.identity.owner())) game.adventure().complete();
                     var stored = records.open(player.identity.owner(), true, expected, game.snapshot());
                     tower.actor.complete(() -> {
                         player.game = game; player.stored = stored; player.revision = player.savedRevision = stored.revision(); player.maximum = 0; player.peakTicks = 0;
@@ -269,6 +271,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                     try {
                         var game = new GameSimulation(map, physics, adventure, flags.flyEnabled(), false);
                         var stored = records.open(player.identity.owner(), replace, expected, game.snapshot()); game.restore(stored.snapshot()); game.physics().cancelInput();
+                        if (crowns.unlocked(player.identity.owner())) game.adventure().complete();
                         tower.actor.complete(() -> {
                             player.game = game; player.stored = stored; player.revision = player.savedRevision = stored.revision(); player.maximum = stored.maximum(); player.peakTicks = stored.peak(); player.loading = false;
                             player.input.reset(stored.id(), player.generation); player.lastPhysical = time.nanos();

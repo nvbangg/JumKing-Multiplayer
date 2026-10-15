@@ -8,7 +8,7 @@ Website game Jump King với một map Main Babe đầy đủ, hỗ trợ chơi 
 | Community Tower | Account chơi cùng sảnh, lưu tiến độ trên server và tính leaderboard |
 | Room | Tạo phòng, Join by ID, tối thiểu 2 người và Host Start; Race, Hardcore, Time Limit hoặc No Walk; Results và History |
 
-Frontend dùng React + TypeScript/Phaser; backend Spring Boot/Java quyết định trạng thái và kết quả online. Spring Data JPA/Hibernate truy cập MySQL để lưu identity, lượt chơi và trận Room. Thống kê tổng và History gồm Solo, Community và Room; Guest có thể Merge lịch sử Room vào Account. Luật chơi trong [gameplay](docs/gameplay.md); tiến độ triển khai trong [PLAN](PLAN.md).
+Frontend dùng React + TypeScript/Phaser; backend Spring Boot/Java quyết định trạng thái và kết quả online. Spring Data JPA/Hibernate truy cập MySQL để lưu identity, lượt chơi và trận Room. Thống kê tổng và History gồm Solo, Community và Room; Guest có thể Merge lịch sử Room và crown vào Account. Luật chơi trong [gameplay](docs/gameplay.md); tiến độ triển khai trong [PLAN](PLAN.md).
 
 ## Kiến trúc
 

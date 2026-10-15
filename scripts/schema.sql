@@ -9,6 +9,7 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NULL,
     guest_token_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
     merged_into_user_id BIGINT NULL,
+    crown_unlocked BOOLEAN NOT NULL DEFAULT FALSE,
     created_at DATETIME(3) NOT NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uq_users_username (username),

@@ -169,6 +169,8 @@ Persistence online dùng PENDING/SAVED/FAILED; SAVED chỉ sau commit. Solo tác
 
 User, PlayRun và Match ánh xạ ba bảng; Service sở hữu transaction, Repository sở hữu truy vấn. Không serialize Entity. Chỉ đọc snapshot khi Continue/save, dùng projection cho Stats/History/leaderboard. `revision` giữ thứ tự payload và chống retry khác nội dung, không thay bằng optimistic version của ORM. Các thao tác merge/New Run/writer khóa owner theo thứ tự rồi khóa lượt trong transaction.
 
-`users.crown_unlocked` chỉ chuyển false → true khi có full Finish, hoặc Merge từ Guest đã mở. `matches.map_level` mặc định 10 cho dữ liệu hiện có, trong [1,10]; Public/Private là metadata phòng RAM, không cần lưu khi match kết thúc. Best Finish Time bỏ Room map_level<10; counters/Finishes/Room Wins vẫn tính.
+`users.crown_unlocked` chỉ chuyển false → true khi có full Finish, hoặc Merge từ Guest đã mở. Guest Solo gửi riêng quyền crown khi vào Room; đây là ngoại hình tự khai báo, không gửi save/history/metrics hoặc ảnh hưởng leaderboard. Guest nhận crown online lưu lại trong profile trình duyệt.
+
+`matches.map_level` mặc định 10 cho dữ liệu hiện có, trong [1,10]; Public/Private là metadata phòng RAM, không cần lưu khi match kết thúc. Best Finish Time bỏ Room map_level<10; counters/Finishes/Room Wins vẫn tính.
 
 Cập nhật database có sẵn bằng SQL additive theo deployment, không reset. Hibernate `validate` không thay thế kiểm thử CHECK/unique/FK trong MySQL thật.

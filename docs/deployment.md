@@ -88,7 +88,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON jumpking.* TO 'jumpking_app'@'127.0.0.1'
 
 4. Điền datasource; backend chỉ kiểm tra schema, không tự reset/update và không chạy bằng root.
 
-mysql CLI: từ root chạy `SOURCE scripts/schema.sql;`. Workbench: File → Open SQL Script → schema.sql → Execute. Database có dữ liệu dùng SQL nâng cấp riêng, không chạy lại DDL tạo mới.
+mysql CLI: từ root chạy `SOURCE scripts/schema.sql;`. Workbench: File → Open SQL Script → schema.sql → Execute. Database có dữ liệu dùng SQL nâng cấp riêng, không chạy lại DDL tạo mới. Nếu bảng `users` chưa có `crown_unlocked`, chạy `scripts/upgrade-crown.sql` một lần trước khi khởi động bản mới; script giữ dữ liệu và cấp crown từ những lượt full Finish đã lưu.
 
 Backup bằng mysqldump/Workbench vào `.local/backups/`, dùng prompt nhập password hoặc cấu hình riêng. Thử restore vào instance cô lập, kiểm tra dữ liệu trước thay database thật; không commit dump. [MySQL CREATE USER](https://dev.mysql.com/doc/refman/8.4/en/create-user.html)
 

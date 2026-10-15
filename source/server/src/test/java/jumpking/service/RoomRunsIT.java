@@ -48,7 +48,10 @@ class RoomRunsIT {
             assertThat(jdbc.queryForObject("SELECT duration_ticks FROM matches WHERE id=?", Long.class, match)).isEqualTo(60);
             assertThat(jdbc.queryForObject("SELECT ended_at FROM matches WHERE id=?", java.sql.Timestamp.class, match)).isNull();
             assertThat(jdbc.queryForObject("SELECT jumps FROM play_runs WHERE id=?", Integer.class, a)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT crown_unlocked FROM users WHERE id=?", Boolean.class, users.get(2))).isFalse();
             records.save(finish); records.save(finish); records.save(update);
+            assertThat(jdbc.queryForObject("SELECT crown_unlocked FROM users WHERE id=?", Boolean.class, users.get(2))).isTrue();
+            assertThat(jdbc.queryForObject("SELECT crown_unlocked FROM users WHERE id=?", Boolean.class, users.get(1))).isFalse();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM play_runs WHERE match_id=?", Integer.class, match)).isEqualTo(2);
             assertThat(jdbc.queryForObject("SELECT user_id FROM play_runs WHERE id=?", Long.class, a)).isEqualTo(users.get(2));
             assertThat(jdbc.queryForObject("SELECT jumps FROM play_runs WHERE id=?", Integer.class, a)).isEqualTo(2);

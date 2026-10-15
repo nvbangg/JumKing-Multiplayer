@@ -23,7 +23,7 @@ import jumpking.security.SessionAuthority;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public class HttpBoundaryFilter extends OncePerRequestFilter {
-    private static final Set<String> AUTH_MUTATIONS = Set.of("/api/auth/guest", "/api/auth/register", "/api/auth/login", "/api/auth/guest-history/merge");
+    private static final Set<String> AUTH_MUTATIONS = Set.of("/api/profile/crown", "/api/auth/guest", "/api/auth/register", "/api/auth/login", "/api/auth/guest-history/merge");
     private final SecuritySettings settings;
     private final SessionAuthority sessions;
     private final AuthRateLimiter limits;

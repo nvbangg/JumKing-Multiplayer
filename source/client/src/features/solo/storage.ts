@@ -18,6 +18,22 @@ export interface SoloRun {
 }
 interface Profile { key: string; activeRunId: string | null; writerId: string | null; leaseExpiresAt: number; crownUnlocked: boolean }
 
+export async function hasCrown(profile: string): Promise<boolean> {
+  const db = await openStore();
+  try { return (await request<Profile | undefined>(db.transaction('profiles').objectStore('profiles').get(profile)))?.crownUnlocked === true; }
+  finally { db.close(); }
+}
+
+export async function rememberCrown(profile: string): Promise<void> {
+  const db = await openStore();
+  try {
+    const tx = db.transaction('profiles', 'readwrite'), done = completed(tx), profiles = tx.objectStore('profiles');
+    const saved: Profile | undefined = await request(profiles.get(profile));
+    profiles.put({ key: profile, activeRunId: null, writerId: null, leaseExpiresAt: 0, ...saved, crownUnlocked: true });
+    await done;
+  } finally { db.close(); }
+}
+
 export class StorageUnavailable extends Error {
   constructor(message = 'Browser storage is unavailable. This game cannot be saved.') { super(message); }
 }
@@ -142,6 +158,9 @@ export class SoloWriter {
           finishTicks: null, startedAt: new Date().toISOString(), endedAt: null, snapshot: { ...structuredClone(initial), adventure: adventure.snapshot() },
         };
         runs.put(run);
+      }
+      if (existing?.crownUnlocked && run.snapshot) {
+        const adventure = new Adventure(map); adventure.restore(run.snapshot.adventure); adventure.complete(); run.snapshot.adventure = adventure.snapshot();
       }
       profiles.put({ key: profile, activeRunId: run.id, writerId, leaseExpiresAt: Date.now() + STORE.writerLeaseMs, crownUnlocked: existing?.crownUnlocked || false } satisfies Profile);
       await done;

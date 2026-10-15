@@ -24,7 +24,7 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 ## Phase 03 — Tinh giản nội dung
 
 - [x] Bỏ Inventory/items/mua bán/quest nhận đồ khỏi simulation/common/protocol/UI và nhánh ending phụ; giữ NPC/hội thoại, môi trường, một ending cơ bản và save hiện có.
-- [ ] Thêm crown profile tự mở bằng full Finish, Merge/local/sync; SQL nâng cấp không reset dữ liệu.
+- [x] Thêm crown profile tự mở bằng full Finish, Merge/local/sync; SQL nâng cấp không reset dữ liệu.
 
 ## Phase 04 — Room và map
 
@@ -72,6 +72,8 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 | Cấu trúc theo học phần | PASS — source/client, source/server, source/common; Maven/Vite/scripts và hướng dẫn chạy đã đồng bộ. 68 client unit tests, 51 Java unit tests, 71 MySQL integration PASS và 1 load opt-in SKIP; 57 Chrome PASS (27 client, 30 online/JAR), build và 72 links/anchors PASS. Sơ đồ architecture/protocol đã render kiểm tra; dữ liệu/cấu hình riêng và tài liệu học phần được giữ nguyên. Báo cáo, thực nghiệm mới và nghiệm thu hai thiết bị vẫn thuộc Phase 07. |
 
 | Phase 03 — Bỏ Inventory | PASS — 66 client unit tests, 48 Java unit tests; 71 MySQL integration PASS, 1 load opt-in SKIP; 27 Chrome client PASS (renderer đã chạy lại sau cập nhật assertion) và 30 Chrome online/JAR PASS. Giữ route hợp lệ 43 screen, NPC/readables, save cũ và ending cơ bản/Skip; loại 9 assets không còn dùng, import nội dung lặp lại cho cùng dữ liệu. Build, 72 links/anchors và diff check PASS. Crown profile server/Merge/sync thuộc checkbox tiếp theo; chưa thay schema/database cá nhân. |
+
+| Phase 03 — Crown profile | PASS — 66 client unit, 48 Java unit; 74 MySQL integration PASS và 1 load opt-in SKIP, flakes=0; 31 Chrome online/JAR, 27 client và 3 Fly dev PASS. Guest mang crown Solo sang Room; Account giữ crown trên thiết bị mới, không chuyển checkpoint. Merge/registration, retry và rollback cùng kết quả đã kiểm chứng. SQL nâng cấp đã áp dụng trên MySQL, giữ dữ liệu; build, links/anchors và diff check PASS. E2E dùng cờ Fly riêng, không sửa cấu hình cá nhân. |
 
 ## Lịch sử triển khai trước thay đổi kiến trúc
 

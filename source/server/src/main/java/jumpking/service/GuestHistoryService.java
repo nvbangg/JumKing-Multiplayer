@@ -33,6 +33,7 @@ public class GuestHistoryService {
             }
             runs.transferRoomRuns(source, target);
             var user = users.findById(source).orElseThrow();
+            if (user.isCrownUnlocked()) users.findById(target).orElseThrow().setCrownUnlocked(true);
             user.setGuestTokenHash(null); user.setMergedIntoUserId(target);
             return true;
         }));

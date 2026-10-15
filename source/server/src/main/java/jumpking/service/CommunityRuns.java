@@ -26,8 +26,9 @@ public class CommunityRuns {
     private final PlayRunRepository runs;
     private final ObjectMapper json;
     private final RunOwners owners;
+    private final CrownService crowns;
     private final Clock clock;
-    public CommunityRuns(PlayRunRepository runs, ObjectMapper json, RunOwners owners, Clock clock) { this.runs = runs; this.json = json; this.owners = owners; this.clock = clock; }
+    public CommunityRuns(PlayRunRepository runs, ObjectMapper json, RunOwners owners, CrownService crowns, Clock clock) { this.runs = runs; this.json = json; this.owners = owners; this.crowns = crowns; this.clock = clock; }
     public Stored open(long account, boolean replace, String expected, GameSimulation.Snapshot spawn) {
         return owners.write(account, owner -> {
             if (!owners.read(owner).type().equals("ACCOUNT")) throw new ApiException(403, "ACCOUNT_REQUIRED", "Sign in to play Community Tower");
@@ -74,7 +75,9 @@ public class CommunityRuns {
             run.setRevision(next.revision()); run.setStatus(next.status()); run.setPlayTicks(state.ticks); run.setJumps(state.jumps); run.setFalls(state.falls);
             run.setCurrentProgress(next.progress()); run.setMaxProgress(next.maximum()); run.setPeakReachedTicks(next.peak());
             run.setFinishTicks(next.status().equals("FINISHED") ? state.ticks : null); run.setSnapshot(active ? encode(next.snapshot()) : null);
-            run.setEndedAt(next.endedAt()); run.setUpdatedAt(clock.instant()); runs.flush();
+            run.setEndedAt(next.endedAt()); run.setUpdatedAt(clock.instant());
+            if (next.status().equals("FINISHED")) crowns.unlock(owner);
+            runs.flush();
             return null;
         });
     }

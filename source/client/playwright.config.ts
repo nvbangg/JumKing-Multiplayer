@@ -14,6 +14,7 @@ export default defineConfig({
     launchOptions: process.env.E2E_BROWSER_PATH ? { executablePath: process.env.E2E_BROWSER_PATH } : {},
   },
   webServer: process.env.E2E_BASE_URL ? undefined : {
+    env: { FLY_ENABLED: process.env.E2E_FLY_ENABLED === 'true' ? 'true' : 'false' },
     command: 'npm run dev -- --port ' + port, url: localUrl, reuseExistingServer: !process.env.CI && !process.env.E2E_PORT,
   },
 });

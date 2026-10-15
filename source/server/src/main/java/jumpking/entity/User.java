@@ -25,6 +25,8 @@ public class User {
     private String guestTokenHash;
     @Column(name = "merged_into_user_id")
     private Long mergedIntoUserId;
+    @Column(name = "crown_unlocked", nullable = false, columnDefinition = "boolean")
+    private boolean crownUnlocked;
     @JdbcTypeCode(SqlTypes.TIMESTAMP)
     @Column(name = "created_at", columnDefinition = "datetime(3)")
     private Instant createdAt;
@@ -51,5 +53,7 @@ public class User {
     public Long getMergedIntoUserId() { return mergedIntoUserId; }
     public void setMergedIntoUserId(Long value) { mergedIntoUserId = value; }
     public Instant getCreatedAt() { return createdAt; }
+    public boolean isCrownUnlocked() { return crownUnlocked; }
+    public void setCrownUnlocked(boolean value) { crownUnlocked = value; }
     public void setCreatedAt(Instant value) { createdAt = value; }
 }

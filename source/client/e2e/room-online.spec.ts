@@ -65,11 +65,15 @@ test('two Guest browsers Start together, jump and End Match with saved Results a
   try {
     for (const context of [first, second]) await context.addInitScript(() => { if (location.protocol.startsWith('http')) localStorage.setItem('jumpking.options', JSON.stringify({ sound: false, displayTimer: true })); });
     const a = await first.newPage(), b = await second.newPage();
-    await a.goto('/'); await a.getByRole('button', { name: 'Play with Friends', exact: true }).click(); await a.getByLabel('Nickname', { exact: true }).fill('Race Host'); await a.getByRole('button', { name: 'Create Room', exact: true }).click();
+    const snapshots: { peers: { nickname: string; crowned: boolean }[] }[] = [];
+    b.on('websocket', socket => socket.on('framereceived', frame => { const message = JSON.parse(frame.payload.toString()); if (message.type === 'GAME_SNAPSHOT') snapshots.push(message.payload); }));
+    await a.goto('/');
+    await a.evaluate(async () => { const path = '/src/features/solo/storage.ts', { rememberCrown } = await import(path); await rememberCrown('guest'); }); await a.getByRole('button', { name: 'Play with Friends', exact: true }).click(); await a.getByLabel('Nickname', { exact: true }).fill('Race Host'); await a.getByRole('button', { name: 'Create Room', exact: true }).click();
     await expect(a.getByRole('button', { name: 'Start', exact: true })).toBeDisabled(); const room = await a.locator('.room-code code').innerText();
     await b.goto('/'); await b.getByRole('button', { name: 'Join by ID', exact: true }).click(); await b.getByLabel('Room ID', { exact: true }).fill(room); await b.getByRole('button', { name: 'Join', exact: true }).click(); await b.getByLabel('Nickname', { exact: true }).fill('Race Peer'); await b.getByRole('button', { name: 'Join', exact: true }).click();
     await a.bringToFront(); await a.getByRole('button', { name: 'Start', exact: true }).click(); await expect(a.getByText('Starting…', { exact: true })).toBeVisible();
     await expect(a.getByRole('button', { name: 'Menu', exact: true })).toBeVisible({ timeout: 15_000 }); await expect(b.getByRole('button', { name: 'Menu', exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => snapshots.at(-1)?.peers.find(peer => peer.nickname === 'Race Host')?.crowned).toBe(true);
     if (await a.getByRole('button', { name: 'Resume', exact: true }).isVisible()) await a.getByRole('button', { name: 'Resume', exact: true }).click();
     await a.keyboard.down('Space'); await a.waitForTimeout(220); await a.keyboard.up('Space'); await expect(a.locator('.game-hud')).toContainText('Jumps: 1');
     await a.getByRole('button', { name: 'Menu', exact: true }).click();
@@ -87,6 +91,7 @@ test('two Guest browsers Start together, jump and End Match with saved Results a
     await b.getByRole('button', { name: 'Play Again', exact: true }).click(); await expect(a.getByRole('button', { name: 'Start', exact: true })).toBeEnabled();
     await a.bringToFront(); await a.getByRole('button', { name: 'Start', exact: true }).click();
     await expect(a.getByRole('button', { name: 'Menu', exact: true })).toBeVisible({ timeout: 15_000 }); await expect(b.getByRole('button', { name: 'Menu', exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => snapshots.at(-1)?.peers.find(peer => peer.nickname === 'Race Host')?.crowned).toBe(true);
     if (await a.getByRole('button', { name: 'Resume', exact: true }).isVisible()) await a.getByRole('button', { name: 'Resume', exact: true }).click();
     await a.getByRole('button', { name: 'Menu', exact: true }).click(); await a.getByRole('button', { name: 'End Match', exact: true }).click();
     for (const page of [a, b]) { await expect(page.getByRole('heading', { name: 'Results', exact: true })).toBeVisible(); await expect(page.getByText('Results saved', { exact: true })).toBeVisible(); }

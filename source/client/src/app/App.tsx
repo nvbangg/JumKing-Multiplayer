@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { SoloGame } from '../features/solo/SoloGame';
-import { currentSolo, soloRuns, StorageUnavailable, type SoloRun } from '../features/solo/storage';
+import { currentSolo, soloRuns, rememberCrown, hasCrown, StorageUnavailable, type SoloRun } from '../features/solo/storage';
 import { readOptions, saveOptions } from '../features/solo/options';
 import { AuthForm } from '../features/account/AuthForm';
 import { StatisticsPanel } from '../features/records/StatisticsPanel';
@@ -17,7 +17,7 @@ import { roomFinishScreen } from '../features/rooms/ending';
 import { OptionsButtons, ControlsHelp } from '../features/solo/OptionsPanel';
 import { AudioBus } from '../game/presentation/AudioBus';
 import { loadManifest } from '../game/content/assets';
-import { SoloSync } from '../features/solo/sync';
+import { SoloSync, syncSolo } from '../features/solo/sync';
 import { OnlineGame } from '../features/community/OnlineGame';
 import { loadReconnect } from '../network/reconnect';
 
@@ -64,6 +64,9 @@ export function App() {
   const profile = identity.account ? backendOrigin() + ':account:' + identity.account.id : 'guest';
   const reconnectProfile = identity.account ? profile : (typeof location === 'undefined' ? '' : backendOrigin()) + ':guest';
   const playing = screen === 'play' || screen === 'online';
+  useEffect(() => {
+    if (identity.account?.crownUnlocked || identity.crownUnlocked) void rememberCrown(profile).catch(cause => setSyncError(cause.message));
+  }, [profile, identity.account?.crownUnlocked, identity.crownUnlocked]);
   useEffect(() => {
     setSyncError('');
     if (!identity.account) return;
@@ -148,6 +151,7 @@ export function App() {
   }, [profile, screen, identity.authenticated, identity.guest, recordsRevision]);
 
   const openSolo = (action: 'new' | 'continue') => { void execute(async () => {
+    if (identity.account?.crownUnlocked) await rememberCrown(profile);
     const current = await currentSolo(profile).catch(cause => {
       if (action === 'new' && cause instanceof StorageUnavailable && window.confirm('Browser storage is unavailable. Start without saving?')) return null;
       throw cause;
@@ -157,7 +161,9 @@ export function App() {
     setLaunch({ profile, action, expectedRunId: current?.id || null }); setScreenState('play');
   }); };
   const connectedSocket = async () => {
+    if (!socket.current && identity.account && await hasCrown(profile).catch(() => false)) await syncSolo(profile, identity.account.id);
     if (!identity.authenticated && !identity.guest) setIdentity(await api<Identity>('/auth/guest', 'POST'));
+    if (!socket.current && !identity.authenticated && await hasCrown('guest').catch(() => false)) await api('/profile/crown', 'POST');
     if (!socket.current) socket.current = new GameSocket((type, payload) => {
       if (type === 'ROOM_STATE') {
         const next = payload as unknown as RoomState;
@@ -175,6 +181,9 @@ export function App() {
       else if (type === 'SAVE_STATUS' && resultRef.current !== null && resultRef.current.playId === payload.playId && ['PENDING', 'SAVED', 'FAILED'].includes(String(payload.saveStatus))) {
         const updated = { ...resultRef.current, saveStatus: payload.saveStatus as MatchResult['saveStatus'] }; resultRef.current = updated; setResult(updated);
         setScreen(roomFinishScreen(updated, socket.current?.selfId || null, viewedEnding.current));
+      }
+      else if (type === 'PLAYER_FINISHED' && payload.playerId === socket.current?.selfId && payload.showEnding === true) {
+        void rememberCrown(profile).catch(cause => setError(cause.message));
       }
       else if (type === 'ROOM_LEFT') { setRoom(null); setResult(null); resultRef.current = null; socket.current?.close(); socket.current = null; back(); }
       else if (type === 'ERROR') setError(String(payload.message));
@@ -209,7 +218,7 @@ export function App() {
   return <main className="home">
     <header className="brand"><h1><img src="/assets/title_logo.png" alt="JumpKing" /></h1></header>
     <div className={screen === 'home' ? 'home-layout' : 'single-panel'}>
-      <MenuPanel title={screen === 'home' ? undefined : ({ 'sign-in': 'Sign In', register: 'Create Account', 'merge-history': 'Guest Room History', account: 'Account', community: 'Community Tower', leaderboard: 'Leaderboard', history: 'History', detail: 'Game Details', options: 'Options', controls: 'Controls', nickname: roomIntent.roomId ? 'Join Room' : 'Play with Friends', join: 'Join by ID', lobby: room?.kind === 'COMMUNITY' ? 'Community Tower' : 'Lobby', results: 'Results' } as Partial<Record<Screen, string>>)[screen]} onBack={screen === 'home' || screen === 'lobby' || screen === 'results' ? undefined : back}>
+      <MenuPanel title={screen === 'home' ? undefined : ({ 'sign-in': 'Sign In', register: 'Create Account', 'merge-history': 'Guest Progress', account: 'Account', community: 'Community Tower', leaderboard: 'Leaderboard', history: 'History', detail: 'Game Details', options: 'Options', controls: 'Controls', nickname: roomIntent.roomId ? 'Join Room' : 'Play with Friends', join: 'Join by ID', lobby: room?.kind === 'COMMUNITY' ? 'Community Tower' : 'Lobby', results: 'Results' } as Partial<Record<Screen, string>>)[screen]} onBack={screen === 'home' || screen === 'lobby' || screen === 'results' ? undefined : back}>
         {screen === 'home' && <>
           {activeSolo && <button onClick={() => openSolo('continue')} disabled={pending}>Continue Solo</button>}
           <button onClick={() => openSolo('new')} disabled={pending}>New Solo Game</button>
@@ -221,7 +230,7 @@ export function App() {
           <div className="account-actions">{identity.account ? <button onClick={() => setScreen('account')}>{identity.account.username}</button> : <><button onClick={() => setScreen('sign-in')}>Sign In</button><button onClick={() => setScreen('register')}>Create Account</button></>}</div>
         </>}
         {(screen === 'sign-in' || screen === 'register') && <AuthForm key={screen} register={screen === 'register'} onSuccess={value => { setIdentity(value); if (value.guestHistoryAvailable) setScreen('merge-history'); else back(); }} onSwitch={() => setScreen(screen === 'register' ? 'sign-in' : 'register')} />}
-        {screen === 'merge-history' && <><p>Add this Guest's Room history to your account?</p><button disabled={pending} onClick={() => { void execute(async () => { const result = await api<{ merged: boolean }>('/auth/guest-history/merge', 'POST'); if (!result.merged) throw new Error('History could not be merged'); back(); }); }}>Merge Guest Room History</button><button disabled={pending} onClick={back}>Skip</button></>}
+        {screen === 'merge-history' && <><p>Add this Guest's Room history and earned crown to your account?</p><button disabled={pending} onClick={() => { void execute(async () => { const result = await api<{ merged: boolean }>('/auth/guest-history/merge', 'POST'); if (!result.merged) throw new Error('History could not be merged'); setIdentity(await api<Identity>('/auth/me')); back(); }); }}>Merge Guest Progress</button><button disabled={pending} onClick={back}>Skip</button></>}
         {screen === 'account' && identity.account && <><dl className="account-info"><dt>Username</dt><dd>{identity.account.username}</dd><dt>Email</dt><dd>{identity.account.email}</dd></dl><button disabled={pending} onClick={() => { void execute(async () => { await api('/auth/logout', 'POST'); clearCsrf(); setIdentity(initialIdentity); setIdentity(await api<Identity>('/auth/me').catch(() => initialIdentity)); back(); }); }}>Sign Out</button></>}
         {screen === 'community' && <>
           {!identity.authenticated ? <><p>Sign in to play Community Tower.</p><button onClick={() => setScreen('sign-in')}>Sign In</button><button onClick={() => setScreen('register')}>Create Account</button></> : <>

@@ -58,7 +58,7 @@ public class AccountService {
         return memberships.changingIdentity(current, Long.valueOf(account.id()), () -> { authenticated.accept(account); return account; });
     }
     public boolean guestHistory(Long guest) {
-        return guest != null && runs.existsByUserIdAndKind(guest, "ROOM");
+        return guest != null && (users.findById(guest).map(User::isCrownUnlocked).orElse(false) || runs.existsByUserIdAndKind(guest, "ROOM"));
     }
     private AccountDto.Account account(String email) {
         return users.findByTypeAndEmail("ACCOUNT", email).map(IdentityContext::accountView).orElseThrow(AccountService::invalidCredentials);

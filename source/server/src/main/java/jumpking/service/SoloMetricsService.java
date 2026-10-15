@@ -13,8 +13,9 @@ public class SoloMetricsService {
     public record Ack(long revision, String syncStatus) {}
     private final PlayRunRepository runs;
     private final RunOwners owners;
+    private final CrownService crowns;
     private final Clock clock;
-    public SoloMetricsService(PlayRunRepository runs, RunOwners owners, Clock clock) { this.runs = runs; this.owners = owners; this.clock = clock; }
+    public SoloMetricsService(PlayRunRepository runs, RunOwners owners, CrownService crowns, Clock clock) { this.runs = runs; this.owners = owners; this.crowns = crowns; this.clock = clock; }
     public Ack save(long account, String id, SoloMetrics incoming) {
         try { if (!UUID.fromString(id).toString().equals(id)) throw new IllegalArgumentException(); }
         catch (IllegalArgumentException invalid) { throw new ApiException(400, "VALIDATION", "Invalid run ID"); }
@@ -39,6 +40,7 @@ public class SoloMetricsService {
             saved.setMaxProgress(incoming.maxProgress()); saved.setPeakReachedTicks(incoming.peakReachedTicks());
             saved.setFinishTicks(incoming.finishTicks()); saved.setEndedAt(incoming.endedAt()); saved.setUpdatedAt(clock.instant());
             runs.saveAndFlush(saved);
+            if (incoming.status() == SoloMetrics.Status.FINISHED) crowns.unlock(owner);
             return new Ack(incoming.revision(), "SAVED");
         });
     }

@@ -17,12 +17,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class IdentityController {
     private final IdentityContext identity;
     private final GuestIdentity guests;
-    public IdentityController(IdentityContext identity, GuestIdentity guests) { this.identity = identity; this.guests = guests; }
+    private final jumpking.service.CrownService crowns;
+    public IdentityController(IdentityContext identity, GuestIdentity guests, jumpking.service.CrownService crowns) { this.identity = identity; this.guests = guests; this.crowns = crowns; }
     @GetMapping("/csrf") public Map<String, String> csrf(CsrfToken token) { return Map.of("token", token.getToken(), "headerName", token.getHeaderName()); }
     @GetMapping("/me") public AccountDto.Me me(HttpServletRequest request) { return identity.me(request); }
     @PostMapping("/guest") public AccountDto.Me guest(HttpServletRequest request, HttpServletResponse response) {
         var account = identity.account();
-        if (account != null) return new AccountDto.Me(true, false, account);
-        guests.ensure(request, response); return new AccountDto.Me(false, true, null);
+        if (account != null) return new AccountDto.Me(true, false, account, account.crownUnlocked());
+        long owner = guests.ensure(request, response); return new AccountDto.Me(false, true, null, crowns.unlocked(owner));
     }
 }

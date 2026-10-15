@@ -28,9 +28,10 @@ public class RoomRuns {
     private final MatchRepository matchRepository;
     private final PlayRunRepository runRepository;
     private final RunOwners owners;
+    private final CrownService crowns;
     private final Clock clock;
     private final int capacity;
-    public RoomRuns(MatchRepository matchRepository, PlayRunRepository runRepository, RunOwners owners, Clock clock, jumpking.game.SharedData shared) { this.matchRepository = matchRepository; this.runRepository = runRepository; this.owners = owners; this.clock = clock; capacity = shared.rules().path("capacity").asInt(); }
+    public RoomRuns(MatchRepository matchRepository, PlayRunRepository runRepository, RunOwners owners, CrownService crowns, Clock clock, jumpking.game.SharedData shared) { this.matchRepository = matchRepository; this.runRepository = runRepository; this.owners = owners; this.crowns = crowns; this.clock = clock; capacity = shared.rules().path("capacity").asInt(); }
     public void save(Write write) {
         validate(write);
         owners.writeAll(write.runs.stream().map(Run::owner).toList(), ownership -> {
@@ -74,6 +75,7 @@ public class RoomRuns {
                 entity.setRevision(write.revision); entity.setStatus(run.status); entity.setPlayTicks(run.ticks); entity.setJumps(run.jumps); entity.setFalls(run.falls);
                 entity.setCurrentProgress(run.progress); entity.setMaxProgress(run.maximum); entity.setPeakReachedTicks(run.peak);
                 entity.setFinishTicks(run.finish); entity.setRank(run.rank); entity.setWinner(run.winner);
+                if (run.status.equals("FINISHED")) crowns.unlock(run.owner);
                 entity.setEndedAt(run.endedAt); entity.setUpdatedAt(clock.instant()); runRepository.save(entity);
             }
             runRepository.flush();

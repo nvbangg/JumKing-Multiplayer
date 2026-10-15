@@ -19,7 +19,7 @@ public class IdentityContext {
         if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken) return null;
         return users.findByTypeAndEmail("ACCOUNT", authentication.getName()).map(IdentityContext::accountView).orElse(null);
     }
-    public static Account accountView(User user) { return new Account(user.getId().toString(), user.getUsername(), user.getEmail()); }
+    public static Account accountView(User user) { return new Account(user.getId().toString(), user.getUsername(), user.getEmail(), user.isCrownUnlocked()); }
     public Account requireAccount() {
         Account account = account(); if (account == null) throw new ApiException(401, "UNAUTHENTICATED", "Sign in to continue"); return account;
     }
@@ -27,6 +27,8 @@ public class IdentityContext {
         Account account = account(); return account == null ? guests.resolve(request) : Long.valueOf(account.id());
     }
     public Me me(HttpServletRequest request) {
-        Account account = account(); return new Me(account != null, account == null && guests.resolve(request) != null, account);
+        Account account = account(); Long guest = account == null ? guests.resolve(request) : null;
+        boolean crown = account != null ? account.crownUnlocked() : guest != null && users.findById(guest).map(User::isCrownUnlocked).orElse(false);
+        return new Me(account != null, guest != null, account, crown);
     }
 }

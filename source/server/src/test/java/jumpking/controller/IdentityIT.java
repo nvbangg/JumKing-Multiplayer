@@ -106,6 +106,8 @@ class IdentityIT {
             assertThat(tree(client.send(path, "PUT", metrics(1, 60, "ACTIVE"))).path("revision").asLong()).isEqualTo(1);
             assertThat(TestDatabase.get().jdbc.queryForObject("SELECT play_ticks FROM play_runs WHERE id=?", Long.class, id)).isEqualTo(120);
             assertThat(client.send(path, "PUT", metrics(3, 120, "FINISHED")).statusCode()).isEqualTo(200);
+            assertThat(tree(client.send("/auth/me", "GET", null)).path("account").path("crownUnlocked").asBoolean()).isTrue();
+            assertThat(client.send("/profile/crown", "POST", null).statusCode()).isEqualTo(403);
             assertThat(client.send(path, "PUT", metrics(4, 180, "ACTIVE")).statusCode()).isEqualTo(409);
             String second = java.util.UUID.randomUUID().toString(); assertThat(client.send("/solo/runs/" + second, "PUT", metrics(1, 60, "ABANDONED")).statusCode()).isEqualTo(200);
             var stats = tree(client.send("/profile/me", "GET", null)).path("total");
@@ -326,4 +328,27 @@ class IdentityIT {
             } finally { memberships.release(owner, member); memberships.release(guestId, member); }
         }
     }
+    @Test void guestCrownIsCosmeticIdempotentAndMergesWithoutImportingSoloHistory() throws Exception {
+        try (var guest = client(); var account = client(); var promoted = client()) {
+            guest.token(); assertThat(guest.send("/profile/crown", "POST", null).statusCode()).isEqualTo(401);
+            assertThat(guest.send("/auth/guest", "POST", null).statusCode()).isEqualTo(200);
+            long source = TestDatabase.get().jdbc.queryForObject("SELECT id FROM users WHERE guest_token_hash=?", Long.class, GuestIdentity.hash(guest.cookie(GuestIdentity.COOKIE)));
+            assertThat(guest.send("/profile/crown", "POST", null).statusCode()).isEqualTo(200);
+            assertThat(guest.send("/profile/crown", "POST", null).statusCode()).isEqualTo(200);
+            assertThat(tree(guest.send("/auth/me", "GET", null)).path("crownUnlocked").asBoolean()).isTrue();
+            assertThat(TestDatabase.get().jdbc.queryForObject("SELECT COUNT(*) FROM play_runs WHERE user_id=?", Integer.class, source)).isZero();
+            String email = unique() + "@example.test", password = "A secure cosmetic password";
+            account.token(); assertThat(account.send("/auth/register", "POST", registration(unique(), email, password)).statusCode()).isEqualTo(200);
+            var login = guest.send("/auth/login", "POST", json.writeValueAsString(java.util.Map.of("email", email, "password", password)));
+            assertThat(tree(login).path("guestHistoryAvailable").asBoolean()).isTrue(); guest.token();
+            assertThat(guest.send("/auth/guest-history/merge", "POST", null).statusCode()).isEqualTo(200);
+            assertThat(guest.send("/auth/guest-history/merge", "POST", null).statusCode()).isEqualTo(200);
+            assertThat(tree(guest.send("/auth/me", "GET", null)).path("account").path("crownUnlocked").asBoolean()).isTrue();
+            assertThat(guest.send("/profile/crown", "POST", null).statusCode()).isEqualTo(403);
+            promoted.token(); promoted.send("/auth/guest", "POST", null); promoted.send("/profile/crown", "POST", null);
+            var registration = promoted.send("/auth/register", "POST", registration(unique(), unique() + "@example.test", password));
+            assertThat(tree(registration).path("account").path("crownUnlocked").asBoolean()).isTrue();
+        }
+    }
+
 }

@@ -41,7 +41,7 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 ## Phase 06 — Rà soát và triển khai
 
 - [x] Rà soát code chết/trùng, trách nhiệm lớp, comments và security/config; không thay luật ngoài scope.
-- [ ] Nghiệm thu clean setup/build/JAR, Local/LAN/ZeroTier và cấu hình VPS một domain.
+- [x] Nghiệm thu clean setup/build/JAR và Local; đối chiếu cấu hình LAN/ZeroTier và VPS một domain. Chơi hai thiết bị nghiệm thu riêng ở Phase 07.
 
 ## Phase 07 — Nghiệm thu và học phần
 
@@ -88,6 +88,8 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 | Phase 05 — Leaderboard trong trận | PASS — 77 client unit, 54 Java unit; 2 MySQL integration và Chrome poll trực tiếp. Bảng Community thu gọn dùng dữ liệu đã commit; mở mới tải, mỗi request cách ít nhất 10 giây, không poll khi đóng/ẩn tab hoặc gửi chồng. Đóng/mở nhanh giữ giới hạn; timer/listener dọn khi unmount. Đã xem ảnh hai bảng trong trận; build/type-check và diff check PASS. |
 
 | Phase 06 — Rà soát | PASS — 77 client unit, 54 Java unit; 77 MySQL integration PASS, 1 load opt-in SKIP, flakes=0; 35 Chrome online/JAR và 27 client E2E. Chat hủy double-tap Fly cũ; preview trên mobile tránh nút cảm ứng. Cấu hình riêng/IDE được ignore, không có key/token khớp mẫu quét trong file tracked. npm audit 0; OSV kiểm tra 73 dependencies runtime, có hai advisory [SSE](https://spring.io/security/cve-2026-47890/)/[XsltView](https://spring.io/security/cve-2026-47884/) nhưng không dùng các chức năng ảnh hưởng. Runner restore qua stdin đã kiểm chứng lại: restart/backup/restore giữ số dòng và checksum ba bảng. Không sửa Origin hoặc dữ liệu cá nhân. |
+
+| Phase 06 — Setup và JAR | PASS — npm ci/build và Maven Wrapper web package từ bản chỉ chứa file Git, không có config riêng/dependencies/build cũ. SchemaIT chạy JAR trong thư mục trống bằng application-local.properties tạo từ mẫu, không dùng ENV datasource; Chrome cùng origin và Vite proxy PASS. ProductionProxyIT đã qua hồi quy đầy đủ. Bản sao setup đã dọn; database cá nhân chưa nâng cấp map_level. LAN/ZeroTier hai thiết bị và VPS bản mới chưa nghiệm thu trực tiếp. |
 
 ## Lịch sử triển khai trước thay đổi kiến trúc
 

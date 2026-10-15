@@ -47,19 +47,27 @@ class SchemaIT {
 
     @Test void validatesActualSchemaAndIndexes() { schema.validate(); }
 
-    @Test void packagedBackendStartsWithValidatedSchema() throws Exception {
+    @Test void packagedBackendStartsWithValidatedSchema(@org.junit.jupiter.api.io.TempDir Path setup) throws Exception {
         int port;
         try (var socket = new ServerSocket(0)) { port = socket.getLocalPort(); }
-        Path log = Path.of("target", "artifact-test.log");
+        Path log = Path.of("target", "artifact-test.log").toAbsolutePath();
+        // Chạy như máy mới: chỉ có JAR và file local từ mẫu, không dựa vào config của developer.
+        Path config = Files.createDirectories(setup.resolve("config")).resolve("application-local.properties");
+        var properties = new java.util.Properties();
+        try (var reader = Files.newBufferedReader(Path.of("config/application-local.properties.example"))) { properties.load(reader); }
+        properties.setProperty("spring.datasource.url", dataSource.getUrl());
+        properties.setProperty("spring.datasource.username", dataSource.getUsername());
+        properties.setProperty("spring.datasource.password", dataSource.getPassword());
+        properties.setProperty("server.port", Integer.toString(port));
+        properties.setProperty("app.allowed-origins", "http://127.0.0.1:" + port + ",http://127.0.0.1:5173");
+        try (var writer = Files.newBufferedWriter(config)) { properties.store(writer, null); }
         var builder = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-            "-jar", "target/jumpking-server.jar");
+            "-jar", Path.of("target/jumpking-server.jar").toAbsolutePath().toString(), "--spring.profiles.active=local")
+            .directory(setup.toFile());
         var environment = builder.environment();
-        environment.put("SPRING_DATASOURCE_URL", dataSource.getUrl());
-        environment.put("SPRING_DATASOURCE_USERNAME", dataSource.getUsername());
-        environment.put("SPRING_DATASOURCE_PASSWORD", dataSource.getPassword());
-        environment.put("SERVER_PORT", Integer.toString(port));
-        environment.put("APP_ALLOWED_ORIGINS", "http://127.0.0.1:" + port + ",http://127.0.0.1:5173");
-        environment.put("SPRING_PROFILES_ACTIVE", "local");
+        for (String key : new String[]{"SPRING_DATASOURCE_URL", "SPRING_DATASOURCE_USERNAME", "SPRING_DATASOURCE_PASSWORD",
+                "SERVER_PORT", "SERVER_ADDRESS", "APP_ALLOWED_ORIGINS", "SPRING_CONFIG_IMPORT", "SPRING_CONFIG_LOCATION",
+                "SPRING_CONFIG_ADDITIONAL_LOCATION", "SPRING_PROFILES_ACTIVE", "SPRING_APPLICATION_JSON"}) environment.remove(key);
         Process process = builder.redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try (var http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(1)).build()) {
             String origin = "http://127.0.0.1:" + port;

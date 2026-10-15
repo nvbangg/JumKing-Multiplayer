@@ -36,6 +36,7 @@ export default defineConfig(({ command, mode, isPreview }) => {
     }],
     define: { __SOLO_FLY_ENABLED__: JSON.stringify(command === 'serve' && !isPreview && env.FLY_ENABLED === 'true') },
     server: {
+      host: true,
       port: 5173, strictPort: true,
       proxy: {
         '/api': { target, changeOrigin: false },

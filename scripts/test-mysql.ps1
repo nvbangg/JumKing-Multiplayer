@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory = $true)][string]$MySqlHome,
+    [string]$MySqlHome,
     [string]$JavaHome = $env:JAVA_HOME,
     [switch]$Web,
     [switch]$DatabaseRecovery,
@@ -7,7 +7,36 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $workspace = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$testRoot = Join-Path $workspace '.local/mysql-tests'
+if (-not $MySqlHome) {
+    if ($env:MYSQL_HOME -and (Test-Path $env:MYSQL_HOME)) {
+        $MySqlHome = $env:MYSQL_HOME
+    } else {
+        $service = Get-CimInstance Win32_Service -Filter "Name LIKE 'MySQL%'" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($service -and $service.PathName) {
+            $exePath = if ($service.PathName -match '^"([^"]+)"') { $matches[1] } else { ($service.PathName -split ' ')[0] }
+            if ($exePath -and (Test-Path $exePath)) {
+                $MySqlHome = (Resolve-Path (Join-Path (Split-Path (Split-Path $exePath)) '.')).Path
+            }
+        }
+        if (-not $MySqlHome) {
+            $candidates = @(
+                'C:\Program Files\MySQL\MySQL Server 9.6',
+                'C:\Program Files\MySQL\MySQL Server 8.4',
+                'C:\Program Files\MySQL\MySQL Server 8.0'
+            )
+            foreach ($candidate in $candidates) {
+                if (Test-Path (Join-Path $candidate 'bin\mysqld.exe')) {
+                    $MySqlHome = $candidate
+                    break
+                }
+            }
+        }
+    }
+}
+if (-not $MySqlHome -or -not (Test-Path $MySqlHome)) {
+    throw "Không tìm thấy thư mục cài đặt MySQL trên máy. Vui lòng truyền tham số -MySqlHome '<đường dẫn MySQL>'."
+}
+$testRoot = Join-Path ([IO.Path]::GetTempPath()) 'jumpking-mysql-tests'
 $runRoot = Join-Path $testRoot ([guid]::NewGuid().ToString('N'))
 $mysqlBase = (Resolve-Path -LiteralPath $MySqlHome).Path
 $server = Join-Path $mysqlBase 'bin/mysqld.exe'

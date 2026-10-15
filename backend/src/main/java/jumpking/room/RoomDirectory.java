@@ -5,8 +5,8 @@ import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Map;
 import jumpking.config.NetworkSettings;
+import jumpking.exception.ApiException;
 import jumpking.game.SharedData;
-import jumpking.network.ApiException;
 import org.springframework.stereotype.Component;
 
 /** Registry ngắn hạn: giữ chỗ trước khi enqueue/đợi JDBC, dùng chung quotas hai kiểu chơi. */

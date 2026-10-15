@@ -22,7 +22,7 @@ class RoomPauseIT {
     }
     @Autowired RoomRaceIT.TestTime time;
     @Autowired Memberships memberships;
-    @Autowired jumpking.identity.SessionAuthority sessions;
+    @Autowired jumpking.security.SessionAuthority sessions;
     @LocalServerPort int port;
     private record Started(String room, String play, JsonNode host, JsonNode peer) {}
     private Started start(GameClient a, GameClient b) throws Exception {

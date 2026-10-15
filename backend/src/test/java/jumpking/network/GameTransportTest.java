@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import jumpking.config.NetworkSettings;
+import jumpking.exception.ApiException;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.*;
 
@@ -18,7 +19,7 @@ class GameTransportTest {
         var now = new java.util.concurrent.atomic.AtomicLong(59_999);
         var clock = mock(java.time.Clock.class); when(clock.millis()).thenAnswer(call -> now.get());
         var workers = mock(GameWorkers.class); when(workers.executor()).thenReturn(Runnable::run);
-        try (var transport = new GameTransport(limits(4), json, mock(jumpking.identity.SessionAuthority.class), clock, List.of(), workers)) {
+        try (var transport = new GameTransport(limits(4), json, mock(jumpking.security.SessionAuthority.class), clock, List.of(), workers)) {
             for (int index = 0; index < 30; index++) transport.handshakeAttempt("one");
             for (int index = 0; index < 60; index++) transport.roomLookup("one");
             assertThatThrownBy(() -> transport.handshakeAttempt("one")).isInstanceOf(ApiException.class);

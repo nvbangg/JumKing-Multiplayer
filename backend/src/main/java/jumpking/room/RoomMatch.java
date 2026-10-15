@@ -7,7 +7,7 @@ import java.util.*;
 import jumpking.config.NetworkSettings;
 import jumpking.game.*;
 import jumpking.network.InputFrames;
-import jumpking.records.RoomRuns;
+import jumpking.service.RoomRuns;
 
 /** State trận chỉ được đọc/ghi trên actor của Room; không thực hiện I/O. */
 final class RoomMatch {

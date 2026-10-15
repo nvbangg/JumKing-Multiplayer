@@ -2,11 +2,10 @@ package jumpking.room;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import jumpking.network.ApiException;
+import jumpking.exception.ApiException;
 import org.junit.jupiter.api.Test;
 
 class MembershipsTest {

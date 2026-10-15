@@ -5,7 +5,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicLong;
-import jumpking.network.ApiException;
+import jumpking.exception.ApiException;
 import org.junit.jupiter.api.Test;
 
 class ChatLogTest {

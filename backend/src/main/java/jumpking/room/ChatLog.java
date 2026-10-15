@@ -3,7 +3,7 @@ package jumpking.room;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
-import jumpking.network.ApiException;
+import jumpking.exception.ApiException;
 
 /** Chat chỉ ở RAM của sảnh, không dùng làm tín hiệu hoạt động điều khiển. */
 public final class ChatLog {

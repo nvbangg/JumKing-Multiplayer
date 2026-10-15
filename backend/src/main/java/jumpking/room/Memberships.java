@@ -1,11 +1,11 @@
 package jumpking.room;
 
 import java.util.HashMap;
-import java.util.Map;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
-import jumpking.network.ApiException;
+import jumpking.exception.ApiException;
 import org.springframework.stereotype.Component;
 
 @Component

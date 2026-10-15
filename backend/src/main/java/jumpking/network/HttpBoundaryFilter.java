@@ -8,16 +8,18 @@ import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.ByteArrayInputStream;
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import jumpking.config.SecuritySettings;
-import jumpking.identity.AuthRateLimiter;
-import jumpking.identity.GuestIdentity;
-import jumpking.identity.SessionAuthority;
+import jumpking.exception.ApiErrors;
+import jumpking.exception.ApiException;
+import jumpking.security.AuthRateLimiter;
+import jumpking.security.GuestIdentity;
+import jumpking.security.SessionAuthority;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public class HttpBoundaryFilter extends OncePerRequestFilter {

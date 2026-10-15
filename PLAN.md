@@ -18,7 +18,7 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 - [x] Chuyển merge/ownership và Solo metrics; kiểm thử locking/idempotency/rollback.
 - [x] Chuyển Community checkpoint/New Run/Finish và worker; hồi quy Continue/retry.
 - [x] Chuyển Room writer/recovery; kiểm thử ghi/finalize đúng một lần.
-- [ ] Chuyển Stats/History/leaderboard/current sang projections/Repository; bỏ đường JDBC và SQL ngoài repository.
+- [x] Chuyển Stats/History/leaderboard/current sang projections/Repository; chuẩn hóa controller/service/repository/entity/dto và tests; bỏ đường JDBC và SQL ngoài repository.
 
 ## Phase 03 — Tinh giản nội dung
 
@@ -70,6 +70,8 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 | Phase 02 — Community | PASS — 51 unit và 9 MySQL integration tests, gồm New Run/Continue, rollback và save failure. Flush lượt cũ trước insert để giữ generated unique ACTIVE; không sửa database cá nhân. |
 
 | Phase 02 — Room writer | PASS — 51 unit; 14 MySQL integration tests qua hai nhóm, gồm Race/Hardcore/Time Limit/No Walk, Host Pause, rollback/late merge, writer và restart ABORTED. Match và roster cùng transaction JPA; entity không đi vào actor. |
+
+| Phase 02 — Layer/Read Repository | PASS — clean build, 51 unit tests; 72 MySQL integration tests gồm 71 PASS và 1 load opt-in SKIP, flakes=0; 30 Chrome PASS qua các harness, gồm JAR cùng origin. Frontend build/type-check, 68 links/anchors và diff check PASS. Không còn JdbcTemplate trong production, SQL nằm ở Repository; DTO tách khỏi Controller/Service, tests theo package mới. Không reset database/cấu hình riêng. |
 
 ## Lịch sử triển khai trước thay đổi kiến trúc
 

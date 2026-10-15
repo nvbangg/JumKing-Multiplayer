@@ -48,10 +48,15 @@ backend/
   config/                         # cấu hình mẫu và file riêng được ignore
   src/main/java/jumpking/
     JumpKingApplication.java
-    identity/                     # Guest/Account, session, merge
+    controller/                   # REST endpoints, nhận/trả DTO
+    service/                      # nghiệp vụ, transactions và ghi bất đồng bộ
+    repository/                   # JPA repositories và query projections
+    entity/                       # User, PlayRun, Match ánh xạ MySQL
+    dto/                          # request/response, không trả Entity
+    security/                     # identity, session, rate limits
+    exception/                    # lỗi HTTP thống nhất
     game/                         # Java simulation và luật xếp hạng
     room/                         # Community, Room và lifecycle
-    records/                      # lượt chơi, persistence và Records
     network/                      # WebSocket transport, envelope và connection
     config/                       # Spring wiring, security và cấu hình
   src/main/resources/
@@ -88,7 +93,7 @@ scripts/                          # schema.sql và tác vụ liên module
 docs/
 ```
 
-Java dùng root package `jumpking`, main class đặt tại root để Spring scan. Controller/service/repository/entity nhóm theo chức năng; `network` chỉ xử lý transport/dispatch, `game` giữ luật thuần. Controller nhận/trả DTO, Service sở hữu nghiệp vụ/transaction, Repository truy cập MySQL. Không trả Entity qua API hoặc giữ managed Entity trong simulation/worker. JPA không nằm trong vòng tick; worker trao đổi snapshot bất biến. Không tạo interface/base class chỉ để chuyển tiếp lời gọi.
+Java dùng root package `jumpking`, main class đặt tại root để Spring scan. Backend chia theo layer controller/service/repository/entity/dto; `network` chỉ xử lý transport/dispatch, `game` giữ luật thuần. Controller nhận/trả DTO, Service sở hữu nghiệp vụ/transaction, Repository truy cập MySQL. Không trả Entity qua API hoặc giữ managed Entity trong simulation/worker. JPA không nằm trong vòng tick; worker trao đổi snapshot bất biến. Không tạo interface/base class chỉ để chuyển tiếp lời gọi.
 
 Frontend nhóm màn hình/hooks theo feature. `game` giữ simulation/input/presentation/netcode, độc lập React UI; `network` chỉ xử lý HTTP/WS. Unit tests đặt cạnh code; E2E ở `e2e/`.
 
@@ -115,6 +120,6 @@ Lỗi command/connection không dừng scheduler; lỗi simulation chỉ cô l�
 
 Một backend instance giữ session/membership/gameplay Room trong RAM. Restart mất gameplay Room, chỉ khôi phục checkpoint Community và metrics đã commit; có thể mất tiến độ từ lần ghi cuối. Cách đóng match dở theo [data](data.md#kết-quả-room). Xóa browser storage trước sync có thể mất số liệu Solo.
 
-Luật/Finish/comparator thuộc `game`, persistence thuộc `records`, độc lập transport/UI. Mở rộng theo [PLAN](../PLAN.md).
+Luật/Finish/comparator thuộc `game`, persistence thuộc `service`/`repository`, độc lập transport/UI. Mở rộng theo [PLAN](../PLAN.md).
 
 Tham chiếu: [Spring Boot package layout](https://docs.spring.io/spring-boot/reference/using/structuring-your-code.html), [Maven layout](https://maven.apache.org/guides/introduction/introduction-to-the-standard-directory-layout.html), [Vite assets](https://vite.dev/guide/assets.html).

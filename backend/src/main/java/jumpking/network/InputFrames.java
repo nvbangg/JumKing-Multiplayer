@@ -1,6 +1,7 @@
 package jumpking.network;
 
 import java.util.ArrayDeque;
+import jumpking.exception.ApiException;
 import jumpking.game.PlayerInput;
 
 /** Chỉ ACK frame đã xử lý; timeout hủy charge, không giả lập thả Jump. */

@@ -37,9 +37,9 @@ class RoomRestartIT {
             assertThat(jdbc.queryForObject("SELECT duration_ticks FROM matches WHERE id=?", Long.class, match)).isEqualTo(duration);
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM play_runs WHERE match_id=? AND status='DNF' AND is_winner=FALSE AND `rank` IS NOT NULL", Integer.class, match)).isEqualTo(2);
             assertThat(restarted.getBean(Memberships.class).find(owner)).isNull();
-            var result = restarted.getBean(jumpking.records.RecordsService.class).detail(owner, "ROOM", match); assertThat(result.path("participants").size()).isEqualTo(2);
+            var result = restarted.getBean(jumpking.service.RecordsService.class).detail(owner, "ROOM", match); assertThat(result.path("participants").size()).isEqualTo(2);
             var before = jdbc.queryForList("SELECT revision,play_ticks,jumps,falls,`rank`,ended_at FROM play_runs WHERE match_id=? ORDER BY id", match);
-            restarted.getBean(jumpking.records.RoomRuns.class).recoverAborted();
+            restarted.getBean(jumpking.service.RoomRuns.class).recoverAborted();
             assertThat(jdbc.queryForList("SELECT revision,play_ticks,jumps,falls,`rank`,ended_at FROM play_runs WHERE match_id=? ORDER BY id", match)).isEqualTo(before);
         }
     }
@@ -47,14 +47,14 @@ class RoomRestartIT {
         var jdbc = TestDatabase.get().jdbc; String match = java.util.UUID.randomUUID().toString();
         try (var first = launch()) {
             var started = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
-            var runs = new java.util.ArrayList<jumpking.records.RoomRuns.Run>();
+            var runs = new java.util.ArrayList<jumpking.service.RoomRuns.Run>();
             for (int index = 0; index < 2; index++) {
                 String hash = java.util.UUID.randomUUID().toString().replace("-", "").repeat(2);
                 jdbc.update("INSERT INTO users(type,guest_token_hash,created_at) VALUES ('GUEST',?,UTC_TIMESTAMP(3))", hash);
                 long owner = jdbc.queryForObject("SELECT id FROM users WHERE guest_token_hash=?", Long.class, hash);
-                runs.add(new jumpking.records.RoomRuns.Run(java.util.UUID.randomUUID().toString(), owner, "Peer " + index, "ACTIVE", 120, 3, 1, 180, 360, 100, null, null, false, null));
+                runs.add(new jumpking.service.RoomRuns.Run(java.util.UUID.randomUUID().toString(), owner, "Peer " + index, "ACTIVE", 120, 3, 1, 180, 360, 100, null, null, false, null));
             }
-            first.getBean(jumpking.records.RoomRuns.class).save(new jumpking.records.RoomRuns.Write(match, "ABCDEF", "RACE", null, 1, started, null, 120, null, runs));
+            first.getBean(jumpking.service.RoomRuns.class).save(new jumpking.service.RoomRuns.Write(match, "ABCDEF", "RACE", null, 1, started, null, 120, null, runs));
         }
         assertThat(jdbc.queryForObject("SELECT end_reason FROM matches WHERE id=?", String.class, match)).isNull();
         try (var restarted = launch()) {

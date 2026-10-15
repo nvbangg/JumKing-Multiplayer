@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashSet;
 import java.util.Set;
+import jumpking.exception.ApiException;
 
 public record GameEnvelope(String type, String requestId, JsonNode payload) {
     private static final Set<String> TYPES = Set.of("HEARTBEAT", "JOIN_COMMUNITY", "CREATE_ROOM", "JOIN_ROOM", "LEAVE_ROOM",

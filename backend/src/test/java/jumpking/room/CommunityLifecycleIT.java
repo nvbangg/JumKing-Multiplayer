@@ -7,7 +7,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import jumpking.JumpKingApplication;
 import jumpking.game.*;
-import jumpking.records.CommunityRuns;
+import jumpking.service.CommunityRuns;
 import jumpking.support.GameClient;
 import jumpking.support.TestDatabase;
 import org.junit.jupiter.api.Test;

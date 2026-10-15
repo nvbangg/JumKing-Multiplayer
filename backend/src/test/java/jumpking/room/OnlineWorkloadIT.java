@@ -12,12 +12,12 @@ import jumpking.JumpKingApplication;
 import jumpking.config.NetworkSettings;
 import jumpking.game.SharedData;
 import jumpking.network.GameEnvelope;
-import jumpking.identity.GuestIdentity;
+import jumpking.security.GuestIdentity;
 import jumpking.support.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.*;
 

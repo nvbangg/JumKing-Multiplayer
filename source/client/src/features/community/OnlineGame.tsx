@@ -35,7 +35,7 @@ export function OnlineGame({ socket, room, onHome, onResults }: { socket: GameSo
   const [disconnected, setDisconnected] = useState(false);
   const [ending, setEnding] = useState<'playing' | 'picture' | null>(null), [pictureReady, setPictureReady] = useState(false);
   const endingActive = useRef(false), skipEnding = useRef<(() => void) | null>(null);
-  const chat = useRoomChat(socket, ready && !ending, () => { runtime.current?.cancel(); input.current?.cancel(); },
+  const chat = useRoomChat(socket, ready && !ending, () => { runtime.current?.cancel(); flight.current?.cancel(); input.current?.cancel(); },
     () => { if (!runtime.current?.menu && !endingActive.current) input.current?.resume(); });
   useEffect(() => { if (ending !== 'picture') return; const timer = setTimeout(() => setPictureReady(true), PRESENTATION.endingPictureGuardMs); return () => clearTimeout(timer); }, [ending]);
   const latestRoom = useRef(room); latestRoom.current = room;

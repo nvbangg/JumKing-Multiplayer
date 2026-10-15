@@ -102,6 +102,6 @@ Cách đơn giản là chạy cùng JAR trên VPS, MySQL nội bộ và Caddy ph
 
 ## Kiểm thử, thực nghiệm và đóng góp
 
-Kiểm thử nhanh: tại `source/client/` chạy `npm test`; tại `source/server/` chạy `.\mvnw.cmd test`. Integration, tiêu chí và thực nghiệm theo [testing](docs/testing.md); kết quả và trạng thái nghiệm thu ở [PLAN](PLAN.md). Đánh giá kỹ thuật tập trung vào server-authoritative, đồng bộ input/snapshot, prediction và lưu kết quả nhất quán; mỗi đóng góp cần code và thực nghiệm đối chiếu, không coi thay đổi giao diện/JPA là novelty.
+Lệnh kiểm thử, tiêu chí nghiệm thu và thực nghiệm theo [testing](docs/testing.md); kết quả ở [PLAN](PLAN.md). Đánh giá kỹ thuật tập trung vào server-authoritative, đồng bộ input/snapshot, prediction và lưu kết quả nhất quán.
 
 Giới hạn: Solo metrics do client khai báo; Room gameplay ở RAM, restart không phục hồi trận. Nghiệm thu LAN/ZeroTier hai thiết bị, báo cáo, phân công nhóm và Compilatio phải có bằng chứng trước nộp. Framework và nguồn nội dung theo [architecture](docs/architecture.md), [học phần](docs/course-materials/final-project/Instruction.md) và [attribution](source/client/public/assets/ATTRIBUTION.md).

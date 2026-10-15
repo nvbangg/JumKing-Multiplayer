@@ -1,5 +1,8 @@
 /temp/
 /.local/
+.vscode/
+.idea/
+*.iml
 
 .env
 .env.*

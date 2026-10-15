@@ -113,8 +113,11 @@ try {
         $restoreDatabase = $database + '_restore'
         & $client @connectionArguments "--execute=CREATE DATABASE $restoreDatabase CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
         if ($LASTEXITCODE -ne 0) { throw 'Could not create isolated restore database.' }
-        & $client @connectionArguments "--database=$restoreDatabase" "--execute=SOURCE $($dump.Replace('\','/'));"
-        if ($LASTEXITCODE -ne 0) { throw 'Isolated database restore failed.' }
+        # Đọc dump qua stdin; không phụ thuộc lệnh SOURCE của mysql client trong batch mode.
+        $restore = Start-Process -FilePath $client -ArgumentList ($connectionArguments + "--database=$restoreDatabase") `
+            -RedirectStandardInput $dump -RedirectStandardOutput (Join-Path $runRoot 'restore.log') `
+            -RedirectStandardError (Join-Path $runRoot 'restore-error.log') -WindowStyle Hidden -Wait -PassThru
+        if ($restore.ExitCode -ne 0) { throw 'Isolated database restore failed.' }
         $restoredCounts = & $client @connectionArguments "--database=$restoreDatabase" "--execute=$countsSql"
         if ($LASTEXITCODE -ne 0 -or ($countsBefore -join "`n") -ne ($restoredCounts -join "`n")) { throw 'Counts changed after restore.' }
         foreach ($table in @('users', 'play_runs', 'matches')) {

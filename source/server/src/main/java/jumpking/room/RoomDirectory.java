@@ -9,7 +9,7 @@ import jumpking.exception.ApiException;
 import jumpking.game.SharedData;
 import org.springframework.stereotype.Component;
 
-/** Registry ngắn hạn: giữ chỗ trước khi enqueue/đợi JDBC, dùng chung quotas hai kiểu chơi. */
+/** Registry ngắn hạn: giữ chỗ trước khi enqueue/đợi persistence, dùng chung quotas hai kiểu chơi. */
 @Component
 public class RoomDirectory {
     public record Info(String roomId, String kind, boolean joinable) {}

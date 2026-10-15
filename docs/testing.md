@@ -124,7 +124,7 @@ npm run test:e2e -- e2e/netcode-experiment.spec.ts --workers=1
 Remove-Item Env:JK_NETCODE_EXPERIMENT
 ```
 
-Workload chạy Community một người, Room 2/10 người và hai Room; input 60 Hz, đo RTT/snapshot/bytes/CPU/heap/final save. Mỗi mẫu 5 giây, client và server chung JVM nên CPU/heap gồm cả driver, chưa xác định sức chứa tối đa. Compute tick đo riêng 1.800 mẫu sau 600 tick warm-up, không gồm scheduler/serialization/socket/JDBC. Netcode dùng Chrome với input chung, snapshot 20 Hz, độ trễ một chiều mô hình 0/50/100 ms và jitter 0–2 tick; không có packet loss/clock drift. Kết quả JSON ở `.local/reports/`; đây là các phép đo khác nhau, không suy độ trễ Internet từ mô hình.
+Workload chạy Community một người, Room 2/10 người và hai Room; input 60 Hz, đo RTT/snapshot/bytes/CPU/heap/final save. Mỗi mẫu 5 giây, client và server chung JVM nên CPU/heap gồm cả driver, chưa xác định sức chứa tối đa. Compute tick đo riêng 1.800 mẫu sau 600 tick warm-up, không gồm scheduler/serialization/socket/database I/O. Netcode dùng Chrome với input chung, snapshot 20 Hz, độ trễ một chiều mô hình 0/50/100 ms và jitter 0–2 tick; không có packet loss/clock drift. Kết quả JSON ở `.local/reports/`; đây là các phép đo khác nhau, không suy độ trễ Internet từ mô hình.
 
 Nghiệm thu Local, LAN/ZeroTier bằng hai thiết bị và điện thoại thật; kiểm tra clean clone, setup/config, build/run, restart, backup/restore và cập nhật tương thích. Thiếu thiết bị/Docker hoặc check thất bại phải ghi BLOCKED/NOT RUN, không đánh dấu hoàn tất.
 

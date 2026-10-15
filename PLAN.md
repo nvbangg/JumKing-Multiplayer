@@ -40,7 +40,7 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 
 ## Phase 06 — Rà soát và triển khai
 
-- [ ] Rà soát code chết/trùng, trách nhiệm lớp, comments và security/config; không thay luật ngoài scope.
+- [x] Rà soát code chết/trùng, trách nhiệm lớp, comments và security/config; không thay luật ngoài scope.
 - [ ] Nghiệm thu clean setup/build/JAR, Local/LAN/ZeroTier và cấu hình VPS một domain.
 
 ## Phase 07 — Nghiệm thu và học phần
@@ -48,7 +48,7 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 - [ ] Hồi quy gameplay/auth/save/history/chat/Room, network/DB failures và 10 mốc Finish.
 - [ ] Chơi trực tiếp mobile, nhiều identities và LAN/ZeroTier hai thiết bị; ghi phần cần người dùng hỗ trợ.
 - [ ] Chốt đóng góp kỹ thuật và baseline; đo RTT/message rate/tick/CPU/heap, so sánh snapshot-only/prediction bằng số liệu thật, phân tích ưu/nhược điểm và giới hạn.
-- [ ] Hoàn thiện `report/report.pdf` theo technical paper của học phần; dùng sơ đồ trong `statics/`, kết quả chọn lọc ở `statics/results/`, trích dẫn nguồn code/assets/ý tưởng đã sử dụng và phân công thực tế.
+- [ ] Hoàn thiện `report/report.pdf` theo technical paper của học phần; dùng sơ đồ trong `statics/`, kết quả chọn lọc ở `statics/results/` và trích dẫn nguồn. Phần phân công do người dùng tự bổ sung.
 - [ ] Đối chiếu README/bộ source với checklist học phần; diễn tập demo và giải thích protocol/concurrency; Compilatio ≤20% và nộp Drive cần người dùng xác nhận.
 
 ## Phase 08 — Mở rộng sau nghiệm thu
@@ -86,6 +86,8 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 | Phase 05 — Players | PASS — 77 client unit, 54 Java unit; 8 MySQL integration và 6 Chrome online; 27 client E2E. Snapshot mang thứ hạng từ RAM, giữ đồng hạng và loại người đã Leave; Community chỉ so current height. Bảng thu gọn hỗ trợ Enter/Space, không tạo jump; canvas nhận lại focus khi click. Hồi quy reconnect giữ chat History, Community Pause/Continue và capacity 10. Build/type-check và diff check PASS. |
 
 | Phase 05 — Leaderboard trong trận | PASS — 77 client unit, 54 Java unit; 2 MySQL integration và Chrome poll trực tiếp. Bảng Community thu gọn dùng dữ liệu đã commit; mở mới tải, mỗi request cách ít nhất 10 giây, không poll khi đóng/ẩn tab hoặc gửi chồng. Đóng/mở nhanh giữ giới hạn; timer/listener dọn khi unmount. Đã xem ảnh hai bảng trong trận; build/type-check và diff check PASS. |
+
+| Phase 06 — Rà soát | PASS — 77 client unit, 54 Java unit; 77 MySQL integration PASS, 1 load opt-in SKIP, flakes=0; 35 Chrome online/JAR và 27 client E2E. Chat hủy double-tap Fly cũ; preview trên mobile tránh nút cảm ứng. Cấu hình riêng/IDE được ignore, không có key/token khớp mẫu quét trong file tracked. npm audit 0; OSV kiểm tra 73 dependencies runtime, có hai advisory [SSE](https://spring.io/security/cve-2026-47890/)/[XsltView](https://spring.io/security/cve-2026-47884/) nhưng không dùng các chức năng ảnh hưởng. Runner restore qua stdin đã kiểm chứng lại: restart/backup/restore giữ số dòng và checksum ba bảng. Không sửa Origin hoặc dữ liệu cá nhân. |
 
 ## Lịch sử triển khai trước thay đổi kiến trúc
 

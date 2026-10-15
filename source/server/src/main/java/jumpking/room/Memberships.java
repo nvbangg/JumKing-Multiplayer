@@ -37,7 +37,7 @@ public class Memberships {
             if (vacant.stream().anyMatch(members::containsKey)) throw new ApiException(409, "CONFLICT", "Leave your current room before changing identity");
             changing.addAll(owners);
         }
-        // JDBC chạy ngoài registry lock; Join đang đổi identity bị từ chối thay vì chặn tick.
+        // Transaction chạy ngoài registry lock; Join đang đổi identity bị từ chối thay vì chặn tick.
         try { return action.get(); }
         finally { synchronized (this) { changing.removeAll(owners); } }
     }

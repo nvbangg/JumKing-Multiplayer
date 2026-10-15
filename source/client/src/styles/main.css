@@ -84,6 +84,7 @@ button { cursor: pointer; }
 }
 
 .chat-preview { pointer-events: none; }
+@media (pointer: coarse), (max-width: 680px) { .chat-preview { bottom: max(100px, env(safe-area-inset-bottom)); } }
 .in-game-panels { position: absolute; top: 62px; right: 12px; width: min(280px, calc(100vw - 24px)); z-index: 2; font-size: .75rem; }
 .in-game-panel { margin-bottom: 6px; padding: 8px; background: #08090cef; border: 1px solid #6b6250; }
 .in-game-panel summary { cursor: pointer; }

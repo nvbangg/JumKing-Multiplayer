@@ -72,6 +72,7 @@ source/
     maps/
     physics.json
     rules.json
+    room-maps.json                # 10 mốc Finish của Room trên cùng geometry
     adventure.json
     fixtures/
 scripts/                          # schema.sql và tác vụ liên module

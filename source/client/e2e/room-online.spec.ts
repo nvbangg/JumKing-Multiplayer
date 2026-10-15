@@ -339,6 +339,28 @@ test("two Guest browsers Start together, jump and End Match with saved Results a
 		await expect(
 			b.getByRole("button", { name: "New Solo Game", exact: true }),
 		).toBeVisible();
+		await a.bringToFront();
+		await a.getByRole("button", { name: "New Solo Game", exact: true }).click();
+		await expect(
+			a.getByRole("button", { name: "Menu", exact: true }),
+		).toBeVisible();
+		await a.keyboard.down("Space");
+		await a.waitForTimeout(220);
+		await a.keyboard.up("Space");
+		await expect(a.locator(".game-hud")).toContainText("Jumps: 1");
+		await a.getByRole("button", { name: "Menu", exact: true }).click();
+		await a.getByRole("button", { name: "Save & Exit", exact: true }).click();
+		const jumps = a
+			.getByLabel("Total statistics")
+			.locator("div")
+			.filter({ has: a.locator("dt", { hasText: /^Jumps$/ }) })
+			.locator("dd");
+		await expect(jumps).toHaveText("2");
+		expect(
+			(await (await a.request.get("/api/profile/me")).json()).total.totalJumps,
+		).toBe(1);
+		await a.reload();
+		await expect(jumps).toHaveText("2");
 		await a.getByRole("button", { name: "History", exact: true }).click();
 		const history = a
 			.getByLabel("Game history")

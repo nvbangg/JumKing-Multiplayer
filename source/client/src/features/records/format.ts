@@ -13,26 +13,39 @@ export function duration(ms: number | null): string {
 	return `${hours ? hours + ":" : ""}${String(minutes % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 export function soloStatistics(runs: SoloRun[]): Statistics {
-	const total = runs.reduce(
-		(total, run) => {
-			total.totalJumps += run.jumps;
-			total.totalFalls += run.falls;
-			if (run.status === "FINISHED") {
-				total.finishes++;
-				const finish = ticksToMs(run.finishTicks!);
-				total.bestFinishTimeMs =
-					total.bestFinishTimeMs === null
-						? finish
-						: Math.min(total.bestFinishTimeMs, finish);
-			}
-			return total;
-		},
-		{ ...EMPTY_STATS },
-	);
-	total.totalPlayTimeMs = ticksToMs(
-		runs.reduce((ticks, run) => ticks + run.playTicks, 0),
-	);
+	const total = { ...EMPTY_STATS };
+	let ticks = 0;
+	for (const run of runs) {
+		ticks += run.playTicks;
+		total.totalJumps += run.jumps;
+		total.totalFalls += run.falls;
+		if (run.status === "FINISHED") {
+			total.finishes++;
+			const finish = ticksToMs(run.finishTicks!);
+			total.bestFinishTimeMs =
+				total.bestFinishTimeMs === null
+					? finish
+					: Math.min(total.bestFinishTimeMs, finish);
+		}
+	}
+	total.totalPlayTimeMs = ticksToMs(ticks);
 	return total;
+}
+export function sumStatistics(a: Statistics, b: Statistics): Statistics {
+	return {
+		totalPlayTimeMs: a.totalPlayTimeMs + b.totalPlayTimeMs,
+		totalJumps: a.totalJumps + b.totalJumps,
+		totalFalls: a.totalFalls + b.totalFalls,
+		finishes: a.finishes + b.finishes,
+		matchesPlayed: a.matchesPlayed + b.matchesPlayed,
+		wins: a.wins + b.wins,
+		bestFinishTimeMs:
+			a.bestFinishTimeMs === null
+				? b.bestFinishTimeMs
+				: b.bestFinishTimeMs === null
+					? a.bestFinishTimeMs
+					: Math.min(a.bestFinishTimeMs, b.bestFinishTimeMs),
+	};
 }
 export function soloHistory(runs: SoloRun[]): HistoryItem[] {
 	return runs

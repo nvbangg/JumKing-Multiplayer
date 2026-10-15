@@ -2,7 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MenuPanel } from "../components/MenuPanel";
 import { AuthForm } from "../features/account/AuthForm";
 import { OnlineGame } from "../features/community/OnlineGame";
-import { duration, soloStatistics } from "../features/records/format";
+import {
+	duration,
+	soloStatistics,
+	sumStatistics,
+} from "../features/records/format";
 import { HistoryDetail } from "../features/records/HistoryDetail";
 import { HistoryList } from "../features/records/HistoryList";
 import { StatisticsPanel } from "../features/records/StatisticsPanel";
@@ -269,11 +273,14 @@ export function App() {
 	useEffect(() => {
 		if (screen === "play" || screen === "online" || screen === "lobby") return;
 		let disposed = false;
-		void soloRuns(profile)
+		const local = soloRuns(profile)
 			.then((runs) => {
-				if (disposed) return;
-				setActiveSolo(runs.find((run) => run.status === "ACTIVE") || null);
-				if (!identity.authenticated) setStatistics(soloStatistics(runs));
+				const total = soloStatistics(runs);
+				if (!disposed) {
+					setActiveSolo(runs.find((run) => run.status === "ACTIVE") || null);
+					if (!identity.authenticated) setStatistics(total);
+				}
+				return total;
 			})
 			.catch((cause) => {
 				if (!disposed)
@@ -282,32 +289,16 @@ export function App() {
 							? cause.message
 							: "Browser storage is unavailable",
 					);
+				return { ...EMPTY_STATS };
 			});
 		if (identity.authenticated || identity.guest) {
 			void api<{ total: Statistics }>("/profile/me")
-				.then((result) => {
-					if (disposed) return;
-					if (identity.authenticated) setStatistics(result.total);
-					else
-						void soloRuns(profile).then((runs) => {
-							if (disposed) return;
-							const local = soloStatistics(runs),
-								total = result.total;
-							const finishes = [
-								local.bestFinishTimeMs,
-								total.bestFinishTimeMs,
-							].filter((value): value is number => value !== null);
-							setStatistics({
-								...total,
-								totalPlayTimeMs: total.totalPlayTimeMs + local.totalPlayTimeMs,
-								totalJumps: total.totalJumps + local.totalJumps,
-								totalFalls: total.totalFalls + local.totalFalls,
-								finishes: total.finishes + local.finishes,
-								bestFinishTimeMs: finishes.length
-									? Math.min(...finishes)
-									: null,
-							});
-						});
+				.then(async ({ total }) => {
+					const solo = await local;
+					if (!disposed)
+						setStatistics(
+							identity.authenticated ? total : sumStatistics(total, solo),
+						);
 				})
 				.catch(() => {});
 		}

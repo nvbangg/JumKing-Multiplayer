@@ -12,8 +12,6 @@ Solo chỉ cần frontend; Community/Room và Solo sync cần backend/MySQL. Tr�
 | Backend | 127.0.0.1:8080; Vite proxy /api và /ws | Bind IP host hoặc 0.0.0.0 |
 | MySQL | 127.0.0.1:3306 | Chỉ backend truy cập |
 
-VS Code dùng `.vscode/settings.json` để loại `.local/` và `temp/` khỏi import Java/Maven. Sau khi đổi POM hoặc còn project cũ trong IDE, chạy `Java: Clean Java Language Server Workspace` từ Command Palette. Cảnh báo resource `../common` nằm ngoài Maven base directory là cảnh báo của m2e; Maven vẫn đóng gói dữ liệu chung và fixtures theo POM.
-
 ## Cấu hình
 
 | File mẫu trong Git | File riêng được ignore |

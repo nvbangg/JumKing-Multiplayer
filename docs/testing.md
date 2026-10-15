@@ -58,7 +58,7 @@ npm run test:e2e -- e2e/fly.spec.ts
 
 Integration dùng [Testcontainers MySQL](https://java.testcontainers.org/modules/databases/mysql/), Docker và MySQL theo [deployment](deployment.md#runtime-và-workflow). E2E dùng instance cô lập; không reset database cá nhân. Setup test chỉ nạp phần CREATE TABLE của schema.sql vào database test mới/rỗng, không chạy phần DROP/CREATE database hoặc USE. Runner chỉ cleanup resources/fixtures do nó tạo, kể cả khi test lỗi.
 
-Windows không có Docker: chạy `./scripts/test-mysql.ps1 -MySqlHome '<thư mục MySQL 8.4>' -JavaHome '<thư mục JDK 25>'` từ root. Runner tạo instance loopback/cổng ngẫu nhiên, credentials riêng, chạy integration rồi dừng và xóa dữ liệu test; không sửa service/database đang dùng. Thêm `-Web` sau khi build frontend để kiểm tra JAR chứa web và Vite proxy. Integration cũng nhận `JK_TEST_DATABASE_URL/USERNAME/PASSWORD` cho database test rỗng có tên bắt đầu `jumpking_it`; runner bên ngoài chịu trách nhiệm cleanup.
+Windows không có Docker: chạy `./source/database/test-mysql.ps1 -MySqlHome '<thư mục MySQL 8.4>' -JavaHome '<thư mục JDK 25>'` từ root. Runner tạo instance loopback/cổng ngẫu nhiên, credentials riêng, chạy integration rồi dừng và xóa dữ liệu test; không sửa service/database đang dùng. Thêm `-Web` sau khi build frontend để kiểm tra JAR chứa web và Vite proxy. Integration cũng nhận `JK_TEST_DATABASE_URL/USERNAME/PASSWORD` cho database test rỗng có tên bắt đầu `jumpking_it`; runner bên ngoài chịu trách nhiệm cleanup.
 
 Integration chỉ giữ tối đa bốn Spring test contexts để giới hạn tài nguyên của các server thử nghiệm.
 
@@ -72,7 +72,7 @@ Kết quả E2E độc lập ở source/client/test-results; harness online dùn
 
 Integration cũng chạy `IdentityRaceBrowserIT`: giữ phản hồi `/auth/me` ẩn danh thật đến sau khi đăng ký thành công; phản hồi cũ không được ghi đè Account mới. Output ở `.local/browser-identity-race-tests`.
 
-Với `-Web` và `E2E_BROWSER_PATH`, `SchemaIT` còn chạy Chrome trực tiếp từ JAR: Account, Community save/Continue và Room hai người Start/Pause/End/Leave/History; không đi qua Vite. Output ở `.local/browser-packaged-tests`.
+Với `-Web` và `E2E_BROWSER_PATH`, `SchemaIT` còn chạy Chrome trực tiếp từ JAR: Account, Community save/Continue và Room hai người Start/End/Leave/History; không đi qua Vite. Output ở `.local/browser-packaged-tests`.
 
 `ProductionProxyIT` kiểm tra profile prod: Secure cookies, HTTPS headers và rate-limit theo IP qua proxy tin cậy; forwarded headers từ peer khác không được đổi identity IP. `SchemaIT` kiểm tra static revalidation trả 304, API vẫn no-store.
 
@@ -118,7 +118,7 @@ Chơi toàn tuyến bằng input hợp lệ để nghiệm thu platform/charge/c
 
 ## Thực nghiệm và bàn giao
 
-Theo [yêu cầu học phần](course-materials/final-project/Instruction.md), mỗi thực nghiệm có giả thuyết, baseline, workload, môi trường, số mẫu và phân tích giới hạn.
+Theo [yêu cầu học phần](final-project/final-project/Instruction.md), mỗi thực nghiệm có giả thuyết, baseline, workload, môi trường, số mẫu và phân tích giới hạn.
 
 So sánh snapshot-only với prediction/reconciliation bằng cùng map/tuning và workload. Đo input-to-display latency, correction magnitude/frequency, snapshot jitter, tick time/overrun, messages/bytes, CPU/RAM và độ trễ/lỗi persistence. Dùng 1/2/max clients, thêm nhiều phòng để tìm giới hạn; báo p50/p95/p99 khi phù hợp. Không có clock synchronization thì đo RTT, không suy one-way latency.
 
@@ -126,7 +126,7 @@ Các thực nghiệm opt-in, từ root:
 
 ```powershell
 $env:JK_WORKLOAD_RUN = 'true'
-./scripts/test-mysql.ps1 -MySqlHome '<MySQL 8.4>' -JavaHome '<JDK 25>' -IntegrationTest OnlineWorkloadIT
+./source/database/test-mysql.ps1 -MySqlHome '<MySQL 8.4>' -JavaHome '<JDK 25>' -IntegrationTest OnlineWorkloadIT
 Remove-Item Env:JK_WORKLOAD_RUN
 cd source/client
 $env:JK_NETCODE_EXPERIMENT = 'true'

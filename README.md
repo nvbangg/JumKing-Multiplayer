@@ -20,7 +20,7 @@ Client–Server, server-authoritative: client gửi input, server quyết địn
 
 Cần **JDK 25, Node.js 24 và MySQL Server 8.4**. Workbench là công cụ quản trị tùy chọn; không thay MySQL Server. Maven Wrapper được cung cấp sẵn.
 
-**1. Database.** Dừng backend nếu đang chạy, mở `scripts/schema.sql` bằng Workbench và Execute bằng tài khoản quản trị MySQL. Script xóa database `jumpking` nếu đã tồn tại rồi tạo mới toàn bộ bảng; mọi dữ liệu cũ sẽ mất. Trong SQL editor, tạo user ứng dụng một lần; thay password mẫu:
+**1. Database.** Dừng backend nếu đang chạy, mở `source/database/schema.sql` bằng Workbench và Execute bằng tài khoản quản trị MySQL. Script xóa database `jumpking` nếu đã tồn tại rồi tạo mới toàn bộ bảng; mọi dữ liệu cũ sẽ mất. Trong SQL editor, tạo user ứng dụng một lần; thay password mẫu:
 
 ```sql
 CREATE USER 'jumpking_app'@'127.0.0.1' IDENTIFIED BY 'CHANGE_ME';
@@ -98,10 +98,10 @@ Cách đơn giản là chạy cùng JAR trên VPS, MySQL nội bộ và Caddy ph
 | Lệnh kiểm thử và tiêu chí nghiệm thu | [testing](docs/testing.md) |
 | Báo cáo kỹ thuật học phần | [report.md](report/report.md) |
 | Quy trình agent | [AGENTS](AGENTS.md) |
-| Yêu cầu bài tập lớn | [Instruction](docs/course-materials/final-project/Instruction.md) |
+| Yêu cầu bài tập lớn | [Instruction](docs/final-project/final-project/Instruction.md) |
 
 ## Kiểm thử và giới hạn
 
 Lệnh kiểm thử, tiêu chí nghiệm thu và thực nghiệm theo [testing](docs/testing.md).
 
-Giới hạn: Solo metrics do client khai báo; Room gameplay ở RAM, restart không phục hồi trận. Framework và nguồn nội dung theo [architecture](docs/architecture.md), [học phần](docs/course-materials/final-project/Instruction.md) và [attribution](source/client/public/assets/ATTRIBUTION.md).
+Giới hạn: Solo metrics do client khai báo; Room gameplay ở RAM, restart không phục hồi trận. Framework và nguồn nội dung theo [architecture](docs/architecture.md), [học phần](docs/final-project/final-project/Instruction.md) và [attribution](source/client/public/assets/ATTRIBUTION.md).

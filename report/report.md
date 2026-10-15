@@ -187,7 +187,7 @@ Hệ thống thể hiện Client-Server hai chiều, xử lý nhiều connection
 
 [8] Spring. CVE-2026-47884, Improper Path Limitation in XsltView, 20/08/2026. [Security advisory](https://spring.io/security/cve-2026-47884/).
 
-Nguồn web được đối chiếu ngày 15/10/2026. Cấu trúc báo cáo và tiêu chí nghiệm thu theo `docs/course-materials/final-project/Instruction.md` của học phần Lập trình mạng 2026-2027.
+Nguồn web được đối chiếu ngày 15/10/2026. Cấu trúc báo cáo và tiêu chí nghiệm thu theo `docs/final-project/final-project/Instruction.md` của học phần Lập trình mạng 2026-2027.
 
 ## Phụ lục: tái lập và trình bày
 

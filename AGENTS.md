@@ -2,7 +2,7 @@
 
 ## Mục tiêu
 
-Xây dựng website game online nhiều người chơi theo mô hình server-authoritative, lấy cảm hứng từ Jump King; đáp ứng yêu cầu bài tập lớn trong `docs/course-materials/`.
+Xây dựng website game online nhiều người chơi theo mô hình server-authoritative, lấy cảm hứng từ Jump King; đáp ứng yêu cầu bài tập lớn trong `docs/final-project/`.
 
 ## Cách làm việc
 
@@ -24,7 +24,7 @@ Xây dựng website game online nhiều người chơi theo mô hình server-aut
 | docs/data.md | Thiết kế database, lưu tiến độ và thành tích |
 | docs/deployment.md | Cài đặt, cấu hình và triển khai Local/LAN/ZeroTier/Internet |
 | docs/testing.md | Kiểm thử, nghiệm thu và đo hiệu năng |
-| docs/course-materials/ | Yêu cầu bài tập lớn và tài liệu học phần; chỉ đọc |
+| docs/final-project/ | Yêu cầu bài tập lớn và tài liệu học phần; chỉ đọc |
 
 Mỗi quyết định có một tài liệu trong `docs/` làm nguồn chính, tài liệu khác dẫn link thay vì sao chép. `docs/` chứa thiết kế và hướng dẫn lâu dài; Thay đổi thiết kế phải cập nhật đúng tài liệu.
 

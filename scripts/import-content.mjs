@@ -71,7 +71,7 @@ textureKeys.add('particles/snow_jump_particle');
 const fonts = Object.fromEntries(Object.entries(manifest.fonts).filter(([key]) => ['font/sf_pixolde', 'font/sf_litter_lover2_bold'].includes(key)));
 const textures = Object.fromEntries([...textureKeys].filter(key => manifest.textures[key]).map(key => [key, manifest.textures[key]]));
 const sounds = Object.fromEntries([...soundKeys].filter(key => manifest.sounds[key]).map(key => [key, manifest.sounds[key]]));
-const output = path.join(root, 'frontend/public/assets');
+const output = path.join(root, 'source/client/public/assets');
 await mkdir(output, { recursive: true });
 let previousHashes = {};
 try { previousHashes = JSON.parse(await readFile(path.join(output, 'manifest.json'), 'utf8')).hashes || {}; }
@@ -98,16 +98,16 @@ for (const file of files) {
 }
 const presentation = { screens: screens.map(({ tiles, wind, teleport, ...display }) => display), npcs, items, itemTextures, skins, birds, messages, merchants, walls, fonts, textures, sounds, hashes };
 for (const [file, data] of [
-  ['shared/maps/main-babe.json', world],
-  ['shared/adventure.json', adventure],
-  ['frontend/public/assets/manifest.json', presentation],
+  ['source/common/maps/main-babe.json', world],
+  ['source/common/adventure.json', adventure],
+  ['source/client/public/assets/manifest.json', presentation],
 ]) {
   const destination = path.join(root, file);
   await mkdir(path.dirname(destination), { recursive: true });
   await writeFile(destination, JSON.stringify(data, null, 2) + '\n');
 }
 if (process.argv[4]) {
-  await mkdir(path.join(root, 'shared/fixtures'), { recursive: true });
-  await writeFile(path.join(root, 'shared/fixtures/main-babe-route.json'), JSON.stringify(JSON.parse(await readFile(process.argv[4], 'utf8')), null, 2) + '\n');
+  await mkdir(path.join(root, 'source/common/fixtures'), { recursive: true });
+  await writeFile(path.join(root, 'source/common/fixtures/main-babe-route.json'), JSON.stringify(JSON.parse(await readFile(process.argv[4], 'utf8')), null, 2) + '\n');
 }
 console.log(JSON.stringify({ screens: world.screens.length, textures: Object.keys(textures).length, sounds: Object.keys(sounds).length, npcs: npcs.length, files: files.size }));

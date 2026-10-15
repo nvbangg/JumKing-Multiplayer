@@ -10,20 +10,7 @@
 | Online | Spring Boot/Java quyết định physics, thời gian, tiến độ và kết quả |
 | Persistence | MySQL + Spring Data JPA/Hibernate: identity, lượt chơi, checkpoint và kết quả |
 
-```mermaid
-flowchart LR
-    UI[React UI] --> TS[TypeScript simulation]
-    TS --> View[Phaser]
-    TS <--> Local[Browser storage - Solo]
-    UI <--> Net[HTTP / WebSocket]
-    TS <--> Net
-    Net <--> Server[Spring Boot]
-    Server --> World[Community / Room executor]
-    World --> Java[Java simulation]
-    World --> Writer[Persistence worker]
-    Writer --> DB[(MySQL)]
-    Server --> DB
-```
+![Kiến trúc hệ thống](../statics/architecture.svg)
 
 Solo mô phỏng/lưu local, đồng bộ metrics Account qua HTTP khi có mạng. Community/Room nhận input qua WebSocket; Java quyết định state, TypeScript dự đoán nhân vật của mình và nội suy peers. HTTP xử lý identity/Records theo [protocol](protocol.md).
 
@@ -33,7 +20,7 @@ Adventure tách dữ liệu luật, trạng thái lượt chơi và nội dung h
 
 | Phần | Nơi sở hữu |
 | --- | --- |
-| Trigger hội thoại và tiến độ nội dung | shared/adventure.json; hai simulation cùng dùng |
+| Trigger hội thoại và tiến độ nội dung | source/common/adventure.json; hai simulation cùng dùng |
 | Tiến độ hội thoại trong lượt | Simulation; server quyết định online, TypeScript quyết định Solo |
 | Câu chữ hội thoại, nhãn, metadata sprite/animation và âm thanh | Frontend; tra cứu bằng ID từ rule/state |
 
@@ -41,57 +28,58 @@ Backend chỉ nạp luật và state gameplay; nội dung hiển thị thuộc f
 
 ## Cấu trúc code
 
-`frontend/` dùng npm, `backend/` dùng Maven; build độc lập. `shared/` chứa dữ liệu JSON dùng chung.
+`source/client/` dùng npm, `source/server/` dùng Maven; build độc lập. `source/common/` chứa dữ liệu JSON dùng chung.
 
 ```text
-backend/
-  config/                         # cấu hình mẫu và file riêng được ignore
-  src/main/java/jumpking/
-    JumpKingApplication.java
-    controller/                   # REST endpoints, nhận/trả DTO
-    service/                      # nghiệp vụ, transactions và ghi bất đồng bộ
-    repository/                   # JPA repositories và query projections
-    entity/                       # User, PlayRun, Match ánh xạ MySQL
-    dto/                          # request/response, không trả Entity
-    security/                     # identity, session, rate limits
-    exception/                    # lỗi HTTP thống nhất
-    game/                         # Java simulation và luật xếp hạng
-    room/                         # Community, Room và lifecycle
-    network/                      # WebSocket transport, envelope và connection
-    config/                       # Spring wiring, security và cấu hình
-  src/main/resources/
-  src/test/java/jumpking/          # tests theo package production
-  src/test/resources/              # dữ liệu kiểm thử riêng backend
-  .mvn/                           # Maven Wrapper
-  pom.xml
-  mvnw
-  mvnw.cmd
-frontend/
-  public/
-    assets/                       # game assets tải động, manifest và ATTRIBUTION.md
-  src/
-    app/                          # routing và bootstrap
-    features/                     # solo, community, rooms, account, records
-    components/                   # UI dùng chung
-    game/                         # scenes, simulation, netcode, presentation
-      content/                    # lời thoại, nhãn và metadata hiển thị theo ID
-    network/                      # HTTP/WS adapter
-    styles/
-    main.tsx                      # entry point
-  e2e/
-  index.html
-  package.json
-  package-lock.json
-  vite.config.ts
-shared/
-  maps/                           # Main Babe geometry và metadata
-  physics.json                    # tuning vật lý
-  rules.json                      # luật/capacity/timing công khai
-  adventure.json                  # trigger và tiến độ hội thoại
-  fixtures/                       # input traces và expected states
+source/
+  client/                         # React/TypeScript và Phaser
+    public/assets/                # manifest, game assets và attribution
+    src/
+      app/                        # routing và bootstrap
+      features/                   # solo, community, rooms, account, records
+      components/                 # UI dùng chung
+      game/                       # simulation, input, netcode và presentation
+        content/                  # lời thoại và metadata hiển thị
+      network/                    # HTTP/WebSocket adapter
+      styles/
+      main.tsx
+    e2e/
+    package.json
+    package-lock.json
+    vite.config.ts
+  server/                         # Spring Boot
+    config/                       # file mẫu và cấu hình riêng được ignore
+    src/main/java/jumpking/
+      JumpKingApplication.java
+      controller/                 # REST API
+      service/                    # nghiệp vụ, transactions và persistence workers
+      repository/                 # JPA repositories và projections
+      entity/                     # ánh xạ MySQL
+      dto/                        # request/response
+      security/                   # identity, session và rate limits
+      exception/                  # lỗi HTTP
+      config/                     # Spring wiring và runtime settings
+      game/                       # simulation và luật xếp hạng
+      room/                       # Community/Room lifecycle
+      network/                    # WebSocket và dispatch
+    src/main/resources/
+    src/test/                     # tests và test resources
+    .mvn/
+    pom.xml
+    mvnw
+    mvnw.cmd
+  common/                         # JSON dùng chung, không chứa mã thực thi
+    maps/
+    physics.json
+    rules.json
+    adventure.json
+    fixtures/
 scripts/                          # schema.sql và tác vụ liên module
-docs/
+docs/                             # thiết kế, runbooks và tài liệu học phần
+statics/                          # sơ đồ kiến trúc/protocol và hình thực nghiệm
 ```
+
+Báo cáo bàn giao đặt tại `report/report.pdf`; hình và kết quả được chọn để trình bày ở `statics/results/`. Chỉ thêm khi có nội dung thật. Service/queue/worker là thành phần nội bộ của server, không tách thêm ứng dụng hoặc thư mục service ở root.
 
 Java dùng root package `jumpking`, main class đặt tại root để Spring scan. Backend chia theo layer controller/service/repository/entity/dto; `network` chỉ xử lý transport/dispatch, `game` giữ luật thuần. Controller nhận/trả DTO, Service sở hữu nghiệp vụ/transaction, Repository truy cập MySQL. Không trả Entity qua API hoặc giữ managed Entity trong simulation/worker. JPA không nằm trong vòng tick; worker trao đổi snapshot bất biến. Không tạo interface/base class chỉ để chuyển tiếp lời gọi.
 
@@ -99,7 +87,7 @@ Frontend nhóm màn hình/hooks theo feature. `game` giữ simulation/input/pres
 
 Phaser tải assets giữ nguyên tên từ `public/assets`; tài nguyên UI được import đặt cạnh component/feature trong `src`.
 
-Dữ liệu shared đóng gói vào cả hai build; backend nạp từ classpath, không phụ thuộc source khi chạy JAR. Client online dùng map/config server công bố và luật adventure cùng bản phát hành. Nội dung frontend liên kết bằng ID; shared không chứa lời thoại/font/đường dẫn assets. URL/secrets theo [deployment](deployment.md).
+Dữ liệu common đóng gói vào cả hai build; backend nạp từ classpath, không phụ thuộc source khi chạy JAR. Client online dùng map/config server công bố và luật adventure cùng bản phát hành. Nội dung frontend liên kết bằng ID; common không chứa lời thoại/font/đường dẫn assets. URL/secrets theo [deployment](deployment.md).
 
 Profile web đóng gói frontend vào JAR. Static files được browser lưu và revalidate bằng Last-Modified; API giữ no-store. SPA fallback index.html chỉ áp dụng route UI, không áp dụng API/WS/asset thiếu.
 

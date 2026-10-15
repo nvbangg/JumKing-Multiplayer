@@ -4,6 +4,8 @@
 
 HTTP JSON `/api`, raw WebSocket `/ws/game`, contract version 1. Solo chỉ dùng HTTP sync; Community/Room nhận map/tuning từ server. Luật/lifecycle theo [gameplay](gameplay.md), ownership/persistence theo [data](data.md).
 
+![Luồng giao tiếp Room](../statics/protocol.svg)
+
 ## Identity và security
 
 Account dùng Spring Security server-side session, không JWT; Guest dùng cookie opaque `JK_GUEST`, hạn 365 ngày. Cookies HttpOnly, SameSite=Lax, Path=/, host-only; Secure theo [deployment](deployment.md#cấu-hình).

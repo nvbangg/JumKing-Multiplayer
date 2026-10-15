@@ -1,0 +1,18 @@
+{
+  "java.import.exclusions": [
+    "**/node_modules/**",
+    "**/.metadata/**",
+    "**/archetype-resources/**",
+    "**/META-INF/maven/**",
+    "**/.local/**",
+    "**/temp/**"
+  ],
+  "maven.excludedFolders": [
+    "**/.*",
+    "**/node_modules",
+    "**/target",
+    "**/bin",
+    "**/archetype-resources",
+    "**/temp"
+  ]
+}

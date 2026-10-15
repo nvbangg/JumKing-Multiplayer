@@ -19,6 +19,7 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 - [x] Chuyển Community checkpoint/New Run/Finish và worker; hồi quy Continue/retry.
 - [x] Chuyển Room writer/recovery; kiểm thử ghi/finalize đúng một lần.
 - [x] Chuyển Stats/History/leaderboard/current sang projections/Repository; chuẩn hóa controller/service/repository/entity/dto và tests; bỏ đường JDBC và SQL ngoài repository.
+- [x] Tổ chức source/client, source/server, source/common và statics theo học phần; đồng bộ build/scripts/hướng dẫn chạy, bảo toàn cấu hình riêng và hồi quy.
 
 ## Phase 03 — Tinh giản nội dung
 
@@ -47,8 +48,9 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 
 - [ ] Hồi quy gameplay/auth/save/history/chat/Room, network/DB failures và 10 mốc Finish.
 - [ ] Chơi trực tiếp mobile, nhiều identities và LAN/ZeroTier hai thiết bị; ghi phần cần người dùng hỗ trợ.
-- [ ] Đo RTT/message rate/tick/CPU/heap và so sánh snapshot-only/prediction bằng số liệu thật.
-- [ ] Hoàn thiện demo/báo cáo theo học phần, contribution và phân công thật; Compilatio/nộp Drive cần người dùng xác nhận.
+- [ ] Chốt đóng góp kỹ thuật và baseline; đo RTT/message rate/tick/CPU/heap, so sánh snapshot-only/prediction bằng số liệu thật, phân tích ưu/nhược điểm và giới hạn.
+- [ ] Hoàn thiện `report/report.pdf` theo technical paper của học phần; dùng sơ đồ trong `statics/`, kết quả chọn lọc ở `statics/results/`, trích dẫn nguồn code/assets/ý tưởng đã sử dụng và phân công thực tế.
+- [ ] Đối chiếu README/bộ source với checklist học phần; diễn tập demo và giải thích protocol/concurrency; Compilatio ≤20% và nộp Drive cần người dùng xác nhận.
 
 ## Phase 08 — Mở rộng sau nghiệm thu
 
@@ -62,16 +64,13 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 | Mốc | Kiểm chứng |
 | --- | --- |
 | Phase 00–01 | PASS — 68 links/anchors; backend unit tests và 16 MySQL integration tests (IdentityIT, JpaPersistenceIT), JSON/timestamp round-trip. Schema/database cá nhân không thay đổi. Các Service JDBC chuyển theo Phase 02; gameplay mới chưa nghiệm thu. |
-
 | Phase 02 — Identity | PASS — 51 unit tests, 18 MySQL integration tests; 22 Chrome online và 1 identity-race PASS. Account/Guest/authentication dùng UserRepository, không đổi contract/session hoặc database cá nhân. |
-
 | Phase 02 — Merge/Solo | PASS — 51 unit và 19 MySQL integration tests (Identity, Community, Room writer). Giữ kiểm tra retry/conflict/rollback và late writer sau Merge. Fixture Room chuyển sang Spring bean để cùng datasource/transaction JPA; lượt lỗi fixture ban đầu không tính PASS. |
-
 | Phase 02 — Community | PASS — 51 unit và 9 MySQL integration tests, gồm New Run/Continue, rollback và save failure. Flush lượt cũ trước insert để giữ generated unique ACTIVE; không sửa database cá nhân. |
-
 | Phase 02 — Room writer | PASS — 51 unit; 14 MySQL integration tests qua hai nhóm, gồm Race/Hardcore/Time Limit/No Walk, Host Pause, rollback/late merge, writer và restart ABORTED. Match và roster cùng transaction JPA; entity không đi vào actor. |
-
 | Phase 02 — Layer/Read Repository | PASS — clean build, 51 unit tests; 72 MySQL integration tests gồm 71 PASS và 1 load opt-in SKIP, flakes=0; 30 Chrome PASS qua các harness, gồm JAR cùng origin. Frontend build/type-check, 68 links/anchors và diff check PASS. Không còn JdbcTemplate trong production, SQL nằm ở Repository; DTO tách khỏi Controller/Service, tests theo package mới. Không reset database/cấu hình riêng. |
+| Rà soát nền tảng trước Phase 03 | PASS — 51 unit và 7 MySQL integration tests (SchemaIT, JpaPersistenceIT); JDT resource analysis không còn cảnh báo TestDatabase. Container được đóng khi khởi tạo lỗi hoặc JVM kết thúc; IDE bỏ qua các bản sao thử nghiệm. Nhánh Docker chưa chạy thực tế; integration dùng MySQL cô lập. Cảnh báo m2e về shared ngoài backend còn có thể xuất hiện, không làm Maven build lỗi. |
+| Cấu trúc theo học phần | PASS — source/client, source/server, source/common; Maven/Vite/scripts và hướng dẫn chạy đã đồng bộ. 68 client unit tests, 51 Java unit tests, 71 MySQL integration PASS và 1 load opt-in SKIP; 57 Chrome PASS (27 client, 30 online/JAR), build và 72 links/anchors PASS. Sơ đồ architecture/protocol đã render kiểm tra; dữ liệu/cấu hình riêng và tài liệu học phần được giữ nguyên. Báo cáo, thực nghiệm mới và nghiệm thu hai thiết bị vẫn thuộc Phase 07. |
 
 ## Lịch sử triển khai trước thay đổi kiến trúc
 

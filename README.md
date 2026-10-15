@@ -1,14 +1,20 @@
 # JumpKing Multiplayer
 
-Website game Jump King với một map Main Babe đầy đủ, hỗ trợ chơi đơn và nhiều người qua mạng.
+Website game Jump King với một map Main Babe đầy đủ, hỗ trợ chơi đơn và nhiều người qua mạng. Thuộc Chủ đề 2 – Phát triển game mạng: đồng bộ trạng thái nhiều client, xử lý kết nối đồng thời và lưu tiến độ/kết quả nhất quán.
 
 | Kiểu chơi | Mục đích |
 | --- | --- |
 | Solo | Luyện tập offline, autosave/Continue; Account đồng bộ thống kê khi có mạng, không lên leaderboard |
 | Community Tower | Account chơi cùng sảnh, lưu tiến độ trên server và tính leaderboard |
-| Room | Public/Private, join danh sách hoặc ID, tối thiểu 2 người và Host Start; Race, Hardcore, Time Limit hoặc No Walk; Results và History |
+| Room | Tạo phòng, Join by ID, tối thiểu 2 người và Host Start; Race, Hardcore, Time Limit hoặc No Walk; Results và History |
 
 Frontend dùng React + TypeScript/Phaser; backend Spring Boot/Java quyết định trạng thái và kết quả online. Spring Data JPA/Hibernate truy cập MySQL để lưu identity, lượt chơi và trận Room. Thống kê tổng và History gồm Solo, Community và Room; Guest có thể Merge lịch sử Room vào Account. Luật chơi trong [gameplay](docs/gameplay.md); tiến độ triển khai trong [PLAN](PLAN.md).
+
+## Kiến trúc
+
+![Kiến trúc hệ thống](statics/architecture.svg)
+
+Client–Server, server-authoritative: client gửi input, server quyết định trạng thái và kết quả online. HTTP/REST phục vụ Account/Records; WebSocket trao đổi input/snapshot. Queue và workers nằm trong một backend, ghi MySQL ngoài vòng tick. [Chi tiết](docs/architecture.md)
 
 ## Cài đặt và chạy
 
@@ -26,11 +32,11 @@ Database đã có dữ liệu cần [SQL nâng cấp riêng](docs/deployment.md#
 **2. Cấu hình riêng.** Từ root project:
 
 ```powershell
-Copy-Item backend/config/application-local.properties.example backend/config/application-local.properties
-Copy-Item frontend/.env.example frontend/.env.local
+Copy-Item source/server/config/application-local.properties.example source/server/config/application-local.properties
+Copy-Item source/client/.env.example source/client/.env.local
 ```
 
-Trong `backend/config/application-local.properties`, điền:
+Trong `source/server/config/application-local.properties`, điền:
 
 ```properties
 spring.datasource.url=jdbc:mysql://127.0.0.1:3306/jumpking?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
@@ -38,26 +44,26 @@ spring.datasource.username=jumpking_app
 spring.datasource.password=CHANGE_ME
 ```
 
-Password phải trùng user vừa tạo; đổi host/port nếu MySQL chạy nơi khác. Giữ các giá trị còn lại trong file mẫu. `frontend/.env.local` dùng mặc định khi chạy local, không cần thêm secrets. Hai file riêng được Git ignore; chỉ commit các file `.example`. Backend không tự đọc file `.env`.
+Password phải trùng user vừa tạo; đổi host/port nếu MySQL chạy nơi khác. Giữ các giá trị còn lại trong file mẫu. `source/client/.env.local` dùng mặc định khi chạy local, không cần thêm secrets. Hai file riêng được Git ignore; chỉ commit các file `.example`. Backend không tự đọc file `.env`.
 
 **3. Chạy hai terminal** từ root project. Backend:
 
 ```powershell
-cd backend
+cd source/server
 .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=local"
 ```
 
 Frontend:
 
 ```powershell
-cd frontend
+cd source/client
 npm ci
 npm run dev
 ```
 
-Mở **http://127.0.0.1:5173**. Backend dùng **8080**, MySQL **3306**. Linux/macOS thay mvnw.cmd bằng ./mvnw và Copy-Item bằng cp. Hai người trên cùng máy dùng hai browser profiles hoặc normal/incognito, chỉ chạy một backend; không cần hai máy hoặc hai backend.
+Mở **http://127.0.0.1:5173**. Backend dùng **8080**, MySQL **3306**. Linux/macOS thay `.\mvnw.cmd` bằng `sh mvnw`, `Copy-Item` bằng `cp`. Hai người trên cùng máy dùng hai browser profiles hoặc normal/incognito, chỉ chạy một backend; không cần hai máy hoặc hai backend.
 
-**Build một ứng dụng:** tại frontend chạy `npm run build`; tại backend chạy `.\mvnw.cmd -Pweb clean package`, rồi `java -jar target/jumpking-server.jar --spring.profiles.active=local`. Mở **http://127.0.0.1:8080**; JAR phục vụ cả frontend/backend, không cần Vite. Dừng backend development trước để giải phóng cổng 8080. Các lệnh cài dependencies/build lần đầu cần Internet.
+**Build một ứng dụng:** tại `source/client/` chạy `npm run build`; tại `source/server/` chạy `.\mvnw.cmd -Pweb clean package`, rồi `java -jar target/jumpking-server.jar --spring.profiles.active=local`. Mở **http://127.0.0.1:8080**; JAR phục vụ cả frontend/backend, không cần Vite. Dừng backend development trước để giải phóng cổng 8080. Các lệnh cài dependencies/build lần đầu cần Internet.
 
 ## Demo nhanh
 
@@ -96,6 +102,6 @@ Cách đơn giản là chạy cùng JAR trên VPS, MySQL nội bộ và Caddy ph
 
 ## Kiểm thử, thực nghiệm và đóng góp
 
-Lệnh và tiêu chí kiểm thử ở [testing](docs/testing.md); kết quả đo và trạng thái nghiệm thu ở [PLAN](PLAN.md). Đánh giá kỹ thuật tập trung vào server-authoritative, đồng bộ input/snapshot, prediction và lưu kết quả nhất quán; mỗi đóng góp cần code và thực nghiệm đối chiếu, không coi thay đổi giao diện/JPA là novelty.
+Kiểm thử nhanh: tại `source/client/` chạy `npm test`; tại `source/server/` chạy `.\mvnw.cmd test`. Integration, tiêu chí và thực nghiệm theo [testing](docs/testing.md); kết quả và trạng thái nghiệm thu ở [PLAN](PLAN.md). Đánh giá kỹ thuật tập trung vào server-authoritative, đồng bộ input/snapshot, prediction và lưu kết quả nhất quán; mỗi đóng góp cần code và thực nghiệm đối chiếu, không coi thay đổi giao diện/JPA là novelty.
 
-Giới hạn: Solo metrics do client khai báo; Room gameplay ở RAM, restart không phục hồi trận. Nghiệm thu LAN/ZeroTier hai thiết bị, báo cáo, phân công nhóm và Compilatio phải có bằng chứng trước nộp. Framework và nguồn nội dung theo [architecture](docs/architecture.md), [học phần](docs/course-materials/final-project/Instruction.md) và [attribution](frontend/public/assets/ATTRIBUTION.md).
+Giới hạn: Solo metrics do client khai báo; Room gameplay ở RAM, restart không phục hồi trận. Nghiệm thu LAN/ZeroTier hai thiết bị, báo cáo, phân công nhóm và Compilatio phải có bằng chứng trước nộp. Framework và nguồn nội dung theo [architecture](docs/architecture.md), [học phần](docs/course-materials/final-project/Instruction.md) và [attribution](source/client/public/assets/ATTRIBUTION.md).

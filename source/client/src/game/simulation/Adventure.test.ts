@@ -1,0 +1,66 @@
+import { expect, test } from 'vitest';
+import { Adventure } from './Adventure';
+import { GameSimulation } from './GameSimulation';
+import { Simulation } from './Simulation';
+import { NEUTRAL_INPUT } from './types';
+import map from '../../../../common/maps/main-babe.json';
+import fixtures from '../../../../common/fixtures/adventure-traces.json';
+import route from '../../../../common/fixtures/main-babe-route.json';
+import checkpoints from '../../../../common/fixtures/main-babe-checkpoints.json';
+
+function projection(adventure: Adventure) {
+  const state = adventure.snapshot();
+  return { inventory: state.inventory, equipped: state.equipped, collected: state.collected, flags: state.flags,
+    birds: state.birds, merchants: state.merchants,
+    readables: Object.fromEntries(Object.entries(state.readables).filter(([, s]) => s.wait > 0 || s.done)),
+    dialogue: Object.fromEntries(Object.entries(state.dialogue).map(([id, s]) => [id, {
+      introduced: s.introduced, best: s.best, loop: s.loop, flags: s.flags, line: s.line, ticks: s.ticks, wait: s.wait, busy: s.busy, talks: s.talks,
+      quoteLengths: s.quote === null ? [] : adventure.quoteLengths(id, s.quote), poolLengths: s.pool.map(quote => adventure.quoteLengths(id, quote)),
+    }])),
+  };
+}
+test.each(fixtures.cases)('adventure matches independent checkpoints: $name', fixture => {
+  let adventure = new Adventure(map), player = new Simulation(map).snapshot();
+  for (const [index, step] of fixture.steps.entries()) {
+    if ('operation' in step) { expect(step.operation).toBe('COMPLETE'); adventure.complete(); }
+    else {
+      player = { ...player, ...step.player };
+      for (let i = 0; i < step.ticks; i++) { player.ticks++; adventure.tick(player, step.input); }
+    }
+    expect(projection(adventure), fixture.name + '/' + index).toEqual(step.expected);
+    const restored = new Adventure(map); restored.restore(adventure.snapshot()); adventure = restored;
+  }
+});
+test('equipment validates ownership and layer and malformed adventure restore is atomic', () => {
+  const adventure = new Adventure(map, ['Cap', 'Shoes']);
+  expect(adventure.equip('Crown', true)).toBe(false);
+  adventure.complete();
+  expect(adventure.snapshot().equipped).toEqual(['Shoes', 'Crown']);
+  expect(adventure.equip('Cap', true)).toBe(true);
+  expect(adventure.snapshot().equipped).toEqual(['Shoes', 'Cap']);
+  const saved = adventure.snapshot();
+  expect(() => adventure.restore({ ...saved, inventory: { GoldRing: -1 } })).toThrow();
+  expect(() => adventure.restore({ ...saved, equipped: ['Cap', 'Crown'] })).toThrow();
+  expect(adventure.snapshot()).toEqual(saved);
+});
+test('full game restores adventure and environment without changing the legitimate physics route', () => {
+  const game = new GameSimulation(map);
+  for (let i = 0; i < 30; i++) game.tick(NEUTRAL_INPUT);
+  for (const [index, action] of route.entries()) {
+    if ('walk' in action) {
+      for (let i = 0; i < action.ticks!; i++) game.tick({ left: action.walk! < 0, right: action.walk! > 0, jump: false });
+    } else {
+      game.tick(NEUTRAL_INPUT);
+      for (let i = 0; i < action.charge!; i++) game.tick({ left: action.charge === 36 && action.direction! < 0, right: action.charge === 36 && action.direction! > 0, jump: true });
+      if (action.charge !== 36) game.tick({ left: action.direction! < 0, right: action.direction! > 0, jump: false });
+      for (let i = 0; i < 180; i++) { game.tick(NEUTRAL_INPUT); if (game.physics.snapshot().grounded && i > 0) break; }
+    }
+    expect(game.physics.snapshot()).toEqual(checkpoints[index]);
+    if (index % 17 === 0) game.restore(game.snapshot());
+  }
+  expect(game.finished).toBe(true); expect(game.adventure.has('Crown')).toBe(true);
+  expect(new Set(game.snapshot().world.registeredScreens).size).toBe(43);
+  const state = game.snapshot();
+  expect(() => game.restore({ ...state, world: { ...state.world, lastTick: state.physics.ticks + 1 } })).toThrow();
+  expect(game.snapshot()).toEqual(state);
+});

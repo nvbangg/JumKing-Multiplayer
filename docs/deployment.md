@@ -12,15 +12,17 @@ Solo chỉ cần frontend; Community/Room và Solo sync cần backend/MySQL. Tr�
 | Backend | 127.0.0.1:8080; Vite proxy /api và /ws | Bind IP host hoặc 0.0.0.0 |
 | MySQL | 127.0.0.1:3306 | Chỉ backend truy cập |
 
+VS Code dùng `.vscode/settings.json` để loại `.local/` và `temp/` khỏi import Java/Maven. Sau khi đổi POM hoặc còn project cũ trong IDE, chạy `Java: Clean Java Language Server Workspace` từ Command Palette. Cảnh báo resource `../common` nằm ngoài Maven base directory là cảnh báo của m2e; Maven vẫn đóng gói dữ liệu chung và fixtures theo POM.
+
 ## Cấu hình
 
 | File mẫu trong Git | File riêng được ignore |
 | --- | --- |
-| backend/config/application-local.properties.example | backend/config/application-local.properties |
-| backend/config/application-prod.properties.example | backend/config/application-prod.properties |
-| frontend/.env.example | frontend/.env.local |
+| source/server/config/application-local.properties.example | source/server/config/application-local.properties |
+| source/server/config/application-prod.properties.example | source/server/config/application-prod.properties |
+| source/client/.env.example | source/client/.env.local |
 
-Chạy backend từ `backend/`; profile local/prod đọc file tương ứng trong `config/`. Spring không tự nạp `.env`; backend dùng properties hoặc process ENV. Ví dụ local:
+Chạy backend từ `source/server/`; profile local/prod đọc file tương ứng trong `config/`. Spring không tự nạp `.env`; backend dùng properties hoặc process ENV. Ví dụ local:
 
 ```properties
 spring.datasource.url=jdbc:mysql://127.0.0.1:3306/jumpking?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
@@ -61,17 +63,17 @@ IP/port trong file mẫu là mặc định local, không phải địa chỉ b�
 | APP_PERSISTENCE_THREADS / QUEUE / RUN_QUEUE | app.persistence-threads=2, app.persistence-queue=256, app.persistence-run-queue=16; workers chung và hàng chờ từng lượt |
 | FLY_ENABLED | app.fly-enabled=${FLY_ENABLED:false}; mặc định false |
 
-Ưu tiên config: command-line → process ENV → external properties → JAR. Backend validate datasource/allowlist. Gameplay/rules ở shared, network bounds theo protocol, presentation ở frontend config. [Spring external config](https://docs.spring.io/spring-boot/reference/features/external-config.html)
+Ưu tiên config: command-line → process ENV → external properties → JAR. Backend validate datasource/allowlist. Gameplay/rules ở source/common, network bounds theo protocol, presentation ở frontend config. [Spring external config](https://docs.spring.io/spring-boot/reference/features/external-config.html)
 
 Root .gitignore chứa quy tắc chung; mỗi module ignore config riêng, dependencies, build/test output.
 
-`backend/config/` chỉ đưa các mẫu `.properties.example` lên Git. File thực tế phải có quyền đọc giới hạn cho người chạy ứng dụng. Tài khoản MySQL chỉ có quyền DML trong database của game; không dùng root.
+`source/server/config/` chỉ đưa các mẫu `.properties.example` lên Git. File thực tế phải có quyền đọc giới hạn cho người chạy ứng dụng. Tài khoản MySQL chỉ có quyền DML trong database của game; không dùng root.
 
 ## Fly Mode local
 
-Solo: đặt `FLY_ENABLED=true` trong `frontend/.env.local`, restart `npm run dev`. Vite config đọc bằng loadEnv; chỉ dev server cho bay, mọi build đều tắt. [Vite conditional config](https://vite.dev/config/#conditional-config)
+Solo: đặt `FLY_ENABLED=true` trong `source/client/.env.local`, restart `npm run dev`. Vite config đọc bằng loadEnv; chỉ dev server cho bay, mọi build đều tắt. [Vite conditional config](https://vite.dev/config/#conditional-config)
 
-Community/Room: đặt `$env:FLY_ENABLED='true'` trong terminal backend rồi chạy Maven/JAR profile local; đổi cờ cần restart. Backend đọc process ENV qua property ở trên, không đọc frontend/.env.local. UI nhận `features.flyEnabled` từ game-config; quyền áp dụng mọi player kể cả LAN/ZeroTier.
+Community/Room: đặt `$env:FLY_ENABLED='true'` trong terminal backend rồi chạy Maven/JAR profile local; đổi cờ cần restart. Backend đọc process ENV qua property ở trên, không đọc source/client/.env.local. UI nhận `features.flyEnabled` từ game-config; quyền áp dụng mọi player kể cả LAN/ZeroTier.
 
 Mặc định false; profile prod luôn ép false dù ENV=true. Khi deploy vẫn đặt false. Cờ công khai; điều khiển và xử lý save/thành tích theo [gameplay](gameplay.md#fly-mode).
 
@@ -94,26 +96,26 @@ Backup bằng mysqldump/Workbench vào `.local/backups/`, dùng prompt nhập pa
 
 ## Chạy development và build
 
-Lệnh PowerShell dưới đây; Linux/macOS thay `.\mvnw.cmd` bằng `./mvnw` và dùng cú pháp copy của shell.
+Lệnh PowerShell dưới đây; Linux/macOS thay `.\mvnw.cmd` bằng `sh mvnw` và dùng cú pháp copy của shell.
 
 Từ root, copy các file mẫu theo bảng cấu hình và điền datasource. Terminal backend:
 
 ```powershell
-cd backend
+cd source/server
 .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=local"
 ```
 
 Terminal frontend:
 
 ```powershell
-cd frontend
+cd source/client
 npm ci
 npm run dev
 ```
 
 Mở http://127.0.0.1:5173. Hai người cùng máy dùng hai browser profiles hoặc normal/incognito với một backend.
 
-Build frontend bằng `npm run build`. Từ backend chạy `.\mvnw.cmd -Pweb clean package`; profile web lấy frontend/dist làm static resources trong target, không chép generated files vào source. Chạy:
+Build frontend bằng `npm run build`. Từ backend chạy `.\mvnw.cmd -Pweb clean package`; profile web lấy source/client/dist làm static resources trong target, không chép generated files vào source. Chạy:
 
 ```powershell
 java -jar target/jumpking-server.jar --spring.profiles.active=local

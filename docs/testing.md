@@ -12,7 +12,7 @@ Kiểm tra theo tài liệu sở hữu; báo PASS/FAIL/BLOCKED/NOT RUN đúng th
 | Luồng online/save/lifecycle | Playwright với backend/MySQL thật và hai identities |
 | Tài liệu | Source of Truth, links/anchors, examples, scope và git diff --check |
 
-Khi đổi dependency: frontend chạy `npm audit`; backend lấy version bằng `./mvnw dependency:list -DincludeScope=runtime` rồi đối chiếu [OSV](https://google.github.io/osv.dev/post-v1-querybatch/) và advisory của nhà cung cấp. Ghi kết quả cùng điều kiện ảnh hưởng/ngoại lệ có nguồn trong PLAN; không coi kết quả quét thô là bằng chứng khai thác được.
+Khi đổi dependency: frontend chạy `npm audit`; backend lấy version bằng `.\mvnw.cmd dependency:list -DincludeScope=runtime` rồi đối chiếu [OSV](https://google.github.io/osv.dev/post-v1-querybatch/) và advisory của nhà cung cấp. Ghi kết quả cùng điều kiện ảnh hưởng/ngoại lệ có nguồn trong PLAN; không coi kết quả quét thô là bằng chứng khai thác được.
 
 ## Lệnh kiểm thử
 
@@ -21,7 +21,7 @@ Mỗi block chạy từ root project trong terminal riêng.
 Frontend:
 
 ```powershell
-cd frontend
+cd source/client
 npm run check
 npm test
 npm run build
@@ -31,16 +31,16 @@ npm run test:e2e
 Backend:
 
 ```powershell
-cd backend
+cd source/server
 .\mvnw.cmd test
 .\mvnw.cmd verify -Pintegration
 ```
 
-Các lệnh là contract của Maven/npm configuration và được nghiệm thu trong [PLAN](../PLAN.md). Linux/macOS dùng `./mvnw`; cài Chromium cho E2E bằng `npx playwright install chromium`.
+Các lệnh là contract của Maven/npm configuration và được nghiệm thu trong [PLAN](../PLAN.md). Linux/macOS dùng `sh mvnw`; cài Chromium cho E2E bằng `npx playwright install chromium`.
 
 E2E (end-to-end) dùng Playwright thao tác trình duyệt qua UI → HTTP/WS → backend/MySQL để kiểm tra cả luồng. Chạy riêng vì cần ứng dụng đang chạy và trình duyệt, khác unit tests kiểm tra từng hàm/module.
 
-Fly dev: chạy trong terminal riêng tại `frontend/`; cổng test riêng tránh dùng nhầm server đang chạy. Các E2E mặc định kiểm tra tính năng bị khóa.
+Fly dev: chạy trong terminal riêng tại `source/client/`; cổng test riêng tránh dùng nhầm server đang chạy. Các E2E mặc định kiểm tra tính năng bị khóa.
 
 ```powershell
 $env:FLY_ENABLED = 'true'
@@ -61,7 +61,7 @@ Thêm `-DatabaseRecovery` để thử restart MySQL và restore dump vào databa
 
 Đặt `E2E_BROWSER_PATH` thành đường dẫn Chrome/Chromium trước khi chạy integration để nghiệm thu Account, contracts và Solo sync qua UI với backend/MySQL cô lập. Harness tự chạy Vite/cổng riêng và đóng sau test; bỏ biến này thì browser integration được ghi là skipped, không coi là đã nghiệm thu UI. `npm run test:e2e` riêng chỉ chạy các scenarios không cần backend, trừ khi cung cấp `E2E_BASE_URL` và cờ online tương ứng.
 
-Kết quả E2E độc lập ở frontend/test-results; harness online dùng .local/browser-online-tests. Khi có E2E_BROWSER_PATH, integration chạy thêm harness riêng cho ending Room, Fly Community và Fly Room; output tương ứng .local/browser-room-ending-tests, .local/browser-fly-online-tests và .local/browser-room-fly-tests. Có thể đổi bằng E2E_OUTPUT_DIR; các lần chạy đồng thời phải dùng thư mục riêng.
+Kết quả E2E độc lập ở source/client/test-results; harness online dùng .local/browser-online-tests. Khi có E2E_BROWSER_PATH, integration chạy thêm harness riêng cho ending Room, Fly Community và Fly Room; output tương ứng .local/browser-room-ending-tests, .local/browser-fly-online-tests và .local/browser-room-fly-tests. Có thể đổi bằng E2E_OUTPUT_DIR; các lần chạy đồng thời phải dùng thư mục riêng.
 
 Integration cũng chạy `IdentityRaceBrowserIT`: giữ phản hồi `/auth/me` ẩn danh thật đến sau khi đăng ký thành công; phản hồi cũ không được ghi đè Account mới. Output ở `.local/browser-identity-race-tests`.
 
@@ -119,7 +119,7 @@ Các thực nghiệm opt-in, từ root:
 $env:JK_WORKLOAD_RUN = 'true'
 ./scripts/test-mysql.ps1 -MySqlHome '<MySQL 8.4>' -JavaHome '<JDK 25>' -IntegrationTest OnlineWorkloadIT
 Remove-Item Env:JK_WORKLOAD_RUN
-cd frontend
+cd source/client
 $env:JK_NETCODE_EXPERIMENT = 'true'
 npm run test:e2e -- e2e/netcode-experiment.spec.ts --workers=1
 Remove-Item Env:JK_NETCODE_EXPERIMENT

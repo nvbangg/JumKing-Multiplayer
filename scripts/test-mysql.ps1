@@ -51,7 +51,7 @@ try {
     $env:JK_TEST_DATABASE_URL = "jdbc:mysql://127.0.0.1:$port/$database`?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true"
     $env:JK_TEST_DATABASE_USERNAME = 'root'
     $env:JK_TEST_DATABASE_PASSWORD = $password
-    Push-Location (Join-Path $workspace 'backend')
+    Push-Location (Join-Path $workspace 'source/server')
     $locationPushed = $true
     $profiles = if ($Web) { '-Pintegration,web' } else { '-Pintegration' }
     $verificationArguments = @('-B', '-ntp', 'clean', 'verify', $profiles)

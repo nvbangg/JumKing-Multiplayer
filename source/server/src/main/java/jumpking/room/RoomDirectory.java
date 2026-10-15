@@ -14,8 +14,10 @@ import org.springframework.stereotype.Component;
 public class RoomDirectory {
     public record Info(String roomId, String kind, boolean joinable) {}
     public record Slot(String roomId, String kind, int color) {}
+    public record PublicRoom(String roomId, String mode, int mapLevel, int playerCount, int capacity) {}
     private static class Entry {
         final String kind; final BitSet slots = new BitSet(); boolean joinable = true;
+        String visibility = "PRIVATE", mode = "RACE";
         Entry(String kind) { this.kind = kind; }
     }
     private final Map<String, Entry> entries = new HashMap<>();
@@ -27,6 +29,17 @@ public class RoomDirectory {
         capacity = rules.path("capacity").asInt(); maximum = limits.rooms();
     }
     public synchronized Info find(String id) { var entry = entries.get(id); return entry == null ? null : new Info(id, entry.kind, entry.joinable && entry.slots.cardinality() < capacity); }
+    public synchronized java.util.List<PublicRoom> publicRooms() {
+        return entries.entrySet().stream().filter(value -> {
+            var entry = value.getValue();
+            return entry.kind.equals("ROOM") && entry.visibility.equals("PUBLIC") && entry.joinable && entry.slots.cardinality() < capacity;
+        }).sorted(Map.Entry.comparingByKey()).map(value -> new PublicRoom(value.getKey(), value.getValue().mode,
+            RoomSettings.FULL_MAP_LEVEL, value.getValue().slots.cardinality(), capacity)).toList();
+    }
+    public synchronized void describeRoom(String id, String visibility, String mode) {
+        var entry = entries.get(id);
+        if (entry != null && entry.kind.equals("ROOM")) { entry.visibility = visibility; entry.mode = mode; }
+    }
     public synchronized Slot community(String requested) {
         String id = requested;
         if (id == null) id = entries.entrySet().stream().filter(entry -> entry.getValue().kind.equals("COMMUNITY") && entry.getValue().slots.cardinality() < capacity)

@@ -13,6 +13,10 @@ export function Lobby({ room, selfId, pending, command, socket }: {
       <span>{member.nickname}</span><span>{member.playerId === room.hostPlayerId ? 'Host' : ''}{!member.connected ? ' · Offline' : ''}{member.nextMatchConfirmed ? ' · Confirmed' : ''}</span>
     </li>)}</ul>
     {room.settings && <>
+      <label className="mode-setting">Visibility<select aria-label="Visibility" value={room.visibility || 'PRIVATE'} disabled={!host || room.state !== 'WAITING' || pending}
+        onChange={event => command('UPDATE_ROOM_SETTINGS', { visibility: event.target.value })}>
+        <option value="PRIVATE">Private</option><option value="PUBLIC">Public</option>
+      </select></label>
       <label className="mode-setting">Mode<select aria-label="Mode" value={room.settings.mode} disabled={!host || room.state !== 'WAITING' || pending}
         onChange={event => command('UPDATE_ROOM_SETTINGS', { mode: event.target.value, timeLimitMinutes: event.target.value === 'TIME_LIMIT' ? rules.timeLimitDefaultMinutes : null })}>
         <option value="RACE">Race</option><option value="HARDCORE">Hardcore</option><option value="TIME_LIMIT">Time Limit</option><option value="NO_WALK">No Walk</option>

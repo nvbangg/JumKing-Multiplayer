@@ -5,6 +5,7 @@ import java.util.Set;
 import jumpking.network.GameEnvelope;
 
 public record RoomSettings(String mode, Integer timeLimitMinutes) {
+    public static final int FULL_MAP_LEVEL = 10;
     private static final Set<String> MODES = Set.of("RACE", "HARDCORE", "TIME_LIMIT", "NO_WALK");
     public static RoomSettings defaults() { return new RoomSettings("RACE", null); }
     public static RoomSettings parse(JsonNode input, JsonNode rules) {

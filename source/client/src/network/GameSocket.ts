@@ -22,6 +22,7 @@ function parseMessage(data: unknown): Message {
 }
 export interface RoomMember { playerId: string; nickname: string; username: string | null; colorSlot: number; connected: boolean; paused: boolean | null; nextMatchConfirmed: boolean | null }
 export interface RoomState {
+  visibility?: 'PRIVATE' | 'PUBLIC';
   roomId: string; kind: 'ROOM' | 'COMMUNITY'; state: 'WAITING' | 'COUNTDOWN' | 'PLAYING' | 'PAUSED' | 'FINISHED';
   hostPlayerId: string | null; settings: { mode: string; timeLimitMinutes: number | null } | null; members: RoomMember[];
   currentPlay: Record<string, unknown> | null; result: unknown; pauseExpiresAt: string | null;

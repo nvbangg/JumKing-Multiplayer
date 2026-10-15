@@ -32,8 +32,8 @@ Backend:
 
 ```powershell
 cd source/server
-.\mvnw.cmd test
-.\mvnw.cmd verify -Pintegration
+.\mvnw.cmd clean test
+.\mvnw.cmd clean verify -Pintegration
 ```
 
 Các lệnh là contract của Maven/npm configuration và được nghiệm thu trong [PLAN](../PLAN.md). Linux/macOS dùng `sh mvnw`; cài Chromium cho E2E bằng `npx playwright install chromium`.
@@ -54,7 +54,7 @@ Windows không có Docker: chạy `./scripts/test-mysql.ps1 -MySqlHome '<thư m�
 
 Integration chỉ giữ tối đa bốn Spring test contexts để giới hạn tài nguyên của các server thử nghiệm.
 
-Có thể chạy nhóm bị ảnh hưởng bằng `-IntegrationTest 'RoomRaceIT'` (nhiều class ngăn bằng dấu phẩy); bỏ tham số để chạy toàn bộ integration. Unit tests vẫn chạy trong cả hai trường hợp.
+Có thể chạy nhóm bị ảnh hưởng bằng `-IntegrationTest 'RoomRaceIT'` (nhiều class ngăn bằng dấu phẩy); bỏ tham số để chạy toàn bộ integration. Unit tests vẫn chạy trong cả hai trường hợp. Với `AccountBrowserIT`, đặt `E2E_SPECS=e2e/public-room-online.spec.ts` để chọn spec online cần chạy; mặc định chạy tất cả `*-online.spec.ts`.
 
 Thêm `-DatabaseRecovery` để thử restart MySQL và restore dump vào database test mới; đối chiếu số dòng/checksum ba bảng. Chỉ thực hiện trên instance do runner tạo; dump được cleanup cùng instance.
 

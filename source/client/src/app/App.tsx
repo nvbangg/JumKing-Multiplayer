@@ -11,6 +11,7 @@ import { MenuPanel } from '../components/MenuPanel';
 import { api, ApiError, backendOrigin, clearCsrf } from '../network/api';
 import { GameSocket, type MatchResult, type RoomState } from '../network/GameSocket';
 import { EMPTY_STATS, type HistoryItem, type Identity, type Statistics, type LeaderboardEntry } from '../network/contracts';
+import { PublicRooms } from '../features/rooms/PublicRooms';
 import { Lobby } from '../features/rooms/Lobby';
 import { Results } from '../features/rooms/Results';
 import { roomFinishScreen } from '../features/rooms/ending';
@@ -21,7 +22,7 @@ import { SoloSync, syncSolo } from '../features/solo/sync';
 import { OnlineGame } from '../features/community/OnlineGame';
 import { loadReconnect } from '../network/reconnect';
 
-type Screen = 'home' | 'play' | 'online' | 'sign-in' | 'register' | 'merge-history' | 'account' | 'community' | 'leaderboard' | 'history' | 'detail' | 'options' | 'controls' | 'nickname' | 'join' | 'lobby' | 'results';
+type Screen = 'home' | 'play' | 'online' | 'sign-in' | 'register' | 'merge-history' | 'account' | 'community' | 'leaderboard' | 'history' | 'detail' | 'options' | 'controls' | 'nickname' | 'join' | 'public-rooms' | 'lobby' | 'results';
 interface SoloLaunch { profile: string; action: 'new' | 'continue' | 'auto'; expectedRunId: string | null }
 const initialIdentity: Identity = { authenticated: false, guest: false, account: null };
 const routes: Partial<Record<Screen, string>> = { home: '/', play: '/play', history: '/history', community: '/community', options: '/options', account: '/account', 'sign-in': '/sign-in', register: '/register' };
@@ -218,11 +219,12 @@ export function App() {
   return <main className="home">
     <header className="brand"><h1><img src="/assets/title_logo.png" alt="JumpKing" /></h1></header>
     <div className={screen === 'home' ? 'home-layout' : 'single-panel'}>
-      <MenuPanel title={screen === 'home' ? undefined : ({ 'sign-in': 'Sign In', register: 'Create Account', 'merge-history': 'Guest Progress', account: 'Account', community: 'Community Tower', leaderboard: 'Leaderboard', history: 'History', detail: 'Game Details', options: 'Options', controls: 'Controls', nickname: roomIntent.roomId ? 'Join Room' : 'Play with Friends', join: 'Join by ID', lobby: room?.kind === 'COMMUNITY' ? 'Community Tower' : 'Lobby', results: 'Results' } as Partial<Record<Screen, string>>)[screen]} onBack={screen === 'home' || screen === 'lobby' || screen === 'results' ? undefined : back}>
+      <MenuPanel title={screen === 'home' ? undefined : ({ 'sign-in': 'Sign In', register: 'Create Account', 'merge-history': 'Guest Progress', account: 'Account', community: 'Community Tower', leaderboard: 'Leaderboard', history: 'History', detail: 'Game Details', options: 'Options', controls: 'Controls', nickname: roomIntent.roomId ? 'Join Room' : 'Play with Friends', join: 'Join by ID', 'public-rooms': 'Join Public', lobby: room?.kind === 'COMMUNITY' ? 'Community Tower' : 'Lobby', results: 'Results' } as Partial<Record<Screen, string>>)[screen]} onBack={screen === 'home' || screen === 'lobby' || screen === 'results' ? undefined : back}>
         {screen === 'home' && <>
           {activeSolo && <button onClick={() => openSolo('continue')} disabled={pending}>Continue Solo</button>}
           <button onClick={() => openSolo('new')} disabled={pending}>New Solo Game</button>
           <button onClick={() => { setRoomIntent({}); setScreen('nickname'); }}>Play with Friends</button>
+          <button onClick={() => { setError(''); setScreen('public-rooms'); }}>Join Public</button>
           <button onClick={() => setScreen('join')}>Join by ID</button>
           <button onClick={() => setScreen('community')}>Community Tower</button>
           <button onClick={() => setScreen('history')}>History</button>
@@ -246,8 +248,9 @@ export function App() {
         {screen === 'controls' && <ControlsHelp flyAllowed={flyAllowed} />}
         {screen === 'nickname' && <form className="menu-form" onSubmit={event => {
           event.preventDefault(); const nickname = String(new FormData(event.currentTarget).get('nickname')).trim();
-          command(roomIntent.roomId ? 'JOIN_ROOM' : 'CREATE_ROOM', { ...(roomIntent.roomId ? { roomId: roomIntent.roomId } : {}), nickname });
-        }}><label>Nickname<input name="nickname" defaultValue={identity.account?.username.slice(0, 16) || ''} required maxLength={16} /></label><button disabled={pending}>{pending ? 'Connecting…' : roomIntent.roomId ? 'Join' : 'Create Room'}</button></form>}
+          command(roomIntent.roomId ? 'JOIN_ROOM' : 'CREATE_ROOM', { ...(roomIntent.roomId ? { roomId: roomIntent.roomId } : {}), nickname, ...(!roomIntent.roomId ? { visibility: String(new FormData(event.currentTarget).get('visibility')) } : {}) });
+        }}><label>Nickname<input name="nickname" defaultValue={identity.account?.username.slice(0, 16) || ''} required maxLength={16} /></label>{!roomIntent.roomId && <label>Visibility<select name="visibility" aria-label="Visibility" defaultValue="PRIVATE"><option value="PRIVATE">Private</option><option value="PUBLIC">Public</option></select></label>}<button disabled={pending}>{pending ? 'Connecting…' : roomIntent.roomId ? 'Join' : 'Create Room'}</button></form>}
+        {screen === 'public-rooms' && <PublicRooms onJoin={roomId => { setError(''); setRoomIntent({ roomId }); setScreen('nickname'); }} />}
         {screen === 'join' && <form className="menu-form" onSubmit={event => {
           event.preventDefault(); const roomId = String(new FormData(event.currentTarget).get('roomId')).trim().toUpperCase();
           void execute(async () => {

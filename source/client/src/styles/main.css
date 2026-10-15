@@ -54,7 +54,7 @@ button { cursor: pointer; }
 .history-list { display: flex; flex-direction: column; gap: 8px; max-height: 55dvh; overflow-y: auto; }
 .history-list button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; font-size: 15px; padding: 12px 4px; }
 .kind-label { font-size: 12px; padding: 3px 5px; background: #302b1d; color: #d6bf8d; }
-.leaderboard, .players { margin: 0 0 16px; padding: 0; list-style: none; max-height: 50dvh; overflow-y: auto; }
+.leaderboard, .players, .public-rooms { margin: 0 0 16px; padding: 0; list-style: none; max-height: 50dvh; overflow-y: auto; }
 .leaderboard li, .players li { display: flex; justify-content: space-between; gap: 18px; padding: 10px 0; font-size: 18px; border-bottom: 1px solid #28251b; }
 .players li > span:last-child { color: #aaa28b; font-size: 15px; }
 .room-code { display: flex; flex-direction: column; align-items: center; gap: 10px; }

@@ -67,7 +67,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
         final SerialExecutor actor;
         final ScheduledFuture<?> timer;
         RoomSettings settings = RoomSettings.defaults();
-        String state = "WAITING";
+        String state = "WAITING", visibility = "PRIVATE";
         RoomMatch match;
         CheckpointWriter<RoomRuns.Write> writer;
         long countdownAt, nextTick, serverTick, lastSnapshotTick, eventSeq, lastSave, pauseDeadline;
@@ -108,7 +108,14 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
                 case "UPDATE_ROOM_SETTINGS" -> {
                     if (!player.id.equals(room.host)) throw new ApiException(403, "FORBIDDEN", "Only the Host can change settings");
                     if (!room.state.equals("WAITING")) throw new ApiException(409, "CONFLICT", "Settings can only change in the Lobby");
-                    room.settings = RoomSettings.parse(command.payload(), rules); connection.reply(command, "ROOM_STATE", state(room)); broadcast(room);
+                    GameEnvelope.fields(command.payload(), Set.of("mode", "timeLimitMinutes", "visibility"));
+                    if (command.payload().isEmpty()) throw GameEnvelope.invalid();
+                    var settingsInput = ((ObjectNode) command.payload()).deepCopy(); settingsInput.remove("visibility");
+                    var settings = settingsInput.isEmpty() ? room.settings : RoomSettings.parse(settingsInput, rules);
+                    String visibility = command.payload().has("visibility") ? visibility(command.payload()) : room.visibility;
+                    room.settings = settings; room.visibility = visibility;
+                    directory.describeRoom(room.id, visibility, settings.mode());
+                    connection.reply(command, "ROOM_STATE", state(room)); broadcast(room);
                 }
                 case "START_GAME" -> { GameEnvelope.fields(command.payload(), Set.of()); start(room, player); connection.reply(command, "ROOM_STATE", state(room)); }
                 case "PLAY_AGAIN" -> {
@@ -148,9 +155,10 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     }
     private synchronized void join(GameConnection connection, GameEnvelope command) {
         boolean create = command.type().equals("CREATE_ROOM");
-        GameEnvelope.fields(command.payload(), create ? Set.of("nickname", "settings") : Set.of("roomId", "nickname"));
+        GameEnvelope.fields(command.payload(), create ? Set.of("nickname", "settings", "visibility") : Set.of("roomId", "nickname"));
         String nickname = GameEnvelope.text(command.payload(), "nickname").strip();
         if (nickname.codePointCount(0, nickname.length()) > 16 || !nickname.matches("[\\p{L}\\p{M}\\p{N} _-]+")) throw new ApiException(400, "VALIDATION", "Nickname must contain 1–16 letters, numbers, spaces, underscores or hyphens");
+        String visibility = create ? visibility(command.payload()) : "PRIVATE";
         var settings = create && command.payload().has("settings") ? RoomSettings.parse(command.payload().get("settings"), rules) : RoomSettings.defaults();
         if (memberships.find(connection.identity().owner()) != null) throw new ApiException(409, "ALREADY_IN_ROOM", "Leave your current room first");
         boolean crowned = crowns.unlocked(connection.identity().owner());
@@ -164,11 +172,16 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
                     memberships.release(player.identity.owner(), new Memberships.Membership(room.id, player.id)); directory.release(slot);
                     connection.error(command, new ApiException(409, "ROOM_NOT_JOINABLE", "This room is not accepting new players")); return;
                 }
-                if (create) room.settings = settings;
+                if (create) { room.settings = settings; room.visibility = visibility; directory.describeRoom(room.id, visibility, settings.mode()); }
                 room.players.put(player.id, player); if (!connection.open()) { player.connection = null; player.disconnectedAt = time.nanos(); }
                 chooseHost(room); connection.reply(command, "ROOM_JOINED", joined(room, player)); broadcast(room); chatHistory(room, player);
             }); } catch (RuntimeException error) { memberships.release(player.identity.owner(), new Memberships.Membership(room.id, player.id)); throw error; }
         } catch (RuntimeException error) { if (directory.release(slot)) { var room = rooms.remove(slot.roomId()); if (room != null) room.timer.cancel(false); } throw error; }
+    }
+    private String visibility(JsonNode payload) {
+        String value = payload.has("visibility") ? GameEnvelope.text(payload, "visibility") : "PRIVATE";
+        if (!Set.of("PRIVATE", "PUBLIC").contains(value)) throw GameEnvelope.invalid();
+        return value;
     }
     private void reconnect(Room room, Member player, GameConnection connection, GameEnvelope command) {
         GameEnvelope.fields(command.payload(), Set.of("roomId", "playerId", "reconnectToken"));
@@ -206,7 +219,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     private ObjectNode context(Room room, Member player) { var result = json.createObjectNode().put("roomId", room.id).put("playerId", player.id).put("generation", player.generation); if (room.match == null) result.putNull("playId"); else result.put("playId", room.match.id); return result; }
     private ObjectNode joined(Room room, Member player) { return context(room, player).put("kind", "ROOM").put("reconnectToken", player.token); }
     private ObjectNode state(Room room) {
-        var state = json.createObjectNode().put("roomId", room.id).put("kind", "ROOM").put("state", room.state);
+        var state = json.createObjectNode().put("roomId", room.id).put("kind", "ROOM").put("state", room.state).put("visibility", room.visibility);
         if (room.host == null) state.putNull("hostPlayerId"); else state.put("hostPlayerId", room.host);
         state.set("settings", json.valueToTree(room.settings)); for (String field : List.of("currentPlay", "result", "pauseExpiresAt")) state.putNull(field);
         if (room.pauseExpiresAt != null) state.put("pauseExpiresAt", room.pauseExpiresAt.toString());

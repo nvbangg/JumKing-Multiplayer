@@ -91,7 +91,7 @@ Leaderboard xét thành tích tốt nhất của mỗi Account từ các lượt
 
 ## Room và xếp hạng
 
-Room tối đa 10 người; trận đầu Start cần ít nhất hai người connected, không cần Ready. Không visibility/danh sách public. ID sáu ký tự từ `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`; dùng chung ô Join by ID với Community. Người tạo là Host; khi cần chuyển quyền, chọn người connected có joinOrder nhỏ nhất.
+Room tối đa 10 người; trận đầu Start cần ít nhất hai người connected, không cần Ready. ID sáu ký tự từ `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`; dùng chung ô Join by ID với Community. Người tạo là Host; khi cần chuyển quyền, chọn người connected có joinOrder nhỏ nhất.
 
 ```text
 WAITING -- Host Start --> COUNTDOWN -- 3 giây --> PLAYING -- finalize --> FINISHED

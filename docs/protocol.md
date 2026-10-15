@@ -69,7 +69,7 @@ SoloMetrics={revision,status,playTicks,jumps,falls,currentProgress,maxProgress,p
 
 Page 0–100000, size/limit 1–100; timestamps ISO-8601 UTC. Chỉ trả Account ID/email của chính phiên, không lộ credentials/token. Detail sai owner trả 404 như không tồn tại.
 
-Tra room ID tối đa 60 requests/phút/IP; ID phải đúng định dạng trong gameplay. API liệt kê chỉ trả Public/WAITING còn chỗ; kết quả tra không cấp quyền Join/reconnect, server kiểm tra lại khi xử lý command.
+Tra ID và danh sách phòng dùng chung giới hạn 60 requests/phút/IP; ID phải đúng định dạng trong gameplay. API liệt kê chỉ trả Public/WAITING còn chỗ; kết quả tra không cấp quyền Join/reconnect, server kiểm tra lại khi xử lý command.
 
 Lỗi chung `{error:{code,message}}`: 400 validation, 401 credentials/identity, 403 quyền/CSRF, 404 not found, 409 conflict, 429 rate limit, 5xx lỗi server đã loại secrets. UI dựa code, không parse message.
 
@@ -110,7 +110,7 @@ Giới hạn mặc định tập trung tại cấu hình network của backend, 
 | JOIN_ROOM | {roomId,nickname?} → vào đúng Community/Room theo ID |
 | LEAVE_ROOM | {} → Community flush checkpoint; Room Leave/DNF |
 | GET_ROOM_STATE | {} → state hiện hành hoặc null khi đã rời |
-| UPDATE_ROOM_SETTINGS | {mode,timeLimitMinutes,mapLevel}; Host/WAITING |
+| UPDATE_ROOM_SETTINGS | {mode,timeLimitMinutes,mapLevel,visibility?}; Host/WAITING; có thể chỉ đổi visibility |
 | START_GAME / END_MATCH | {}; quyền, roster và lifecycle theo gameplay; kiểm tra khi xử lý command |
 | PLAY_AGAIN | {matchId}; mỗi thành viên xác nhận sau match vừa kết thúc, kể cả khi phòng đã về WAITING |
 | SET_ROOM_PAUSED | {playId,paused:boolean}; Host, PLAYING/PAUSED; sai trận bị từ chối |
@@ -138,7 +138,7 @@ Client nhận diện nhấn đúp khi Fly Mode được bật và gửi freeFlig
 | Type | Payload chính |
 | --- | --- |
 | ROOM_JOINED | {roomId,kind,playerId,reconnectToken,generation,playId}; token chỉ gửi owner |
-| ROOM_STATE | {roomId,kind,state,hostPlayerId,settings,members,currentPlay,result,pauseExpiresAt} |
+| ROOM_STATE | {roomId,kind,state,visibility?,hostPlayerId,settings,members,currentPlay,result,pauseExpiresAt} |
 | ROOM_LEFT | {roomId}; null nếu đã rời |
 | GAME_STARTED | {playId,generation,countdownMs} |
 | GAME_SNAPSHOT | {roomId,serverTick,playId,generation,self,peers,elapsedTimeMs,remainingTimeMs} |

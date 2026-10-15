@@ -105,4 +105,33 @@ class RoomRaceIT {
             a.ok("LEAVE_ROOM", Map.of()); b.ok("LEAVE_ROOM", Map.of());
         }
     }
+    @Test void publicVisibilityIsHostOnlyAtomicAndStartRechecksConcurrentJoins() throws Exception {
+        try (var host = new GameClient(port); var peer = new GameClient(port); var extra = new GameClient(port)) {
+            for (var client : List.of(host, peer, extra)) { client.guest(); client.connect(); }
+            String id = host.ok("CREATE_ROOM", Map.of("nickname", "Host")).path("roomId").asText();
+            peer.ok("JOIN_ROOM", Map.of("roomId", id, "nickname", "Peer"));
+            assertThat(host.request("/rooms", "GET", null).path("rooms").findValuesAsText("roomId")).doesNotContain(id);
+            assertThat(peer.command("UPDATE_ROOM_SETTINGS", Map.of("visibility", "PUBLIC")).path("payload").path("code").asText()).isEqualTo("FORBIDDEN");
+            assertThat(host.command("UPDATE_ROOM_SETTINGS", Map.of("visibility", "PUBLIC", "mode", "HARDCORE", "timeLimitMinutes", 1)).path("type").asText()).isEqualTo("ERROR");
+            assertThat(host.ok("GET_ROOM_STATE", Map.of()).path("visibility").asText()).isEqualTo("PRIVATE");
+            host.ok("UPDATE_ROOM_SETTINGS", Map.of("visibility", "PUBLIC"));
+            var listed = host.request("/rooms", "GET", null).path("rooms");
+            var entry = java.util.stream.StreamSupport.stream(listed.spliterator(), false).filter(row -> row.path("roomId").asText().equals(id)).findFirst().orElseThrow();
+            assertThat(entry.path("playerCount").asInt()).isEqualTo(2); assertThat(entry.path("mode").asText()).isEqualTo("RACE");
+            for (String secret : List.of("members", "reconnectToken", "username")) assertThat(entry.has(secret)).isFalse();
+            try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+                var start = pool.submit(() -> host.ok("START_GAME", Map.of()));
+                var join = pool.submit(() -> extra.command("JOIN_ROOM", Map.of("roomId", id, "nickname", "Extra")));
+                assertThat(start.get().path("state").asText()).isEqualTo("COUNTDOWN");
+                var joined = join.get();
+                if (joined.path("type").asText().equals("ERROR")) assertThat(joined.path("payload").path("code").asText()).isEqualTo("ROOM_NOT_JOINABLE");
+                else assertThat(host.ok("GET_ROOM_STATE", Map.of()).path("members").size()).isEqualTo(3);
+            }
+            assertThat(host.request("/rooms", "GET", null).path("rooms").findValuesAsText("roomId")).doesNotContain(id);
+            assertThat(host.command("UPDATE_ROOM_SETTINGS", Map.of("visibility", "PRIVATE")).path("payload").path("code").asText()).isEqualTo("CONFLICT");
+            if (host.ok("GET_ROOM_STATE", Map.of()).path("members").size() == 3) extra.ok("LEAVE_ROOM", Map.of());
+            host.ok("LEAVE_ROOM", Map.of()); peer.ok("LEAVE_ROOM", Map.of());
+        }
+    }
+
 }

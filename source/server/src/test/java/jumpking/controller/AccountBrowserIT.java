@@ -24,6 +24,7 @@ import org.springframework.test.context.DynamicPropertySource;
 @EnabledIfEnvironmentVariable(named = "E2E_BROWSER_PATH", matches = ".+")
 @SpringBootTest(classes = JumpKingApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AccountBrowserIT {
+    private static final String ALL_SPECS = "e2e/.*-online.spec.ts";
     private static final int VITE_PORT = freePort();
     @LocalServerPort int port;
     @Autowired PasswordEncoder passwords;
@@ -93,7 +94,8 @@ class AccountBrowserIT {
                 Thread.sleep(250);
             }
             assertThat(ready).isTrue();
-            var builder = new ProcessBuilder("node", "node_modules/@playwright/test/cli.js", "test", "e2e/.*-online.spec.ts", "--workers=1").directory(frontend);
+            String specs = System.getenv().getOrDefault("E2E_SPECS", ALL_SPECS);
+            var builder = new ProcessBuilder("node", "node_modules/@playwright/test/cli.js", "test", specs, "--workers=1").directory(frontend);
             builder.environment().put("E2E_BASE_URL", origin); builder.environment().put("E2E_AUTH_ONLINE", "true");
             builder.environment().put("E2E_OUTPUT_DIR", "../../.local/browser-online-tests");
             var merge = mergeFixture();
@@ -106,10 +108,13 @@ class AccountBrowserIT {
             browser = builder.redirectErrorStream(true).redirectOutput(Path.of("target/auth-browser-test.log").toFile()).start();
             assertThat(browser.waitFor(300, TimeUnit.SECONDS)).as("Browser test timeout; inspect target/auth-browser-test.log").isTrue();
             assertThat(browser.exitValue()).as("Inspect target/auth-browser-test.log and client/test-results").isZero();
-            var jdbc = TestDatabase.get().jdbc;
-            assertThat(jdbc.queryForObject("SELECT user_id FROM play_runs WHERE id=?", Long.class, merge.run)).isEqualTo(merge.account);
-            assertThat(jdbc.queryForObject("SELECT merged_into_user_id FROM users WHERE id=?", Long.class, merge.guest)).isEqualTo(merge.account);
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM play_runs WHERE id=? AND status='FINISHED' AND snapshot IS NULL AND finish_ticks=16957", Integer.class, finish.run)).isEqualTo(1);
+            // Các fixtures này chỉ được hoàn tất khi chạy toàn bộ scenarios online.
+            if (specs.equals(ALL_SPECS)) {
+                var jdbc = TestDatabase.get().jdbc;
+                assertThat(jdbc.queryForObject("SELECT user_id FROM play_runs WHERE id=?", Long.class, merge.run)).isEqualTo(merge.account);
+                assertThat(jdbc.queryForObject("SELECT merged_into_user_id FROM users WHERE id=?", Long.class, merge.guest)).isEqualTo(merge.account);
+                assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM play_runs WHERE id=? AND status='FINISHED' AND snapshot IS NULL AND finish_ticks=16957", Integer.class, finish.run)).isEqualTo(1);
+            }
         } finally {
             if (browser != null && browser.isAlive()) { browser.destroyForcibly(); browser.waitFor(5, TimeUnit.SECONDS); }
             vite.destroy(); if (!vite.waitFor(10, TimeUnit.SECONDS)) { vite.destroyForcibly(); vite.waitFor(5, TimeUnit.SECONDS); }

@@ -1,6 +1,7 @@
 export const PRESENTATION = Object.freeze({
   width: 480, height: 360, spriteSize: 48, spriteStartX: 224, spriteColumns: 4,
   peerOpacity: 0.7, maxFrameMs: 250, hudIntervalMs: 100, afkPollMs: 1000, nameFontSize: 9, nameGap: 3,
+  chatPreviewMs: 10000, chatPreviewMessages: 3,
   gamepadDeadZone: 0.35,
   effectVolume: 0.65, peerEffectVolume: 0.35, ambienceVolume: 0.6,
   bubblePadding: 7, bubbleMargin: 5, bubbleOffsetY: 32, npcTalkingFrameSeconds: 0.2,

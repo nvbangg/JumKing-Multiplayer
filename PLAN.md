@@ -34,7 +34,7 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 
 ## Phase 05 — Chat và xếp hạng
 
-- [ ] Chat chung Enter/Esc/focus/tin mới 10 giây và touch; nghiệm thu vấn đề #5.
+- [x] Chat chung Enter/Esc/focus/tin mới 10 giây và touch; nghiệm thu vấn đề #5.
 - [ ] Players ranking từ server RAM ở Room/Community, bảng thu gọn.
 - [ ] Leaderboard Community trong trận, refresh giới hạn; nghiệm thu vấn đề #10.
 
@@ -80,6 +80,8 @@ Thiết kế theo docs; kế hoạch dưới đây thay thế thứ tự triển
 | Phase 04 — Mốc Finish | PASS — 77 client unit, 52 Java unit; 10 MySQL integration PASS. Replay hợp lệ từ spawn chuẩn tới cả 10 đích, không Fly/splat; đồng bộ prediction và server. Map ngắn không cấp crown/Best Finish Time/ending; lưu map_level, retry/conflict/restart và migration giữ dữ liệu đã kiểm chứng. Build/type-check và diff check PASS. Lobby/History hoàn thiện ở mốc tiếp theo; chưa chạy migration trên database cá nhân. |
 
 | Phase 04 — Lobby/History/Results | PASS — 77 client unit, 52 Java unit; 7 Chrome online (chọn đủ 10 map, map ngắn/full ending và bốn mode Fly), 27 client E2E; nhóm MySQL History/restart 5 PASS sau sửa assertion fixture mặc định. Hai identities thấy cùng map; Results/History đúng độ dài, Play Again giữ ID/settings, không cấp nhầm crown/best full-map. Đã xem ảnh Lobby/Results; build/type-check và diff check PASS. SQL nâng cấp vẫn cần chạy trên database đang dùng trước khi chạy backend mới. |
+
+| Phase 05 — Chat | PASS — 77 client unit; build/type-check; Chrome hai identities với cảm ứng giả lập và backend/MySQL thật. Enter mở/focus/gửi, Esc đóng, preview hết 10 giây không lấy focus; chat thủ công giữ mở. Mở chat khi giữ Space hủy charge, không launch và Room clock vẫn chạy. Tin lịch sử/ID lặp không mở preview; cleanup timer/listener khi đổi phòng. Diff check PASS. |
 
 ## Lịch sử triển khai trước thay đổi kiến trúc
 

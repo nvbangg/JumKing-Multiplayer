@@ -82,3 +82,5 @@ button { cursor: pointer; }
   .menu-panel button { font-size: 21px; padding-top: 10px; padding-bottom: 10px; }
   .statistics { padding: 0 8px; }
 }
+
+.chat-preview { pointer-events: none; }

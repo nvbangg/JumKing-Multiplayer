@@ -156,6 +156,24 @@ HTTPS/WSS có thể kết thúc trực tiếp tại Spring Boot bằng server.ss
 
 Kiểm tra từ mạng ngoài: đăng ký/đăng nhập, WS, Room hai Account, Community save/Continue và reconnect. Cấu hình TLS/service cụ thể phụ thuộc VPS, không dùng thông số máy cá nhân trong source.
 
+### GitHub Actions deploy tự động
+
+Workflow `.github/workflows/deploy-vps.yml` build frontend trước, sau đó chạy `mvnw -Pweb clean verify` để đóng frontend vào một JAR. Mỗi push vào nhánh `main` (và `test-deploy` khi kiểm thử) có thay đổi liên quan sẽ deploy JAR đó; có thể chạy thủ công từ tab **Actions**. Job deploy dùng GitHub Environment `production`, nhờ đó có thể đặt required reviewers trước khi phát hành.
+
+Chuẩn bị VPS một lần với Java 25, MySQL, reverse proxy/TLS và user không đặc quyền `jumpking`. Tạo `/opt/jumpking` (thư mục này phải ghi được bởi user `jumpking`), chép [`ops/jumpking.service.example`](../ops/jumpking.service.example) thành `/etc/systemd/system/jumpking.service`, rồi điều chỉnh đường dẫn Java nếu cần. Lưu cấu hình production chỉ trên VPS tại `/etc/jumpking/application-prod.properties`; service nạp thư mục này qua `spring.config.additional-location`, nên cấu hình ngoài JAR sẽ ghi đè file cùng tên bên trong JAR. File cấu hình phải để user `jumpking` đọc được (ví dụ `chown root:jumpking` và `chmod 640`) và VPS cần có `curl` cho bước kiểm tra `/api/health`. Sau khi tạo service, chạy `sudo systemctl daemon-reload` và `sudo systemctl enable --now jumpking`.
+
+Tài khoản SSH dùng để deploy phải được phép ghi vào `/opt/jumpking` và chỉ được phép `sudo /usr/bin/systemctl restart jumpking.service`; cấu hình NOPASSWD trong `/etc/sudoers.d` (ví dụ `jumpking ALL=(root) NOPASSWD: /usr/bin/systemctl restart jumpking.service`) để chạy non-interactive. Bước chẩn đoán khi lỗi dùng `systemctl status`/`journalctl` không cần sudo; thêm user vào group `systemd-journal` nếu muốn đọc log. Lấy host key đáng tin cậy trực tiếp từ VPS (ví dụ qua console nhà cung cấp), không lấy từ log CI. Tạo các GitHub Actions secrets trong Environment `production`:
+
+| Secret | Nội dung |
+| --- | --- |
+| `VPS_HOST` | Hostname hoặc IP VPS |
+| `VPS_USER` | User SSH deploy |
+| `VPS_SSH_PRIVATE_KEY` | Private key Ed25519 của user deploy |
+| `VPS_SSH_KNOWN_HOSTS` | Dòng host key đã kiểm chứng cho VPS |
+| `VPS_SSH_PORT` | Tùy chọn, mặc định `22` |
+
+Workflow xác minh host key, upload JAR lên `/opt/jumpking/current.jar.upload`, thay thế nguyên tử `current.jar`, restart systemd và gọi `/api/health`. Workflow không gửi database password, domain, certificate hay private key lên repository. Do ghi đè trực tiếp nên không có lịch sử release để rollback; sao lưu `current.jar` trên VPS trước khi cập nhật nếu cần.
+
 ## Persistence JPA
 
 Backend dùng Spring Data JPA/Hibernate với `spring.jpa.hibernate.ddl-auto=validate` và `spring.jpa.open-in-view=false`; không tự tạo/update/reset database khi start. Khởi tạo lại theo phần [MySQL](#mysql). Credentials giữ ở file riêng như bảng cấu hình; không đưa database vào Git.

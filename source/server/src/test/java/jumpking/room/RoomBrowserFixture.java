@@ -9,7 +9,7 @@ import jumpking.support.GameClient;
 import jumpking.support.MainBabeRoute;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/** State cuối tuyến native chỉ được chuẩn bị trong test, không có endpoint cheat. */
+/** State trước Finish Room chỉ được chuẩn bị trong test, không có endpoint cheat. */
 public final class RoomBrowserFixture implements AutoCloseable {
   private final GameClient first, second;
   private final Memberships memberships;
@@ -41,7 +41,7 @@ public final class RoomBrowserFixture implements AutoCloseable {
       first.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT"));
       first.disconnect();
       second.disconnect();
-      var before = MainBabeRoute.beforeFinish(shared, json);
+      var before = MainBabeRoute.beforeRoomFinish(shared, json);
       Object room = ((Map<?, ?>) ReflectionTestUtils.getField(server, "rooms")).get(roomId);
       var actor = (SerialExecutor) ReflectionTestUtils.getField(room, "actor");
       GameClient.until(

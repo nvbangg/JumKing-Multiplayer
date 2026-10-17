@@ -13,24 +13,24 @@ test("Room markers use the approved landing platforms", () => {
 			return [level, marker.x, marker.y, marker.width];
 		}),
 	).toEqual([
-		[1, 288, -1720, 184],
-		[2, 248, -3152, 48],
-		[3, 216, -4584, 64],
-		[4, 128, -6424, 48],
-		[5, 96, -8584, 8],
-		[6, 192, -8904, 56],
-		[7, 16, -11064, 184],
-		[8, 256, -12488, 32],
-		[9, 248, -13584, 40],
-		[10, 336, -14976, 88],
+		[1, 136, -760, 72],
+		[2, 152, -1472, 176],
+		[3, 8, -3056, 48],
+		[4, 216, -4584, 64],
+		[5, 240, -6256, 72],
+		[6, 272, -7320, 72],
+		[7, 208, -8416, 72],
+		[8, 264, -10976, 40],
+		[9, 192, -12488, 32],
+		[10, 112, -14976, 312],
 	]);
 });
 
-test("Room 8 does not Finish on the left platform at the same height", () => {
-	const game = new GameSimulation(roomMap(map, 8));
+test("Room 9 does not Finish on the right platform at the same height", () => {
+	const game = new GameSimulation(roomMap(map, 9));
 	game.physics.restore({
 		...game.physics.snapshot(),
-		x: 208 - PHYSICS.bodyWidth / 2,
+		x: 272 - PHYSICS.bodyWidth / 2,
 		y: -12488 - PHYSICS.bodyHeight - 2,
 		screen: 35,
 		grounded: false,

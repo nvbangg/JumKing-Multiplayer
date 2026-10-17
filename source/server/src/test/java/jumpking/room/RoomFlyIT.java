@@ -97,7 +97,7 @@ class RoomFlyIT {
 
   @Test
   void allFourModesAllowLocalFlightPhasingAndCountTheNormalCommittedFinish() throws Exception {
-    var before = MainBabeRoute.beforeFinish(shared, json);
+    var before = MainBabeRoute.beforeRoomFinish(shared, json);
     for (String mode : List.of("RACE", "HARDCORE", "TIME_LIMIT", "NO_WALK")) {
       try (var a = new GameClient(port);
           var b = new GameClient(port)) {

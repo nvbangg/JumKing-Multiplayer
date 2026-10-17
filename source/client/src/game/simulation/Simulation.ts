@@ -159,7 +159,38 @@ export class Simulation {
 			this.state.screen === this.map.finish.screen &&
 			this.state.grounded &&
 			this.state.x + P.bodyWidth / 2 >= this.map.finish.minCenterX &&
-			this.progress >= (this.map.finish.minProgress ?? 0)
+			this.progress >= (this.map.finish.minProgress ?? 0) &&
+			this.onFinishPlatform()
+		);
+	}
+
+	private onFinishPlatform(): boolean {
+		const { finish, tileSize: size, screenHeight: height } = this.map;
+		// Mốc Room có minProgress xác định mặt nền; đích gốc không có mốc này.
+		if (!finish.minProgress) return true;
+		const feetY = this.map.progressOriginY - finish.minProgress,
+			row = (feetY + finish.screen * height) / size,
+			tiles = this.map.screens[finish.screen]!.tiles,
+			firstColumn = Math.ceil(finish.minCenterX / size);
+		if (
+			this.state.y + P.bodyHeight !== feetY ||
+			!Number.isInteger(row) ||
+			row < 1 ||
+			row >= tiles.length ||
+			firstColumn < 0
+		)
+			return false;
+		let column = firstColumn;
+		while (
+			column < tiles[row]!.length &&
+			"#IN".includes(tiles[row]![column]!) &&
+			tiles[row - 1]![column] === " "
+		)
+			column++;
+		return (
+			column > firstColumn &&
+			this.state.x + P.bodyWidth > firstColumn * size &&
+			this.state.x < column * size
 		);
 	}
 

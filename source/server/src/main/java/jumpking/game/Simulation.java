@@ -118,7 +118,31 @@ public final class Simulation {
     return state.screen == map.finish().screen()
         && state.grounded
         && state.x + p.bodyWidth / 2.0 >= map.finish().minCenterX()
-        && progress() >= map.finish().minProgress();
+        && progress() >= map.finish().minProgress()
+        && onFinishPlatform();
+  }
+
+  private boolean onFinishPlatform() {
+    var finish = map.finish();
+    // Mốc Room có minProgress xác định mặt nền; đích gốc không có mốc này.
+    if (finish.minProgress() == 0) return true;
+    double feetY = map.progressOriginY() - finish.minProgress();
+    double rowIndex = (feetY + finish.screen() * map.screenHeight()) / map.tileSize();
+    var tiles = map.screens().get(finish.screen()).tiles();
+    int firstColumn = (int) Math.ceil(finish.minCenterX() / map.tileSize());
+    if (state.y + p.bodyHeight != feetY
+        || rowIndex != Math.floor(rowIndex)
+        || rowIndex < 1
+        || rowIndex >= tiles.size()
+        || firstColumn < 0) return false;
+    int row = (int) rowIndex;
+    int column = firstColumn;
+    while (column < tiles.get(row).length()
+        && "#IN".indexOf(tiles.get(row).charAt(column)) >= 0
+        && tiles.get(row - 1).charAt(column) == ' ') column++;
+    return column > firstColumn
+        && state.x + p.bodyWidth > firstColumn * map.tileSize()
+        && state.x < column * map.tileSize();
   }
 
   private int screenAt(double y) {

@@ -7,6 +7,8 @@ import { ROOM_MAPS, roomMap } from "./roomMaps";
 import { PHYSICS } from "./tuning";
 import { NEUTRAL_INPUT, type PlayerInput } from "./types";
 
+const floorEnds = [208, 328, 56, 280, 312, 344, 280, 304, 224, 424];
+
 test("Room maps keep the ten approved Finish boundaries", () => {
 	expect(
 		ROOM_MAPS.map(({ level, finish }) => [
@@ -17,21 +19,21 @@ test("Room maps keep the ten approved Finish boundaries", () => {
 			finish.requiresGrounded,
 		]),
 	).toEqual([
-		[1, 5, 288, 2048, true],
-		[2, 9, 248, 3480, true],
-		[3, 13, 216, 4912, true],
-		[4, 18, 128, 6752, true],
-		[5, 24, 88, 8912, true],
-		[6, 25, 192, 9232, true],
-		[7, 31, 16, 11392, true],
-		[8, 35, 256, 12816, true],
-		[9, 38, 248, 13912, true],
-		[10, 42, 336, 0, true],
+		[1, 3, 136, 1088, true],
+		[2, 5, 152, 1800, true],
+		[3, 9, 8, 3384, true],
+		[4, 13, 216, 4912, true],
+		[5, 18, 240, 6584, true],
+		[6, 21, 272, 7648, true],
+		[7, 24, 208, 8744, true],
+		[8, 31, 264, 11304, true],
+		[9, 35, 192, 12816, true],
+		[10, 42, 112, 15304, true],
 	]);
 });
 
 for (const goal of ROOM_MAPS)
-	test(`Room ${goal.level}: Finish includes both boundaries and requires landing`, () => {
+	test(`Room ${goal.level}: Finish requires landing on the selected floor`, () => {
 		const world = roomMap(map, goal.level),
 			game = new GameSimulation(world),
 			state = {
@@ -45,37 +47,62 @@ for (const goal of ROOM_MAPS)
 		expect(game.finished).toBe(true);
 		game.physics.restore({ ...state, x: state.x - 0.25 });
 		expect(game.finished).toBe(false);
-		// Progress bị chặn tại 0 nên Map 10 không có giá trị dưới ngưỡng.
-		if (goal.finish.minProgress > 0) {
-			game.physics.restore({ ...state, y: state.y + 0.25 });
-			expect(game.finished).toBe(false);
-		}
+		game.physics.restore({ ...state, y: state.y + 0.25 });
+		expect(game.finished).toBe(false);
+		game.physics.restore({ ...state, y: state.y - 0.25 });
+		expect(game.finished).toBe(false);
 		game.physics.restore({ ...state, grounded: false });
 		expect(game.finished).toBe(false);
 		game.physics.restore({ ...state, screen: state.screen - 1 });
 		expect(game.finished).toBe(false);
+		const floorEnd = floorEnds[goal.level - 1]!;
+		game.physics.restore({ ...state, x: floorEnd });
+		expect(game.finished).toBe(false);
+		// Thân còn chạm mép nền vẫn hợp lệ, kể cả khi tâm đã qua mép phải.
+		game.physics.restore({ ...state, x: floorEnd - 0.25 });
+		expect(game.finished).toBe(true);
 	});
 
 test.each([
-	[1, 2064, 73.875, 2056, false],
-	[1, 2217, 303.75, 2048, true],
-	[5, 9469, 91.5, 8912, true],
-	[8, 14236, 289.75, 12816, true],
+	[6, 8489],
+	[9, 14236],
+	[10, 16957],
 ] as const)(
-	"Room %i: canonical landing at tick %i has the expected Finish result",
-	(level, ticks, centerX, progress, finished) => {
+	"Room %i: another platform at tick %i does not satisfy Finish",
+	(level, ticks) => {
 		const game = new GameSimulation(roomMap(map, level)),
 			point = checkpoints.find((checkpoint) => checkpoint.ticks === ticks)!;
 		expect(point).toBeDefined();
 		game.physics.restore({ ...point, codecVersion: 1 });
-		expect(point.x + PHYSICS.bodyWidth / 2).toBe(centerX);
-		expect(game.physics.progress).toBe(progress);
-		expect(game.finished).toBe(finished);
+		expect(point.grounded).toBe(true);
+		expect(point.x + PHYSICS.bodyWidth / 2).toBeGreaterThanOrEqual(
+			game.map.finish.minCenterX,
+		);
+		expect(game.physics.progress).toBeGreaterThanOrEqual(
+			game.map.finish.minProgress!,
+		);
+		expect(game.finished).toBe(false);
 	},
 );
 
-test("Room 10 keeps the original Main Babe Finish", () => {
-	expect(roomMap(map, 10).finish).toEqual({ ...map.finish, minProgress: 0 });
+test("the Room 10 floor does not change the native Solo and Community Finish", () => {
+	expect(map.finish).toEqual({
+		screen: 42,
+		minCenterX: 336,
+		requiresGrounded: true,
+	});
+	const original = new GameSimulation(map),
+		room = new GameSimulation(roomMap(map, 10));
+	for (const [ticks, originalFinished, roomFinished] of [
+		[16861, false, true],
+		[16957, true, false],
+	] as const) {
+		const point = checkpoints.find((checkpoint) => checkpoint.ticks === ticks)!;
+		original.physics.restore({ ...point, codecVersion: 1 });
+		room.physics.restore({ ...point, codecVersion: 1 });
+		expect(original.finished).toBe(originalFinished);
+		expect(room.finished).toBe(roomFinished);
+	}
 });
 
 for (const goal of ROOM_MAPS)
@@ -84,11 +111,16 @@ for (const goal of ROOM_MAPS)
 			game = new GameSimulation(world);
 		expect(world.screens).toBe(map.screens);
 		expect(world.spawn).toBe(map.spawn);
+		let stopAt = goal.level === 6 ? 8489 : goal.level === 9 ? 14391 : Infinity;
 		const step = (input: PlayerInput = NEUTRAL_INPUT) => {
-			if (!game.finished) game.tick(input);
+			if (!game.finished && game.physics.snapshot().ticks < stopAt)
+				game.tick(input);
 		};
-		for (let i = 0; i < 30; i++) step();
-		for (const action of route) {
+		const repeat = (ticks: number, input: PlayerInput = NEUTRAL_INPUT) => {
+			for (let i = 0; i < ticks; i++) step(input);
+		};
+		repeat(30);
+		for (const [index, action] of route.entries()) {
 			if ("walk" in action) {
 				for (let i = 0; i < action.ticks!; i++)
 					step({
@@ -116,22 +148,44 @@ for (const goal of ROOM_MAPS)
 				}
 			}
 			if (game.finished) break;
+			expect(game.physics.snapshot(), `route checkpoint ${index}`).toEqual(
+				checkpoints[index],
+			);
+			if (game.physics.snapshot().ticks === stopAt) break;
+		}
+		if (goal.level === 6 || goal.level === 9) {
+			expect(game.finished).toBe(false);
+			expect(game.physics.snapshot().ticks).toBe(stopAt);
+			stopAt = Infinity;
+			// Hai nền được chọn nằm ngoài nhánh đi thẳng của canonical route.
+			if (goal.level === 6) {
+				repeat(48, { ...NEUTRAL_INPUT, right: true });
+				step();
+				repeat(18, { ...NEUTRAL_INPUT, jump: true });
+				step({ ...NEUTRAL_INPUT, left: true });
+				repeat(31);
+			} else {
+				repeat(2, { ...NEUTRAL_INPUT, left: true });
+				step();
+				repeat(4, { ...NEUTRAL_INPUT, jump: true });
+				step({ ...NEUTRAL_INPUT, left: true });
+				repeat(46);
+			}
 		}
 		const state = game.physics.snapshot();
 		expect(game.finished).toBe(true);
 		expect(state.screen).toBe(goal.finish.screen);
-		expect(state.falls).toBe(0);
+		expect(state.falls).toBe(goal.level === 9 ? 1 : 0);
 		expect(state.freeFlight).toBe(false);
 		expect(game.adventure.completed).toBe(goal.level === 10);
-		const landing = checkpoints.find(
-			(point) =>
-				point.screen === goal.finish.screen &&
-				point.grounded &&
-				map.progressOriginY - point.y - 26 >= goal.finish.minProgress &&
-				point.x + 9 >= goal.finish.minCenterX,
+		expect(game.physics.progress).toBe(goal.finish.minProgress);
+		expect(state.x).toBeLessThan(floorEnds[goal.level - 1]!);
+		expect(state.x + PHYSICS.bodyWidth).toBeGreaterThan(goal.finish.minCenterX);
+		expect(state.ticks).toBe(
+			[1021, 1815, 4078, 5524, 7367, 8588, 9253, 12780, 14445, 16861][
+				goal.level - 1
+			],
 		);
-		expect(landing).toBeDefined();
-		expect(state.ticks).toBeLessThanOrEqual(landing!.ticks);
 		const airborne = { ...state, grounded: false };
 		game.physics.restore(airborne);
 		expect(game.finished).toBe(false);

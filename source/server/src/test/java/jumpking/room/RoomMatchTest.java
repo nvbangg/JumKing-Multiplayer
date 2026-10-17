@@ -182,29 +182,13 @@ class RoomMatchTest {
 
   @Test
   void everyLengthFinalizesOnItsOwnLandingAndOnlyFullMapOffersAnEnding() throws Exception {
-    com.fasterxml.jackson.databind.JsonNode checkpoints;
-    try (var input =
-        new org.springframework.core.io.ClassPathResource("fixtures/main-babe-checkpoints.json")
-            .getInputStream()) {
-      checkpoints = json.readTree(input);
-    }
     for (var goal : shared.roomMaps()) {
-      var point =
-          java.util.stream.StreamSupport.stream(checkpoints.spliterator(), false)
-              .filter(
-                  state ->
-                      state.path("grounded").asBoolean()
-                          && state.path("screen").asInt() == goal.finish().screen()
-                          && 302 - state.path("y").asDouble() >= goal.finish().minProgress()
-                          && state.path("x").asDouble() + 9 >= goal.finish().minCenterX())
-              .findFirst()
-              .orElseThrow();
+      var point = landing(goal.level());
       var match = match(new RoomSettings("RACE", null, goal.level()));
       var now = Instant.parse("2026-01-01T00:00:00Z");
       match.start(now);
-      for (var player : match.players.values())
-        player.game.physics().restore(json.treeToValue(point, PlayerState.class));
-      match.ticks = point.path("ticks").asLong();
+      for (var player : match.players.values()) player.game.physics().restore(point);
+      match.ticks = point.ticks;
       match.tick(1_000_000_000L, now.plusSeconds(300));
       assertThat(match.reason).as("map %s", goal.level()).isEqualTo("FINISH");
       assertThat(match.results().get("mapLevel")).isEqualTo(goal.level());
@@ -248,7 +232,7 @@ class RoomMatchTest {
   @Test
   void allPlayersOfTheFinishingTickAreProcessedBeforeResultsAndTies() throws Exception {
     var match = match();
-    var before = MainBabeRoute.beforeFinish(shared, json);
+    var before = MainBabeRoute.beforeRoomFinish(shared, json);
     var start = Instant.parse("2026-01-01T00:00:00Z");
     match.start(start);
     match.ticks = before.physics().ticks;
@@ -258,12 +242,49 @@ class RoomMatchTest {
       player.peak = before.physics().ticks;
     }
     match.tick(1_000_000_000L, start.plusSeconds(283));
-    assertThat(match.ticks).isEqualTo(16957);
+    assertThat(match.ticks).isEqualTo(16861);
     assertThat(match.reason).isEqualTo("FINISH");
     assertThat(match.players.values())
-        .allMatch(player -> player.winner && player.rank == 1 && player.finish == 16957);
+        .allMatch(player -> player.winner && player.rank == 1 && player.finish == 16861);
     assertThat(match.write(1).runs())
         .allMatch(
-            run -> run.status().equals("FINISHED") && run.ticks() == 16957 && run.rank() == 1);
+            run -> run.status().equals("FINISHED") && run.ticks() == 16861 && run.rank() == 1);
+  }
+
+  private PlayerState landing(int level) throws Exception {
+    int[] ticks = {1021, 1815, 4078, 5524, 7367, 8489, 9253, 12780, 14391, 16861};
+    var sim = new Simulation(shared.roomMap(level), shared.tuning(), false, false);
+    sim.restore(checkpoint(ticks[level - 1]));
+    if (level == 6) {
+      repeat(sim, new PlayerInput(false, true, false), 48);
+      repeat(sim, PlayerInput.NEUTRAL, 1);
+      repeat(sim, new PlayerInput(false, false, true), 18);
+      repeat(sim, new PlayerInput(true, false, false), 1);
+      repeat(sim, PlayerInput.NEUTRAL, 31);
+    } else if (level == 9) {
+      repeat(sim, new PlayerInput(true, false, false), 2);
+      repeat(sim, PlayerInput.NEUTRAL, 1);
+      repeat(sim, new PlayerInput(false, false, true), 4);
+      repeat(sim, new PlayerInput(true, false, false), 1);
+      repeat(sim, PlayerInput.NEUTRAL, 46);
+    }
+    assertThat(sim.finished()).as("map %s selected landing", level).isTrue();
+    return sim.snapshot();
+  }
+
+  private void repeat(Simulation sim, PlayerInput input, int ticks) {
+    for (int tick = 0; tick < ticks; tick++) sim.tick(input);
+  }
+
+  private PlayerState checkpoint(int ticks) throws Exception {
+    try (var input =
+        new org.springframework.core.io.ClassPathResource("fixtures/main-babe-checkpoints.json")
+            .getInputStream()) {
+      for (var checkpoint : json.readTree(input)) {
+        if (checkpoint.path("ticks").asInt() == ticks)
+          return json.treeToValue(checkpoint, PlayerState.class);
+      }
+    }
+    throw new IllegalArgumentException("Missing route checkpoint: " + ticks);
   }
 }

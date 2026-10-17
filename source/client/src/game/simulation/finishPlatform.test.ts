@@ -14,30 +14,30 @@ test("Room markers use the approved landing platforms", () => {
 		}),
 	).toEqual([
 		[1, 136, -760, 72],
-		[2, 8, -3056, 48],
-		[3, 216, -4584, 64],
-		[4, 240, -6256, 72],
-		[5, 208, -8416, 72],
-		[6, 192, -8904, 56],
-		[7, 264, -10976, 40],
-		[8, 256, -12488, 32],
+		[2, 152, -1472, 176],
+		[3, 8, -3056, 48],
+		[4, 216, -4584, 64],
+		[5, 128, -6424, 48],
+		[6, 96, -8584, 8],
+		[7, 24, -11064, 48],
+		[8, 288, -12256, 96],
 		[9, 248, -13584, 40],
 		[10, 336, -14976, 88],
 	]);
 });
 
-test("Room 6 does not Finish on the separate right platform at the same height", () => {
-	const game = new GameSimulation(roomMap(map, 6));
+test("Room 7 does not Finish on the right walkway at the same height", () => {
+	const game = new GameSimulation(roomMap(map, 7));
 	game.physics.restore({
 		...game.physics.snapshot(),
-		x: 456 - PHYSICS.bodyWidth / 2,
-		y: -8904 - PHYSICS.bodyHeight - 2,
-		screen: 25,
+		x: 400 - PHYSICS.bodyWidth / 2,
+		y: -11064 - PHYSICS.bodyHeight - 2,
+		screen: 31,
 		grounded: false,
 	});
 	for (let tick = 0; tick < PHYSICS.tickRate; tick++) game.tick(NEUTRAL_INPUT);
 	expect(game.physics.snapshot().grounded).toBe(true);
-	expect(game.physics.progress).toBe(9232);
+	expect(game.physics.progress).toBe(11392);
 	expect(game.finished).toBe(false);
 });
 

@@ -120,6 +120,8 @@ public final class Simulation {
     return state.screen == map.finish().screen()
         && state.grounded
         && state.x + p.bodyWidth / 2.0 >= map.finish().minCenterX()
+        && (map.finish().maxCenterX() == null
+            || state.x + p.bodyWidth / 2.0 <= map.finish().maxCenterX())
         && progress() >= map.finish().minProgress()
         && (map.finish().minProgress() == 0
             || (finishPlatform != null
@@ -283,8 +285,8 @@ public final class Simulation {
     if (input.freeFlight() != null && input.freeFlight() != s.freeFlight)
       setFlight(input.freeFlight());
     if (s.freeFlight) {
-      s.vx = ((input.right() ? 1 : 0) - (input.left() ? 1 : 0)) * p.flySpeed;
-      s.vy = ((input.down() ? 1 : 0) - (input.up() || input.jump() ? 1 : 0)) * p.flySpeed;
+      s.vx = ((input.right() ? 1 : 0) - (input.left() ? 1 : 0)) * p.flyHorizontalSpeed;
+      s.vy = ((input.down() ? 1 : 0) - (input.up() || input.jump() ? 1 : 0)) * p.flyVerticalSpeed;
       s.x = clamp(f(s.x + s.vx), 0, map.width() - p.bodyWidth);
       s.y =
           clamp(

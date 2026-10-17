@@ -15,8 +15,12 @@ record FinishPlatform(double x, double y, double width) {
     while (column < tiles.get(row).length()
         && "#IN".indexOf(tiles.get(row).charAt(column)) >= 0
         && tiles.get(row - 1).charAt(column) == ' ') column++;
-    return column > first
-        ? new FinishPlatform(first * map.tileSize(), feetY, (column - first) * map.tileSize())
+    double end =
+        Math.min(
+            column * map.tileSize(),
+            finish.maxCenterX() == null ? Double.POSITIVE_INFINITY : finish.maxCenterX());
+    return end > first * map.tileSize()
+        ? new FinishPlatform(first * map.tileSize(), feetY, end - first * map.tileSize())
         : null;
   }
 }

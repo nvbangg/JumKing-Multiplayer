@@ -8,7 +8,7 @@ import { ROOM_MAPS, roomMap } from "./roomMaps";
 import { PHYSICS } from "./tuning";
 import { NEUTRAL_INPUT, type PlayerInput } from "./types";
 
-const floorEnds = [208, 56, 280, 312, 280, 248, 304, 288, 288];
+const floorEnds = [208, 328, 56, 280, 176, 104, 72, 384, 288];
 
 test("Room maps keep the ten approved Finish boundaries", () => {
 	expect(
@@ -21,20 +21,24 @@ test("Room maps keep the ten approved Finish boundaries", () => {
 		]),
 	).toEqual([
 		[1, 3, 136, 1088, true],
-		[2, 9, 8, 3384, true],
-		[3, 13, 216, 4912, true],
-		[4, 18, 240, 6584, true],
-		[5, 24, 208, 8744, true],
-		[6, 25, 192, 9232, true],
-		[7, 31, 264, 11304, true],
-		[8, 35, 256, 12816, true],
+		[2, 5, 152, 1800, true],
+		[3, 9, 8, 3384, true],
+		[4, 13, 216, 4912, true],
+		[5, 18, 128, 6752, true],
+		[6, 24, 96, 8912, true],
+		[7, 31, 24, 11392, true],
+		[8, 35, 288, 12584, true],
 		[9, 38, 248, 13912, true],
 		[10, 42, 336, 0, true],
 	]);
 });
 
-test("short Room names match the region containing their Finish", () => {
-	for (const goal of ROOM_MAPS.slice(0, -1))
+test("Room labels distinguish the forest sections and retain later region names", () => {
+	expect(ROOM_MAPS.slice(0, 2).map((goal) => goal.name)).toEqual([
+		"Green Woods",
+		"Red Tree",
+	]);
+	for (const goal of ROOM_MAPS.slice(2, -1))
 		expect(manifest.screens[goal.finish.screen]!.location).toBe(
 			goal.name.toUpperCase(),
 		);
@@ -66,8 +70,14 @@ for (const goal of ROOM_MAPS.slice(0, -1))
 		const floorEnd = floorEnds[goal.level - 1]!;
 		game.physics.restore({ ...state, x: floorEnd });
 		expect(game.finished).toBe(false);
-		// Thân còn chạm mép nền vẫn hợp lệ, kể cả khi tâm đã qua mép phải.
-		game.physics.restore({ ...state, x: floorEnd - 0.25 });
+		// Giữ biên phải của đoạn Finish; nền không giới hạn chấp nhận thân còn chạm mép.
+		game.physics.restore({
+			...state,
+			x:
+				goal.finish.maxCenterX === undefined
+					? floorEnd - 0.25
+					: goal.finish.maxCenterX - PHYSICS.bodyWidth / 2,
+		});
 		expect(game.finished).toBe(true);
 	});
 
@@ -82,6 +92,24 @@ test("a higher grounded platform in the Finish screen does not end a short Room"
 	);
 	expect(game.physics.progress).toBeGreaterThan(game.map.finish.minProgress!);
 	expect(game.finished).toBe(false);
+});
+
+test("Room 7 requires reaching the left brazier rather than the rest of the walkway", () => {
+	const game = new GameSimulation(roomMap(map, 7));
+	for (const [x, finished] of [
+		[60, true],
+		[64, false],
+		[152, false],
+	] as const) {
+		game.physics.restore({
+			...game.physics.snapshot(),
+			x,
+			y: -11064 - PHYSICS.bodyHeight,
+			screen: 31,
+			grounded: true,
+		});
+		expect(game.finished).toBe(finished);
+	}
 });
 
 test("Room 10 keeps the native Solo and Community Finish", () => {
@@ -144,6 +172,9 @@ for (const goal of ROOM_MAPS)
 					if (game.physics.snapshot().grounded && i > 0) break;
 				}
 			}
+			// Bước tới tâm cột cờ sau cú nhảy cuối của đoạn leo.
+			if (goal.level === 6 && game.physics.snapshot().ticks === 9469)
+				repeat(4, { ...NEUTRAL_INPUT, right: true });
 			if (game.finished) break;
 			expect(game.physics.snapshot(), `route checkpoint ${index}`).toEqual(
 				checkpoints[index],
@@ -161,7 +192,7 @@ for (const goal of ROOM_MAPS)
 		}
 		expect(state.x + PHYSICS.bodyWidth).toBeGreaterThan(goal.finish.minCenterX);
 		expect(state.ticks).toBe(
-			[1021, 4078, 5524, 7367, 9253, 9774, 12780, 14236, 15426, 16957][
+			[1021, 1815, 4078, 5524, 7538, 9473, 12908, 14058, 15426, 16957][
 				goal.level - 1
 			],
 		);

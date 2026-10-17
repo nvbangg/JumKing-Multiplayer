@@ -14,17 +14,17 @@ class RoomMapsTest {
     assertThat(shared.roomMaps())
         .extracting(SharedData.RoomMap::finish)
         .containsExactly(
-            new GameMap.Finish(3, 136, true, 1088),
-            new GameMap.Finish(9, 8, true, 3384),
-            new GameMap.Finish(13, 216, true, 4912),
-            new GameMap.Finish(18, 240, true, 6584),
-            new GameMap.Finish(24, 208, true, 8744),
-            new GameMap.Finish(25, 192, true, 9232),
-            new GameMap.Finish(31, 264, true, 11304),
-            new GameMap.Finish(35, 256, true, 12816),
-            new GameMap.Finish(38, 248, true, 13912),
-            new GameMap.Finish(42, 336, true, 0));
-    assertThat(shared.geometry().finish()).isEqualTo(new GameMap.Finish(42, 336, true, 0));
+            new GameMap.Finish(3, 136, true, 1088, null),
+            new GameMap.Finish(5, 152, true, 1800, null),
+            new GameMap.Finish(9, 8, true, 3384, null),
+            new GameMap.Finish(13, 216, true, 4912, null),
+            new GameMap.Finish(18, 128, true, 6752, null),
+            new GameMap.Finish(24, 96, true, 8912, null),
+            new GameMap.Finish(31, 24, true, 11392, 72.0),
+            new GameMap.Finish(35, 288, true, 12584, null),
+            new GameMap.Finish(38, 248, true, 13912, null),
+            new GameMap.Finish(42, 336, true, 0, null));
+    assertThat(shared.geometry().finish()).isEqualTo(new GameMap.Finish(42, 336, true, 0, null));
   }
 
   @Test
@@ -63,9 +63,12 @@ class RoomMapsTest {
       state.x = platform.x() + platform.width();
       sim.restore(state);
       assertThat(sim.finished()).as("level %s beyond floor", goal.level()).isFalse();
-      state.x -= 0.25;
+      state.x =
+          map.finish().maxCenterX() == null
+              ? state.x - 0.25
+              : map.finish().maxCenterX() - physics.bodyWidth / 2.0;
       sim.restore(state);
-      assertThat(sim.finished()).as("level %s overlapping floor edge", goal.level()).isTrue();
+      assertThat(sim.finished()).as("level %s inside right boundary", goal.level()).isTrue();
       state.x = x;
 
       state.grounded = false;
@@ -88,6 +91,20 @@ class RoomMapsTest {
         .isGreaterThanOrEqualTo(map.finish().minCenterX());
     assertThat(sim.progress()).isGreaterThan(map.finish().minProgress());
     assertThat(sim.finished()).isFalse();
+  }
+
+  @Test
+  void leftBrazierFinishRejectsTheRestOfTheWalkway() throws Exception {
+    var shared = new SharedData(new ObjectMapper());
+    var sim = new Simulation(shared.roomMap(7), shared.tuning(), false, false);
+    var state = sim.snapshot();
+    state.screen = 31;
+    state.y = -11064 - shared.tuning().bodyHeight;
+    for (double x : new double[] {60, 64, 152}) {
+      state.x = x;
+      sim.restore(state);
+      assertThat(sim.finished()).isEqualTo(x == 60);
+    }
   }
 
   @Test
@@ -145,6 +162,9 @@ class RoomMapsTest {
             if (game.physics().snapshot().grounded && i > 0) break;
           }
         }
+        // Bước tới tâm cột cờ sau cú nhảy cuối của đoạn leo.
+        if (goal.level() == 6 && game.physics().snapshot().ticks == 9469)
+          for (int tick = 0; tick < 4; tick++) game.tick(new PlayerInput(false, true, false));
         if (game.finished()) break;
       }
       var state = game.physics().snapshot();
@@ -155,7 +175,7 @@ class RoomMapsTest {
             .isEqualTo(map.progressOriginY() - goal.finish().minProgress());
       assertThat(state.ticks)
           .isEqualTo(
-              new int[] {1021, 4078, 5524, 7367, 9253, 9774, 12780, 14236, 15426, 16957}
+              new int[] {1021, 1815, 4078, 5524, 7538, 9473, 12908, 14058, 15426, 16957}
                   [goal.level() - 1]);
       assertThat(state.falls).isZero();
       assertThat(state.freeFlight).isFalse();

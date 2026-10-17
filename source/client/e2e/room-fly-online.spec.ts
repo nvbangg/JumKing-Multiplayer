@@ -75,7 +75,7 @@ test("short Room finish shows Results and History without ending or full-map rew
 			.poll(() => snapshots.at(-1)?.self.simulation.physics.x, {
 				intervals: [20],
 			})
-			.toBeLessThan(goal.minCenterX + map.tileSize);
+			.toBeLessThan(goal.minCenterX + map.tileSize * 5);
 		await a.keyboard.up("ArrowLeft");
 		await a.keyboard.down("Space");
 		await expect
@@ -100,7 +100,7 @@ test("short Room finish shows Results and History without ending or full-map rew
 		).toBeEnabled({ timeout: 10_000 });
 		await expect(a.locator(".winner")).toContainText(hostName);
 		await expect(
-			a.getByText("Map 1 · Redcrown Woods", { exact: true }),
+			a.getByText("Map 1 · Green Woods", { exact: true }),
 		).toBeVisible();
 		await expect(
 			a.getByRole("button", { name: "Skip", exact: true }),
@@ -124,9 +124,7 @@ test("short Room finish shows Results and History without ending or full-map rew
 		await a.getByRole("button", { name: "Leave", exact: true }).click();
 		await a.getByRole("button", { name: "History", exact: true }).click();
 		await a.locator(".history-list > button").first().click();
-		await expect(
-			a.getByText("1 · Redcrown Woods", { exact: true }),
-		).toBeVisible();
+		await expect(a.getByText("1 · Green Woods", { exact: true })).toBeVisible();
 		expect(errors).toEqual([]);
 	} finally {
 		for (const context of [first, second])

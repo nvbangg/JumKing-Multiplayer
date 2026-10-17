@@ -258,6 +258,8 @@ class RoomMatchTest {
             .getInputStream()) {
       for (var checkpoint : json.readTree(input)) {
         sim.restore(json.treeToValue(checkpoint, PlayerState.class));
+        if (level == 6 && sim.snapshot().ticks == 9469)
+          for (int tick = 0; tick < 4; tick++) sim.tick(new PlayerInput(false, true, false));
         if (sim.finished()) return sim.snapshot();
       }
     }

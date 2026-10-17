@@ -47,7 +47,12 @@ export function findFinishPlatform(map: GameMap): FinishPlatform | undefined {
 				screen: finish.screen,
 				x: bestStart * size,
 				y: top + row * size,
-				width: bestWidth * size,
+				width:
+					Math.min(
+						(bestStart + bestWidth) * size,
+						finish.maxCenterX ?? Infinity,
+					) -
+					bestStart * size,
 			};
 	}
 	return undefined;

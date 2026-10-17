@@ -1,7 +1,7 @@
 [
   {
     "level": 1,
-    "name": "Redcrown Woods",
+    "name": "Green Woods",
     "finish": {
       "screen": 3,
       "minCenterX": 136,
@@ -11,6 +11,16 @@
   },
   {
     "level": 2,
+    "name": "Red Tree",
+    "finish": {
+      "screen": 5,
+      "minCenterX": 152,
+      "requiresGrounded": true,
+      "minProgress": 1800
+    }
+  },
+  {
+    "level": 3,
     "name": "Colossal Drain",
     "finish": {
       "screen": 9,
@@ -20,7 +30,7 @@
     }
   },
   {
-    "level": 3,
+    "level": 4,
     "name": "False Kings Keep",
     "finish": {
       "screen": 13,
@@ -30,33 +40,23 @@
     }
   },
   {
-    "level": 4,
+    "level": 5,
     "name": "Bargainburg",
     "finish": {
       "screen": 18,
-      "minCenterX": 240,
+      "minCenterX": 128,
       "requiresGrounded": true,
-      "minProgress": 6584
-    }
-  },
-  {
-    "level": 5,
-    "name": "Great Frontier",
-    "finish": {
-      "screen": 24,
-      "minCenterX": 208,
-      "requiresGrounded": true,
-      "minProgress": 8744
+      "minProgress": 6752
     }
   },
   {
     "level": 6,
-    "name": "Windswept Bluff",
+    "name": "Great Frontier",
     "finish": {
-      "screen": 25,
-      "minCenterX": 192,
+      "screen": 24,
+      "minCenterX": 96,
       "requiresGrounded": true,
-      "minProgress": 9232
+      "minProgress": 8912
     }
   },
   {
@@ -64,9 +64,10 @@
     "name": "Stormwall Pass",
     "finish": {
       "screen": 31,
-      "minCenterX": 264,
+      "minCenterX": 24,
       "requiresGrounded": true,
-      "minProgress": 11304
+      "minProgress": 11392,
+      "maxCenterX": 72
     }
   },
   {
@@ -74,9 +75,9 @@
     "name": "Chapel Perilous",
     "finish": {
       "screen": 35,
-      "minCenterX": 256,
+      "minCenterX": 288,
       "requiresGrounded": true,
-      "minProgress": 12816
+      "minProgress": 12584
     }
   },
   {

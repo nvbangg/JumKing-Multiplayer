@@ -452,7 +452,7 @@ class RoomRaceIT {
       a.ok("START_GAME", Map.of());
       time.advance(3000);
       a.await(message -> message.path("type").asText().equals("GAME_SNAPSHOT"));
-      var before = jumpking.support.MainBabeRoute.beforeRoomFinish(shared, json);
+      var before = jumpking.support.MainBabeRoute.beforeFinish(shared, json);
       var room =
           ((Map<?, ?>) org.springframework.test.util.ReflectionTestUtils.getField(server, "rooms"))
               .get(id);
@@ -482,7 +482,7 @@ class RoomRaceIT {
       var finished =
           a.await(message -> message.path("type").asText().equals("GAME_FINISHED")).path("payload");
       assertThat(finished.path("reason").asText()).isEqualTo("FINISH");
-      assertThat(finished.path("durationMs").asLong()).isEqualTo(281016);
+      assertThat(finished.path("durationMs").asLong()).isEqualTo(282616);
       for (var row : finished.path("results")) {
         assertThat(row.path("rank").asInt()).isEqualTo(1);
         assertThat(row.path("isWinner").asBoolean()).isTrue();
@@ -501,7 +501,7 @@ class RoomRaceIT {
               TestDatabase.get()
                   .jdbc
                   .queryForObject(
-                      "SELECT COUNT(*) FROM play_runs WHERE match_id=? AND status='FINISHED' AND is_winner=TRUE AND finish_ticks=16861",
+                      "SELECT COUNT(*) FROM play_runs WHERE match_id=? AND status='FINISHED' AND is_winner=TRUE AND finish_ticks=16957",
                       Integer.class,
                       play))
           .isEqualTo(2);

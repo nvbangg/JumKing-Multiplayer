@@ -116,7 +116,7 @@ class RoomEndingIT {
               + " BEFORE UPDATE ON matches FOR EACH ROW BEGIN IF NEW.id='"
               + game.play
               + "' AND NEW.ended_at IS NOT NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='injected ending commit failure'; END IF; END");
-      var before = MainBabeRoute.beforeRoomFinish(shared, json);
+      var before = MainBabeRoute.beforeFinish(shared, json);
       arrange(
           game.room,
           match -> {

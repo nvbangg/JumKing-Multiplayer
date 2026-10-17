@@ -14,20 +14,9 @@ public final class MainBabeRoute {
     var checkpoints =
         json.readTree(Path.of("../common/fixtures/main-babe-checkpoints.json").toFile());
     long target = checkpoints.get(checkpoints.size() - 1).path("ticks").asLong() - 1;
-    return beforeFinish(shared, json, json.treeToValue(shared.map(), GameMap.class), target);
-  }
-
-  /** Đích Room Map 10 nằm trên mái nhà, đạt ở tick 16861 của route chuẩn. */
-  public static GameSimulation.Snapshot beforeRoomFinish(SharedData shared, ObjectMapper json)
-      throws Exception {
-    return beforeFinish(shared, json, shared.roomMap(10), 16860);
-  }
-
-  private static GameSimulation.Snapshot beforeFinish(
-      SharedData shared, ObjectMapper json, GameMap map, long target) throws Exception {
     var game =
         new GameSimulation(
-            map,
+            json.treeToValue(shared.map(), GameMap.class),
             new Physics(
                 json.convertValue(
                     shared.physics(),

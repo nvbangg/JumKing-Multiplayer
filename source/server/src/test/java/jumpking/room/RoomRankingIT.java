@@ -100,7 +100,7 @@ class RoomRankingIT {
   @Test
   void allFourModesFinishTogetherAtTheNativeDestinationAndPersistSharedFirstPlace()
       throws Exception {
-    var before = MainBabeRoute.beforeRoomFinish(shared, json);
+    var before = MainBabeRoute.beforeFinish(shared, json);
     for (String mode : List.of("RACE", "HARDCORE", "TIME_LIMIT", "NO_WALK")) {
       try (var a = new GameClient(port);
           var b = new GameClient(port)) {
@@ -145,7 +145,7 @@ class RoomRankingIT {
                 TestDatabase.get()
                     .jdbc
                     .queryForObject(
-                        "SELECT COUNT(*) FROM play_runs WHERE match_id=? AND finish_ticks=16861 AND `rank`=1 AND is_winner=TRUE",
+                        "SELECT COUNT(*) FROM play_runs WHERE match_id=? AND finish_ticks=16957 AND `rank`=1 AND is_winner=TRUE",
                         Integer.class,
                         game.play))
             .as(mode)

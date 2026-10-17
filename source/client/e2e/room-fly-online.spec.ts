@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+import map from "../../common/maps/main-babe.json" with { type: "json" };
+import physics from "../../common/physics.json" with { type: "json" };
+import goals from "../../common/room-maps.json" with { type: "json" };
 import type { OnlineSnapshot } from "../src/game/netcode/OnlineRuntime";
 import {
 	createRoom,
@@ -66,12 +69,13 @@ test("short Room finish shows Results and History without ending or full-map rew
 		await expect
 			.poll(() => snapshots.at(-1)?.self.simulation.physics.freeFlight)
 			.toBe(true);
+		const goal = goals[0]!.finish;
 		await a.keyboard.down("ArrowLeft");
 		await expect
 			.poll(() => snapshots.at(-1)?.self.simulation.physics.x, {
 				intervals: [20],
 			})
-			.toBeLessThan(70);
+			.toBeLessThan(goal.minCenterX + map.tileSize);
 		await a.keyboard.up("ArrowLeft");
 		await a.keyboard.down("Space");
 		await expect
@@ -79,7 +83,12 @@ test("short Room finish shows Results and History without ending or full-map rew
 				timeout: 15_000,
 				intervals: [30],
 			})
-			.toBeLessThan(-1790);
+			.toBeLessThan(
+				map.progressOriginY -
+					goal.minProgress -
+					physics.bodyHeight -
+					map.tileSize,
+			);
 		await a.keyboard.up("Space");
 		await a.screenshot({ path: info.outputPath("room-map-1-finish.png") });
 		await a.waitForTimeout(400);

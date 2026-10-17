@@ -232,7 +232,7 @@ class RoomMatchTest {
   @Test
   void allPlayersOfTheFinishingTickAreProcessedBeforeResultsAndTies() throws Exception {
     var match = match();
-    var before = MainBabeRoute.beforeRoomFinish(shared, json);
+    var before = MainBabeRoute.beforeFinish(shared, json);
     var start = Instant.parse("2026-01-01T00:00:00Z");
     match.start(start);
     match.ticks = before.physics().ticks;
@@ -242,49 +242,25 @@ class RoomMatchTest {
       player.peak = before.physics().ticks;
     }
     match.tick(1_000_000_000L, start.plusSeconds(283));
-    assertThat(match.ticks).isEqualTo(16861);
+    assertThat(match.ticks).isEqualTo(16957);
     assertThat(match.reason).isEqualTo("FINISH");
     assertThat(match.players.values())
-        .allMatch(player -> player.winner && player.rank == 1 && player.finish == 16861);
+        .allMatch(player -> player.winner && player.rank == 1 && player.finish == 16957);
     assertThat(match.write(1).runs())
         .allMatch(
-            run -> run.status().equals("FINISHED") && run.ticks() == 16861 && run.rank() == 1);
+            run -> run.status().equals("FINISHED") && run.ticks() == 16957 && run.rank() == 1);
   }
 
   private PlayerState landing(int level) throws Exception {
-    int[] ticks = {1021, 1815, 4078, 5524, 7367, 8489, 9253, 12780, 14391, 16861};
     var sim = new Simulation(shared.roomMap(level), shared.tuning(), false, false);
-    sim.restore(checkpoint(ticks[level - 1]));
-    if (level == 6) {
-      repeat(sim, new PlayerInput(false, true, false), 48);
-      repeat(sim, PlayerInput.NEUTRAL, 1);
-      repeat(sim, new PlayerInput(false, false, true), 18);
-      repeat(sim, new PlayerInput(true, false, false), 1);
-      repeat(sim, PlayerInput.NEUTRAL, 31);
-    } else if (level == 9) {
-      repeat(sim, new PlayerInput(true, false, false), 2);
-      repeat(sim, PlayerInput.NEUTRAL, 1);
-      repeat(sim, new PlayerInput(false, false, true), 4);
-      repeat(sim, new PlayerInput(true, false, false), 1);
-      repeat(sim, PlayerInput.NEUTRAL, 46);
-    }
-    assertThat(sim.finished()).as("map %s selected landing", level).isTrue();
-    return sim.snapshot();
-  }
-
-  private void repeat(Simulation sim, PlayerInput input, int ticks) {
-    for (int tick = 0; tick < ticks; tick++) sim.tick(input);
-  }
-
-  private PlayerState checkpoint(int ticks) throws Exception {
     try (var input =
         new org.springframework.core.io.ClassPathResource("fixtures/main-babe-checkpoints.json")
             .getInputStream()) {
       for (var checkpoint : json.readTree(input)) {
-        if (checkpoint.path("ticks").asInt() == ticks)
-          return json.treeToValue(checkpoint, PlayerState.class);
+        sim.restore(json.treeToValue(checkpoint, PlayerState.class));
+        if (sim.finished()) return sim.snapshot();
       }
     }
-    throw new IllegalArgumentException("Missing route checkpoint: " + ticks);
+    throw new IllegalArgumentException("Missing Finish landing for map " + level);
   }
 }

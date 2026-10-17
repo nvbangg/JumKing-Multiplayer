@@ -15,15 +15,15 @@ class RoomMapsTest {
         .extracting(SharedData.RoomMap::finish)
         .containsExactly(
             new GameMap.Finish(3, 136, true, 1088),
-            new GameMap.Finish(5, 152, true, 1800),
             new GameMap.Finish(9, 8, true, 3384),
             new GameMap.Finish(13, 216, true, 4912),
             new GameMap.Finish(18, 240, true, 6584),
-            new GameMap.Finish(21, 272, true, 7648),
             new GameMap.Finish(24, 208, true, 8744),
+            new GameMap.Finish(25, 192, true, 9232),
             new GameMap.Finish(31, 264, true, 11304),
-            new GameMap.Finish(35, 192, true, 12816),
-            new GameMap.Finish(42, 112, true, 15304));
+            new GameMap.Finish(35, 256, true, 12816),
+            new GameMap.Finish(38, 248, true, 13912),
+            new GameMap.Finish(42, 336, true, 0));
     assertThat(shared.geometry().finish()).isEqualTo(new GameMap.Finish(42, 336, true, 0));
   }
 
@@ -31,7 +31,7 @@ class RoomMapsTest {
   void eachGoalRequiresItsInclusiveHorizontalAndProgressBoundariesAndGrounded() throws Exception {
     var shared = new SharedData(new ObjectMapper());
     var physics = shared.tuning();
-    for (var goal : shared.roomMaps()) {
+    for (var goal : shared.roomMaps().subList(0, 9)) {
       var map = shared.roomMap(goal.level());
       var sim = new Simulation(map, physics, false, false);
       var state = sim.snapshot();
@@ -54,6 +54,20 @@ class RoomMapsTest {
       assertThat(sim.finished()).as("level %s above the selected floor", goal.level()).isFalse();
       state.y += 0.25;
 
+      state.screen--;
+      sim.restore(state);
+      assertThat(sim.finished()).as("level %s wrong screen", goal.level()).isFalse();
+      state.screen++;
+      double x = state.x;
+      var platform = FinishPlatform.find(map);
+      state.x = platform.x() + platform.width();
+      sim.restore(state);
+      assertThat(sim.finished()).as("level %s beyond floor", goal.level()).isFalse();
+      state.x -= 0.25;
+      sim.restore(state);
+      assertThat(sim.finished()).as("level %s overlapping floor edge", goal.level()).isTrue();
+      state.x = x;
+
       state.grounded = false;
       sim.restore(state);
       assertThat(sim.finished()).as("level %s while airborne", goal.level()).isFalse();
@@ -61,20 +75,33 @@ class RoomMapsTest {
   }
 
   @Test
-  void selectedFloorsRejectOtherLandingsThatAlsoMeetTheOldLowerBounds() throws Exception {
+  void higherPlatformInTheFinishScreenDoesNotEndAShortRoom() throws Exception {
     var json = new ObjectMapper();
     var shared = new SharedData(json);
-    int[][] alternatives = {{6, 8489}, {9, 14236}, {10, 16957}};
-    for (var alternative : alternatives) {
-      var goal = shared.roomMap(alternative[0]);
-      var sim = new Simulation(goal, shared.tuning(), false, false);
-      sim.restore(checkpoint(json, alternative[1]));
-      assertThat(sim.snapshot().grounded).isTrue();
-      assertThat(sim.snapshot().screen).isEqualTo(goal.finish().screen());
-      assertThat(sim.snapshot().x + shared.tuning().bodyWidth / 2.0)
-          .isGreaterThanOrEqualTo(goal.finish().minCenterX());
-      assertThat(sim.progress()).isGreaterThanOrEqualTo(goal.finish().minProgress());
-      assertThat(sim.finished()).as("level %s alternate floor", alternative[0]).isFalse();
+    var map = shared.roomMap(1);
+    var sim = new Simulation(map, shared.tuning(), false, false);
+    var state = checkpoint(json, 1182);
+    sim.restore(state);
+    assertThat(state.grounded).isTrue();
+    assertThat(state.screen).isEqualTo(map.finish().screen());
+    assertThat(state.x + shared.tuning().bodyWidth / 2.0)
+        .isGreaterThanOrEqualTo(map.finish().minCenterX());
+    assertThat(sim.progress()).isGreaterThan(map.finish().minProgress());
+    assertThat(sim.finished()).isFalse();
+  }
+
+  @Test
+  void fullRoomKeepsTheNativeSoloAndCommunityFinish() throws Exception {
+    var json = new ObjectMapper();
+    var shared = new SharedData(json);
+    for (int ticks : new int[] {16861, 16957}) {
+      var original = new Simulation(shared.geometry(), shared.tuning(), false, false);
+      var room = new Simulation(shared.roomMap(10), shared.tuning(), false, false);
+      var state = checkpoint(json, ticks);
+      original.restore(state);
+      room.restore(state);
+      assertThat(original.finished()).isEqualTo(ticks == 16957);
+      assertThat(room.finished()).isEqualTo(original.finished());
     }
   }
 
@@ -94,10 +121,9 @@ class RoomMapsTest {
     for (var goal : shared.roomMaps()) {
       var map = shared.roomMap(goal.level());
       var game = new GameSimulation(map, physics, shared.adventure(), false, false);
-      long branchTick = goal.level() == 6 ? 8489 : goal.level() == 9 ? 14391 : Long.MAX_VALUE;
       java.util.function.Consumer<PlayerInput> step =
           input -> {
-            if (!game.finished() && game.physics().snapshot().ticks < branchTick) game.tick(input);
+            if (!game.finished()) game.tick(input);
           };
       for (int i = 0; i < 30; i++) step.accept(PlayerInput.NEUTRAL);
       for (var action : route) {
@@ -119,35 +145,19 @@ class RoomMapsTest {
             if (game.physics().snapshot().grounded && i > 0) break;
           }
         }
-        if (game.finished() || game.physics().snapshot().ticks >= branchTick) break;
-      }
-      if (goal.level() == 6 || goal.level() == 9) {
-        assertThat(game.finished()).as("level %s before the branch", goal.level()).isFalse();
-        assertThat(game.physics().snapshot().ticks).isEqualTo(branchTick);
-        assertThat(game.physics().snapshot())
-            .usingRecursiveComparison()
-            .isEqualTo(checkpoint(json, (int) branchTick));
-        if (goal.level() == 6) {
-          repeat(game, new PlayerInput(false, true, false), 48);
-          repeat(game, PlayerInput.NEUTRAL, 1);
-          repeat(game, new PlayerInput(false, false, true), 18);
-          repeat(game, new PlayerInput(true, false, false), 1);
-          repeat(game, PlayerInput.NEUTRAL, 31);
-        } else {
-          repeat(game, new PlayerInput(true, false, false), 2);
-          repeat(game, PlayerInput.NEUTRAL, 1);
-          repeat(game, new PlayerInput(false, false, true), 4);
-          repeat(game, new PlayerInput(true, false, false), 1);
-          repeat(game, PlayerInput.NEUTRAL, 46);
-        }
+        if (game.finished()) break;
       }
       var state = game.physics().snapshot();
       assertThat(game.finished()).as("level %s", goal.level()).isTrue();
       assertThat(state.screen).isEqualTo(goal.finish().screen());
-      assertThat(state.y + physics.bodyHeight)
-          .isEqualTo(map.progressOriginY() - goal.finish().minProgress());
-      // Nhánh Map 9 rơi từ màn trên xuống đúng nền đã chọn và có một lần splat hợp lệ.
-      assertThat(state.falls).isEqualTo(goal.level() == 9 ? 1 : 0);
+      if (goal.level() < 10)
+        assertThat(state.y + physics.bodyHeight)
+            .isEqualTo(map.progressOriginY() - goal.finish().minProgress());
+      assertThat(state.ticks)
+          .isEqualTo(
+              new int[] {1021, 4078, 5524, 7367, 9253, 9774, 12780, 14236, 15426, 16957}
+                  [goal.level() - 1]);
+      assertThat(state.falls).isZero();
       assertThat(state.freeFlight).isFalse();
       assertThat(game.adventure().completed()).isEqualTo(goal.level() == 10);
       state.grounded = false;
@@ -156,10 +166,6 @@ class RoomMapsTest {
     }
     assertThatThrownBy(() -> shared.roomMap(0)).isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> shared.roomMap(11)).isInstanceOf(IllegalArgumentException.class);
-  }
-
-  private void repeat(GameSimulation game, PlayerInput input, int ticks) {
-    for (int tick = 0; tick < ticks && !game.finished(); tick++) game.tick(input);
   }
 
   private PlayerState checkpoint(ObjectMapper json, int ticks) throws Exception {

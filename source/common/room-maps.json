@@ -13,16 +13,6 @@
     "level": 2,
     "name": "Colossal Drain",
     "finish": {
-      "screen": 5,
-      "minCenterX": 152,
-      "requiresGrounded": true,
-      "minProgress": 1800
-    }
-  },
-  {
-    "level": 3,
-    "name": "False Kings Keep",
-    "finish": {
       "screen": 9,
       "minCenterX": 8,
       "requiresGrounded": true,
@@ -30,8 +20,8 @@
     }
   },
   {
-    "level": 4,
-    "name": "Bargainburg",
+    "level": 3,
+    "name": "False Kings Keep",
     "finish": {
       "screen": 13,
       "minCenterX": 216,
@@ -40,8 +30,8 @@
     }
   },
   {
-    "level": 5,
-    "name": "Great Frontier",
+    "level": 4,
+    "name": "Bargainburg",
     "finish": {
       "screen": 18,
       "minCenterX": 240,
@@ -50,18 +40,8 @@
     }
   },
   {
-    "level": 6,
-    "name": "Windswept Bluff",
-    "finish": {
-      "screen": 21,
-      "minCenterX": 272,
-      "requiresGrounded": true,
-      "minProgress": 7648
-    }
-  },
-  {
-    "level": 7,
-    "name": "Stormwall Pass",
+    "level": 5,
+    "name": "Great Frontier",
     "finish": {
       "screen": 24,
       "minCenterX": 208,
@@ -70,8 +50,18 @@
     }
   },
   {
-    "level": 8,
-    "name": "Chapel Perilous",
+    "level": 6,
+    "name": "Windswept Bluff",
+    "finish": {
+      "screen": 25,
+      "minCenterX": 192,
+      "requiresGrounded": true,
+      "minProgress": 9232
+    }
+  },
+  {
+    "level": 7,
+    "name": "Stormwall Pass",
     "finish": {
       "screen": 31,
       "minCenterX": 264,
@@ -80,13 +70,23 @@
     }
   },
   {
+    "level": 8,
+    "name": "Chapel Perilous",
+    "finish": {
+      "screen": 35,
+      "minCenterX": 256,
+      "requiresGrounded": true,
+      "minProgress": 12816
+    }
+  },
+  {
     "level": 9,
     "name": "Blue Ruin",
     "finish": {
-      "screen": 35,
-      "minCenterX": 192,
+      "screen": 38,
+      "minCenterX": 248,
       "requiresGrounded": true,
-      "minProgress": 12816
+      "minProgress": 13912
     }
   },
   {
@@ -94,9 +94,9 @@
     "name": "Main Babe",
     "finish": {
       "screen": 42,
-      "minCenterX": 112,
+      "minCenterX": 336,
       "requiresGrounded": true,
-      "minProgress": 15304
+      "minProgress": 0
     }
   }
 ]

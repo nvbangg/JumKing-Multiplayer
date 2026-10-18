@@ -38,43 +38,43 @@ export function ChatPanel({
 	colors,
 	onSend,
 	onClose,
+	onFocus,
+	onBlur,
 	focusRequest = 0,
 }: {
 	messages: ChatMessage[];
 	colors: readonly string[];
 	onSend: (text: string) => Promise<void>;
 	onClose?: () => void;
+	onFocus?: () => void;
+	onBlur?: () => void;
 	focusRequest?: number;
 }) {
 	const [text, setText] = useState(""),
 		[error, setError] = useState(""),
 		[sending, setSending] = useState(false);
 	const input = useRef<HTMLInputElement>(null);
+	const displayMessages = messages.slice(-10);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: Mỗi focusRequest yêu cầu focus lại cùng ô nhập.
 	useEffect(() => {
 		if (focusRequest > 0) input.current?.focus();
 	}, [focusRequest]);
 	return (
-		<section
-			className="chat-panel"
-			aria-label="Room chat"
-			onKeyDown={(event) => {
-				if (event.key === "Escape" && onClose) {
-					event.preventDefault();
-					event.stopPropagation();
-					onClose();
-				}
-			}}
-		>
-			<header>
-				<span>Chat</span>
-				{onClose && (
-					<button type="button" onClick={onClose} aria-label="Close chat">
-						×
-					</button>
-				)}
-			</header>
-			<ChatMessages messages={messages} colors={colors} />
+		<div className="chat-panel" role="region" aria-label="Room chat">
+			{displayMessages.length > 0 && (
+				<section className="chat-history-box" aria-label="Chat messages">
+					<ChatMessages messages={displayMessages} colors={colors} />
+				</section>
+			)}
+			<section className="chat-input-box" aria-label="Chat input">
+				<header>
+					<span>Chat</span>
+					{onClose && (
+						<button type="button" onClick={onClose} aria-label="Close chat">
+							×
+						</button>
+					)}
+				</header>
 			<form
 				onSubmit={(event) => {
 					event.preventDefault();
@@ -92,7 +92,8 @@ export function ChatPanel({
 					void onSend(text)
 						.then(() => {
 							setText("");
-							input.current?.focus();
+							input.current?.blur();
+							onClose?.();
 						})
 						.catch((cause) =>
 							setError(
@@ -111,6 +112,16 @@ export function ChatPanel({
 					ref={input}
 					id="chat-message"
 					value={text}
+					onFocus={onFocus}
+					onBlur={onBlur}
+					onKeyDown={(event) => {
+						if (event.key === "Escape") {
+							event.preventDefault();
+							event.stopPropagation();
+							input.current?.blur();
+							onClose?.();
+						}
+					}}
 					onChange={(event) => setText(event.currentTarget.value)}
 					autoComplete="off"
 				/>
@@ -118,7 +129,8 @@ export function ChatPanel({
 					Send
 				</button>
 			</form>
-			{error && <p role="alert">{error}</p>}
-		</section>
+				{error && <p role="alert">{error}</p>}
+			</section>
+		</div>
 	);
 }

@@ -1,13 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PRESENTATION } from "../../game/presentation/config";
 import type { GameSocket } from "../../network/GameSocket";
+import type { ChatMessage } from "../../network/contracts";
+
+export interface RoomChatState {
+	open: boolean;
+	preview: boolean;
+	messages: ChatMessage[];
+	focusRequest: number;
+	openChat: () => void;
+	closeChat: () => void;
+}
 
 export function useRoomChat(
 	socket: GameSocket,
 	enabled = true,
 	onOpen?: () => void,
 	onClose?: () => void,
-) {
+): RoomChatState {
 	const [open, setOpen] = useState(false),
 		[preview, setPreview] = useState(false);
 	const [focusRequest, setFocusRequest] = useState(0);

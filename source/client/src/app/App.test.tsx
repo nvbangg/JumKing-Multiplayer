@@ -6,9 +6,8 @@ test("entry renders an accessible page without a backend connection", () => {
 	const html = renderToStaticMarkup(<App />);
 	expect(html).toContain('alt="JumpKing"');
 	expect(html).toContain("New Game");
-	expect(html).toContain("Controls guide");
-	expect(html).toContain("Hold Space");
-	expect(html).toContain("Chat Online");
+	expect(html).not.toContain("Hold Space");
+	expect(html).not.toContain("Chat Online");
 });
 
 test("history screen keeps brand logo above the menu panel", () => {

@@ -180,18 +180,6 @@ button {
 	width: min(100%, 800px);
 	align-items: start;
 }
-.home-menu-column {
-	display: flex;
-	flex-direction: column;
-	gap: 20px;
-}
-.home-controls-guide {
-	padding: 0 4px;
-}
-.home-controls-guide .controls-help {
-	gap: 12px 20px;
-	font-size: 16px;
-}
 .single-panel {
 	width: min(100%, 500px);
 }

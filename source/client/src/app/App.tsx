@@ -396,179 +396,72 @@ export function App() {
 			<div
 				className={screen === "home" && home ? "home-layout" : "single-panel"}
 			>
-				<div
-					className={screen === "home" && home ? "home-menu-column" : undefined}
-				>
-					<MenuPanel
-						title={
-							screen === "home"
-								? undefined
-								: (
-										{
-											"sign-in": "Sign In",
-											register: "Create Account",
-											password: "Change Password",
-											rooms: "Room",
-											account: "Account",
-											history: "History",
-											detail: "Game Details",
-											options: "Options",
+				<MenuPanel
+					title={
+						screen === "home"
+							? undefined
+							: (
+									{
+										"sign-in": "Sign In",
+										register: "Create Account",
+										password: "Change Password",
+										rooms: "Room",
+										account: "Account",
+										history: "History",
+										detail: "Game Details",
+										options: "Options",
 
-											"public-rooms": "Join Public Room",
-											lobby: "Lobby",
-											results: "Results",
-										} as Partial<Record<Screen, string>>
-									)[screen]
-						}
-						onBack={
-							screen === "home" || screen === "lobby" || screen === "results"
-								? undefined
-								: back
-						}
-					>
-						{screen === "home" && (
-							<>
-								{home?.run && (
-									<button
-										type="button"
-										onClick={() => enterCommunity(false)}
-										disabled={
-											pending || (!!accountId && (homeLoading || !home))
-										}
-									>
-										Continue
-									</button>
-								)}
+										"public-rooms": "Join Public Room",
+										lobby: "Lobby",
+										results: "Results",
+									} as Partial<Record<Screen, string>>
+								)[screen]
+					}
+					onBack={
+						screen === "home" || screen === "lobby" || screen === "results"
+							? undefined
+							: back
+					}
+				>
+					{screen === "home" && (
+						<>
+							{home?.run && (
 								<button
 									type="button"
-									onClick={() => enterCommunity(true)}
+									onClick={() => enterCommunity(false)}
 									disabled={pending || (!!accountId && (homeLoading || !home))}
 								>
-									New Game
+									Continue
 								</button>
-								<button type="button" onClick={() => setScreen("rooms")}>
-									Room
-								</button>
-								<button
-									type="button"
-									onClick={() =>
-										setScreen(identity.account ? "history" : "sign-in")
-									}
-								>
-									History
-								</button>
-								<button type="button" onClick={() => setScreen("options")}>
-									Options
-								</button>
-								<div className="account-actions">
-									{identity.account ? (
-										<button type="button" onClick={() => setScreen("account")}>
-											{identity.account.username}
-										</button>
-									) : (
-										<>
-											<button
-												type="button"
-												onClick={() => setScreen("sign-in")}
-											>
-												Sign In
-											</button>
-											<button
-												type="button"
-												onClick={() => setScreen("register")}
-											>
-												Create Account
-											</button>
-										</>
-									)}
-								</div>
-							</>
-						)}
-						{(screen === "sign-in" || screen === "register") && (
-							<AuthForm
-								key={screen}
-								register={screen === "register"}
-								onSuccess={(value) => {
-									setIdentity(value);
-									back();
-								}}
-								onSwitch={() =>
-									setScreen(screen === "register" ? "sign-in" : "register")
-								}
-							/>
-						)}
-						{screen === "account" && identity.account && (
-							<>
-								<dl className="account-info">
-									<dt>Username</dt>
-									<dd>{identity.account.username}</dd>
-								</dl>
-								<button type="button" onClick={() => setScreen("password")}>
-									Change Password
-								</button>
-								<button
-									type="button"
-									disabled={pending}
-									onClick={() => {
-										void execute(async () => {
-											await api("/auth/logout", "POST");
-											socket.current?.close();
-											socket.current = null;
-											clearCsrf();
-											setIdentity(initialIdentity);
-											back();
-										});
-									}}
-								>
-									Sign Out
-								</button>
-							</>
-						)}
-						{screen === "password" && identity.account && (
-							<ChangePassword
-								onChanged={() => {
-									socket.current?.close();
-									socket.current = null;
-									setIdentity(initialIdentity);
-									setScreen("sign-in");
-									setError("Password changed. Sign in again.");
-								}}
-							/>
-						)}
-						{screen === "history" &&
-							(identity.account ? (
-								<HistoryList
-									key={accountId}
-									onSelect={(item) => {
-										setDetail({ accountId: identity.account!.id, item });
-										setScreen("detail");
-									}}
-								/>
-							) : (
-								<button type="button" onClick={() => setScreen("sign-in")}>
-									Sign In
-								</button>
-							))}
-						{screen === "detail" &&
-							detail?.accountId === accountId &&
-							detail && (
-								<HistoryDetail
-									key={detail.item.kind + ":" + detail.item.id}
-									item={detail.item}
-								/>
 							)}
-						{screen === "options" && (
-							<OptionsButtons
-								options={options}
-								onChange={updateOptions}
-								onError={setError}
-							/>
-						)}
-						{screen === "rooms" && (
-							<>
-								{!identity.authenticated ? (
+							<button
+								type="button"
+								onClick={() => enterCommunity(true)}
+								disabled={pending || (!!accountId && (homeLoading || !home))}
+							>
+								New Game
+							</button>
+							<button type="button" onClick={() => setScreen("rooms")}>
+								Room
+							</button>
+							<button
+								type="button"
+								onClick={() =>
+									setScreen(identity.account ? "history" : "sign-in")
+								}
+							>
+								History
+							</button>
+							<button type="button" onClick={() => setScreen("options")}>
+								Options
+							</button>
+							<div className="account-actions">
+								{identity.account ? (
+									<button type="button" onClick={() => setScreen("account")}>
+										{identity.account.username}
+									</button>
+								) : (
 									<>
-										<p>Sign in to play online.</p>
 										<button type="button" onClick={() => setScreen("sign-in")}>
 											Sign In
 										</button>
@@ -576,110 +469,199 @@ export function App() {
 											Create Account
 										</button>
 									</>
-								) : (
-									<>
-										<button
-											type="button"
-											disabled={pending}
-											onClick={() => command("CREATE_ROOM")}
-										>
-											Create Room
-										</button>
-										<button
-											type="button"
-											onClick={() => setScreen("public-rooms")}
-										>
-											Join Public Room
-										</button>
-										<form
-											className="room-join-form"
-											onSubmit={(event) => {
-												event.preventDefault();
-												const roomId = String(
-													new FormData(event.currentTarget).get("roomId") || "",
-												)
-													.trim()
-													.toUpperCase();
-												command("JOIN_ROOM", { roomId });
-											}}
-										>
-											<input
-												name="roomId"
-												aria-label="Room ID"
-												placeholder="Enter Room ID"
-												required
-												minLength={6}
-												maxLength={6}
-												autoComplete="off"
-												autoCapitalize="characters"
-												pattern="[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}"
-												onInput={(event) => {
-													event.currentTarget.value =
-														event.currentTarget.value.toUpperCase();
-												}}
-											/>
-
-											<button type="submit" disabled={pending}>
-												Join
-											</button>
-										</form>
-									</>
 								)}
-							</>
-						)}
-						{screen === "public-rooms" && identity.authenticated && (
-							<PublicRooms
-								onJoin={(roomId) => command("JOIN_ROOM", { roomId })}
-							/>
-						)}
-						{screen === "lobby" && room && (
-							<Lobby
-								room={room}
-								selfId={socket.current?.selfId || null}
-								pending={pending}
-								command={command}
-								socket={socket.current}
-							/>
-						)}
-						{screen === "results" && result && (
-							<Results
-								result={result}
-								room={room}
-								selfId={socket.current?.selfId || null}
-								pending={pending}
-								onAgain={() =>
-									command("PLAY_AGAIN", { matchId: result.playId })
-								}
-								onLeave={() => command("LEAVE_ROOM")}
-							/>
-						)}
-
-						{error && (
-							<p className="error" role="alert">
-								{error}
-							</p>
-						)}
-						{screen === "home" && accountId && !home && !homeLoading && (
+							</div>
+						</>
+					)}
+					{(screen === "sign-in" || screen === "register") && (
+						<AuthForm
+							key={screen}
+							register={screen === "register"}
+							onSuccess={(value) => {
+								setIdentity(value);
+								back();
+							}}
+							onSwitch={() =>
+								setScreen(screen === "register" ? "sign-in" : "register")
+							}
+						/>
+					)}
+					{screen === "account" && identity.account && (
+						<>
+							<dl className="account-info">
+								<dt>Username</dt>
+								<dd>{identity.account.username}</dd>
+							</dl>
+							<button type="button" onClick={() => setScreen("password")}>
+								Change Password
+							</button>
 							<button
 								type="button"
+								disabled={pending}
 								onClick={() => {
-									setError("");
-									setHomeRevision((value) => value + 1);
+									void execute(async () => {
+										await api("/auth/logout", "POST");
+										socket.current?.close();
+										socket.current = null;
+										clearCsrf();
+										setIdentity(initialIdentity);
+										back();
+									});
 								}}
 							>
-								Retry
+								Sign Out
 							</button>
-						)}
-						{screen === "home" && accountId && homeLoading && (
-							<p role="status">Loading…</p>
-						)}
-					</MenuPanel>
-					{screen === "home" && (
-						<aside className="home-controls-guide" aria-label="Controls guide">
-							<ControlsHelp />
-						</aside>
+						</>
 					)}
-				</div>
+					{screen === "password" && identity.account && (
+						<ChangePassword
+							onChanged={() => {
+								socket.current?.close();
+								socket.current = null;
+								setIdentity(initialIdentity);
+								setScreen("sign-in");
+								setError("Password changed. Sign in again.");
+							}}
+						/>
+					)}
+					{screen === "history" &&
+						(identity.account ? (
+							<HistoryList
+								key={accountId}
+								onSelect={(item) => {
+									setDetail({ accountId: identity.account!.id, item });
+									setScreen("detail");
+								}}
+							/>
+						) : (
+							<button type="button" onClick={() => setScreen("sign-in")}>
+								Sign In
+							</button>
+						))}
+					{screen === "detail" && detail?.accountId === accountId && detail && (
+						<HistoryDetail
+							key={detail.item.kind + ":" + detail.item.id}
+							item={detail.item}
+						/>
+					)}
+					{screen === "options" && (
+						<>
+							<OptionsButtons
+								options={options}
+								onChange={updateOptions}
+								onError={setError}
+							/>
+							<ControlsHelp />
+						</>
+					)}
+					{screen === "rooms" && (
+						<>
+							{!identity.authenticated ? (
+								<>
+									<p>Sign in to play online.</p>
+									<button type="button" onClick={() => setScreen("sign-in")}>
+										Sign In
+									</button>
+									<button type="button" onClick={() => setScreen("register")}>
+										Create Account
+									</button>
+								</>
+							) : (
+								<>
+									<button
+										type="button"
+										disabled={pending}
+										onClick={() => command("CREATE_ROOM")}
+									>
+										Create Room
+									</button>
+									<button
+										type="button"
+										onClick={() => setScreen("public-rooms")}
+									>
+										Join Public Room
+									</button>
+									<form
+										className="room-join-form"
+										onSubmit={(event) => {
+											event.preventDefault();
+											const roomId = String(
+												new FormData(event.currentTarget).get("roomId") || "",
+											)
+												.trim()
+												.toUpperCase();
+											command("JOIN_ROOM", { roomId });
+										}}
+									>
+										<input
+											name="roomId"
+											aria-label="Room ID"
+											placeholder="Enter Room ID"
+											required
+											minLength={6}
+											maxLength={6}
+											autoComplete="off"
+											autoCapitalize="characters"
+											pattern="[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}"
+											onInput={(event) => {
+												event.currentTarget.value =
+													event.currentTarget.value.toUpperCase();
+											}}
+										/>
+
+										<button type="submit" disabled={pending}>
+											Join
+										</button>
+									</form>
+								</>
+							)}
+						</>
+					)}
+					{screen === "public-rooms" && identity.authenticated && (
+						<PublicRooms
+							onJoin={(roomId) => command("JOIN_ROOM", { roomId })}
+						/>
+					)}
+					{screen === "lobby" && room && (
+						<Lobby
+							room={room}
+							selfId={socket.current?.selfId || null}
+							pending={pending}
+							command={command}
+							socket={socket.current}
+						/>
+					)}
+					{screen === "results" && result && (
+						<Results
+							result={result}
+							room={room}
+							selfId={socket.current?.selfId || null}
+							pending={pending}
+							onAgain={() => command("PLAY_AGAIN", { matchId: result.playId })}
+							onLeave={() => command("LEAVE_ROOM")}
+						/>
+					)}
+
+					{error && (
+						<p className="error" role="alert">
+							{error}
+						</p>
+					)}
+					{screen === "home" && accountId && !home && !homeLoading && (
+						<button
+							type="button"
+							onClick={() => {
+								setError("");
+								setHomeRevision((value) => value + 1);
+							}}
+						>
+							Retry
+						</button>
+					)}
+					{screen === "home" && accountId && homeLoading && (
+						<p role="status">Loading…</p>
+					)}
+				</MenuPanel>
 				{screen === "home" && home && (
 					<StatisticsPanel statistics={home.statistics} />
 				)}

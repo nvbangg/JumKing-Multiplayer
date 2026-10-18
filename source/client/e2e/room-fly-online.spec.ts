@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+import map from "../../common/maps/main-babe.json" with { type: "json" };
+import physics from "../../common/physics.json" with { type: "json" };
+import goals from "../../common/room-maps.json" with { type: "json" };
 import type { OnlineSnapshot } from "../src/game/netcode/OnlineRuntime";
 import {
 	createRoom,
@@ -66,12 +69,13 @@ test("short Room finish shows Results and History without ending or full-map rew
 		await expect
 			.poll(() => snapshots.at(-1)?.self.simulation.physics.freeFlight)
 			.toBe(true);
+		const goal = goals[0]!.finish;
 		await a.keyboard.down("ArrowLeft");
 		await expect
 			.poll(() => snapshots.at(-1)?.self.simulation.physics.x, {
 				intervals: [20],
 			})
-			.toBeLessThan(70);
+			.toBeLessThan(goal.minCenterX + map.tileSize * 5);
 		await a.keyboard.up("ArrowLeft");
 		await a.keyboard.down("Space");
 		await expect
@@ -79,8 +83,38 @@ test("short Room finish shows Results and History without ending or full-map rew
 				timeout: 15_000,
 				intervals: [30],
 			})
-			.toBeLessThan(-1790);
+			.toBeLessThan(
+				map.progressOriginY -
+					goal.minProgress -
+					physics.bodyHeight -
+					map.tileSize,
+			);
 		await a.keyboard.up("Space");
+		await expect
+			.poll(() => snapshots.at(-1)?.self.simulation.physics.vy)
+			.toBe(0);
+		// Đáp đúng nền Finish; không rơi lên nền cao hơn khi Fly vượt đích.
+		const landingY =
+			map.progressOriginY -
+			goal.minProgress -
+			physics.bodyHeight -
+			physics.flyVerticalSpeed * 2;
+		for (let attempt = 0; attempt < 12; attempt++) {
+			const state = snapshots.at(-1)!.self.simulation.physics;
+			if (Math.abs(state.y - landingY) <= physics.flyVerticalSpeed) break;
+			await a.keyboard.press(state.y < landingY ? "ArrowDown" : "ArrowUp", {
+				delay: 20,
+			});
+			await expect
+				.poll(() => {
+					const current = snapshots.at(-1)!.self.simulation.physics;
+					return current.ticks > state.ticks && current.vy === 0;
+				})
+				.toBe(true);
+		}
+		expect(
+			Math.abs(snapshots.at(-1)!.self.simulation.physics.y - landingY),
+		).toBeLessThanOrEqual(physics.flyVerticalSpeed);
 		await a.screenshot({ path: info.outputPath("room-map-1-finish.png") });
 		await a.waitForTimeout(400);
 		await a.keyboard.press("Space");
@@ -91,7 +125,7 @@ test("short Room finish shows Results and History without ending or full-map rew
 		).toBeEnabled({ timeout: 10_000 });
 		await expect(a.locator(".winner")).toContainText(hostName);
 		await expect(
-			a.getByText("Map 1 · Redcrown Woods", { exact: true }),
+			a.getByText("Map 1 · Green Woods", { exact: true }),
 		).toBeVisible();
 		await expect(
 			a.getByRole("button", { name: "Skip", exact: true }),
@@ -105,7 +139,8 @@ test("short Room finish shows Results and History without ending or full-map rew
 		expect(stats.wins).toBe(1);
 		expect(stats.bestFinishTimeMs).toBeNull();
 		expect(
-			(await (await a.request.get("/api/auth/me")).json()).crownUnlocked,
+			(await (await a.request.get("/api/auth/me")).json()).account
+				.crownUnlocked,
 		).toBe(false);
 		await a.screenshot({ path: info.outputPath("short-room-results.png") });
 		await a.getByRole("button", { name: "Play Again", exact: true }).click();
@@ -115,9 +150,7 @@ test("short Room finish shows Results and History without ending or full-map rew
 		await a.getByRole("button", { name: "Leave", exact: true }).click();
 		await a.getByRole("button", { name: "History", exact: true }).click();
 		await a.locator(".history-list > button").first().click();
-		await expect(
-			a.getByText("1 · Redcrown Woods", { exact: true }),
-		).toBeVisible();
+		await expect(a.getByText("1 · Green Woods", { exact: true })).toBeVisible();
 		expect(errors).toEqual([]);
 	} finally {
 		for (const context of [first, second])

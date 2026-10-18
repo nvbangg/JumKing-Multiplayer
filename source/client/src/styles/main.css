@@ -390,6 +390,12 @@ button {
 	align-items: center;
 	gap: 10px;
 }
+.room-code code,
+output.room-code {
+	user-select: all;
+	-webkit-user-select: all;
+	-webkit-touch-callout: default;
+}
 .room-code code {
 	font: inherit;
 	font-size: 32px;

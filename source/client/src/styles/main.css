@@ -442,11 +442,10 @@ button {
 	font-size: 14px;
 }
 .chat-history-box {
-	max-height: 35dvh;
-	overflow-y: auto;
 	overflow-wrap: anywhere;
 }
 .chat-history-box .chat-messages {
+	max-height: 35dvh;
 	overflow-y: auto;
 	overflow-wrap: anywhere;
 }
@@ -513,11 +512,8 @@ button {
 	}
 }
 
-.chat-preview {
-	pointer-events: none;
-}
 @media (pointer: coarse), (max-width: 680px) {
-	.chat-preview {
+	.play-page .chat-panel {
 		bottom: max(100px, env(safe-area-inset-bottom));
 	}
 }

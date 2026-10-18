@@ -4,7 +4,7 @@
 
 JDK 25, Node.js 24, MySQL Server 8.4; build dùng Maven Wrapper/npm lockfile. Workbench quản trị MySQL; Docker phục vụ [integration tests](testing.md).
 
-Solo chỉ cần frontend; Community/Room và Solo sync cần backend/MySQL.
+Community và Room đều cần frontend, backend và MySQL.
 
 | Thành phần | Development | Local/LAN/ZeroTier |
 | --- | --- | --- |
@@ -53,7 +53,6 @@ IP/port trong file mẫu là mặc định local, không phải địa chỉ b�
 | SERVER_SERVLET_SESSION_TIMEOUT | server.servlet.session.timeout; idle theo [protocol](protocol.md#identity-và-security) |
 | APP_SESSION_ABSOLUTE_TIMEOUT | app.session-absolute-timeout; hạn tối đa theo protocol |
 | APP_AUTH_RATE_PER_MINUTE / APP_HTTP_BODY_LIMIT | app.auth-rate-per-minute=20; app.http-body-limit=16384 bytes |
-| APP_SOLO_SYNC_RATE_PER_MINUTE | app.solo-sync-rate-per-minute=60; giới hạn theo Account |
 | APP_CHECKPOINT_INTERVAL_MS | app.checkpoint-interval-ms=1000; chu kỳ checkpoint Community và metrics Room |
 | APP_PERSISTENCE_RETRY_COUNT | app.persistence-retry-count=3; tối đa 3 lần thử lại sau lần ghi đầu |
 | APP_PERSISTENCE_RETRY_DELAY_MS | app.persistence-retry-delay-ms=1000; khoảng chờ giữa các lần thử |
@@ -70,7 +69,7 @@ Root .gitignore chứa quy tắc chung; mỗi module ignore config riêng, depen
 
 Đặt `$env:FLY_ENABLED='true'` trong terminal backend trước khi chạy Maven/JAR, hoặc đặt `app.fly-enabled=true` trong file `source/server/config/application-<profile>.properties` đang dùng. Spring Boot không đọc `source/client/.env.local`. Đổi cờ cần restart backend và vào lại màn chơi; không cần build lại frontend hoặc bật Options.
 
-Mặc định false. Cờ áp dụng cho mọi người trong Solo, Community và Room, ở localhost, LAN hoặc Internet, kể cả profile prod. Client đọc quyền qua `/api/game-config`. Solo vẫn chơi/lưu offline khi backend không truy cập được, nhưng không mở quyền bay. Điều khiển và save/thành tích theo [gameplay](gameplay.md#fly-mode).
+Mặc định false. Cờ áp dụng cho mọi người trong Community và Room, ở localhost, LAN hoặc Internet, kể cả profile prod. Client đọc quyền qua `/api/game-config`. Điều khiển và save/thành tích theo [gameplay](gameplay.md#fly-mode).
 
 ## MySQL
 
@@ -116,7 +115,7 @@ Build frontend bằng `npm run build`. Từ backend chạy `.\mvnw.cmd -Pweb cle
 java -jar target/jumpking-server.jar --spring.profiles.active=local
 ```
 
-Mở http://127.0.0.1:8080. Backend độc lập bỏ profile web; frontend độc lập dùng static host để chơi Solo, không mở dist/index.html bằng file://.
+Mở http://127.0.0.1:8080. Backend độc lập bỏ profile web; frontend độc lập dùng static host và kết nối backend, không mở dist/index.html bằng file://.
 
 ## LAN và ZeroTier
 
@@ -142,36 +141,16 @@ Máy người chơi kiểm tra `Test-NetConnection 10.147.17.5 -Port 8080`; `Tcp
 | Đăng nhập xong lại mất phiên | Dùng nhất quán một hostname/IP; HTTP Local/ZeroTier dùng profile local với cookie Secure=false, HTTPS dùng prod/Secure=true |
 | Backend không start | MySQL, schema, grants và datasource |
 | Community báo chưa lưu | Kết nối DB và save status; không khôi phục thủ công save cũ |
-| Solo không lưu | Quyền/quota browser storage |
-| Solo chưa đồng bộ Stats | Backend, mạng/phiên Account đúng owner và hàng chờ local; save vẫn ở thiết bị |
 
-## VPS một domain
+## VPS và GitHub Actions
 
-Build JAR có frontend theo phần trên; đặt MySQL trong mạng riêng của backend. Copy mẫu application-prod.properties, điền datasource và origins theo domain thực tế, bật cookie Secure. Chạy với --spring.profiles.active=prod.
+VPS tự quản lý TLS, service và cấu hình riêng ngoài repository. Cần Java 25, MySQL trong mạng riêng và user chạy ứng dụng không có đặc quyền quản trị. Chạy profile `prod`, điền datasource và `app.allowed-origins` theo domain HTTPS thực tế; cookie Secure phải bật. Đường dẫn cấu hình do VPS quyết định và phải được service nạp khi khởi động. Không đưa credentials, chứng chỉ hoặc keystore lên Git.
 
-HTTPS/WSS có thể kết thúc trực tiếp tại Spring Boot bằng server.ssl.* và keystore riêng được ignore, hoặc qua reverse proxy đã cấu hình đúng. Không mặc định trust forwarded headers khi không có proxy; không mở MySQL ra Internet. Chứng chỉ/keystore/password không đưa lên Git. DNS chỉ trỏ địa chỉ, không tự cấp HTTPS. Sau cập nhật phải build và restart JAR; push Git không tự deploy nếu chưa có pipeline.
+Workflow `.github/workflows/deploy-vps.yml` build frontend, chạy Maven `-Pweb clean verify`, rồi upload JAR và restart service. VPS không cần Node.js hoặc Maven. Workflow chạy khi push lên `main` có thay đổi trong `source/client/`, `source/common/`, `source/server/` hoặc chính file workflow; cũng có thể chạy thủ công từ tab **Actions**. Chỉ sửa tài liệu hoặc database không tự kích hoạt deploy.
 
-Kiểm tra từ mạng ngoài: đăng ký/đăng nhập, WS, Room hai Account, Community save/Continue và reconnect. Cấu hình TLS/service cụ thể phụ thuộc VPS, không dùng thông số máy cá nhân trong source.
+VPS cần service `jumpking.service` chạy `/opt/jumpking/current.jar`. Tài khoản SSH triển khai phải có quyền ghi JAR và chạy `sudo /usr/bin/systemctl restart jumpking.service` không cần mật khẩu; chỉ cấp sudo cho đúng lệnh này.
 
-### GitHub Actions deploy tự động
-
-Workflow `.github/workflows/deploy-vps.yml` tự động build và triển khai ứng dụng lên VPS thông qua GitHub Actions.
-
-Quy trình build frontend React + Vite trước, sau đó chạy Maven Wrapper với profile `web` để đóng gói frontend vào JAR của Spring Boot. VPS chỉ cần môi trường chạy Java và các dịch vụ phụ trợ cần thiết; không cần cài Node.js hoặc Maven để chạy ứng dụng.
-
-Khi phát triển và cập nhật ứng dụng, chỉ cần commit và push các thay đổi lên nhánh `main`. GitHub Actions sẽ tự động build, upload JAR lên VPS và restart dịch vụ `jumpking.service`. Không cần build hoặc triển khai thủ công trên VPS.
-
-Workflow cũng hỗ trợ chạy thủ công từ tab **Actions** khi cần.
-
-#### Chuẩn bị VPS
-
-VPS cần có Java 25, MySQL, reverse proxy/TLS và user chạy ứng dụng không có đặc quyền quản trị. Dịch vụ systemd `jumpking.service` chạy JAR tại `/opt/jumpking/current.jar` với profile `prod`.
-
-Cấu hình production được lưu bên ngoài JAR tại `/etc/jumpking/application-prod.properties`. Đảm bảo service được cấu hình để nạp file này, datasource trỏ đến MySQL thực tế và user chạy ứng dụng có quyền đọc cấu hình. Không đưa mật khẩu database, private key hoặc chứng chỉ vào repository.
-
-Tài khoản SSH triển khai phải có quyền ghi vào `/opt/jumpking` và được phép chạy lệnh `sudo /usr/bin/systemctl restart jumpking.service` không cần nhập mật khẩu. Chỉ cấp quyền sudo cho đúng lệnh cần thiết.
-
-#### GitHub Actions secrets
+### GitHub Actions secrets
 
 Các secrets được cấu hình trong GitHub Environment `production`:
 
@@ -189,5 +168,7 @@ Workflow upload JAR trực tiếp đến `/opt/jumpking/current.jar`, sau đó r
 sudo systemctl status jumpking.service
 sudo journalctl -u jumpking.service -n 100 --no-pager
 ```
+
+Sau deploy, kiểm tra từ mạng ngoài: đăng ký/đăng nhập, WebSocket, Room hai Account, Community Save & Exit/Continue và reconnect.
 
 Không chạy lại script khởi tạo schema database trong quá trình deploy. Cập nhật code không đồng nghĩa với việc reset dữ liệu người chơi.

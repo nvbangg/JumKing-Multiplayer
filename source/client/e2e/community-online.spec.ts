@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import type { OnlineSnapshot } from "../src/game/netcode/OnlineRuntime";
+import { NETWORK } from "../src/network/config";
 import { leaveOnline } from "./support/online";
 
 test.skip(
@@ -91,6 +92,63 @@ async function leave(page: Page) {
 		page.getByRole("button", { name: "New Game", exact: true }),
 	).toBeVisible();
 }
+for (const failure of ["rejected", "timeout"] as const)
+	test(`Browser Back reports ${failure} Leave and allows Save & Exit to retry`, async ({
+		page,
+	}) => {
+		const observed = observe(page);
+		let attempts = 0;
+		await page.routeWebSocket("**/ws/game", (socket) => {
+			const server = socket.connectToServer();
+			socket.onMessage((data) => {
+				const message = JSON.parse(data.toString());
+				if (message.type === "LEAVE_ROOM" && ++attempts === 1) {
+					if (failure === "rejected")
+						socket.send(
+							JSON.stringify({
+								v: 1,
+								type: "ERROR",
+								requestId: message.requestId,
+								payload: {
+									code: "SAVE_FAILED",
+									message: "Community progress could not be saved",
+								},
+							}),
+						);
+					return;
+				}
+				server.send(data);
+			});
+		});
+		await account(page, `leave_${failure}`);
+		await page.getByRole("button", { name: "New Game", exact: true }).click();
+		await expect(
+			page.getByRole("button", { name: "Menu", exact: true }),
+		).toBeVisible();
+		await expect.poll(() => observed.snapshots.length).toBeGreaterThan(0);
+		const run = observed.snapshots.at(-1)!.playId;
+		await page.goBack();
+		const message =
+			failure === "rejected"
+				? "Community progress could not be saved"
+				: "The server has not confirmed this action";
+		await expect(page.getByRole("alert")).toHaveText(message, {
+			timeout: NETWORK.timeoutMs + 5000,
+		});
+		expect(attempts).toBe(1);
+		expect(observed.snapshots.at(-1)!.playId).toBe(run);
+		await leave(page);
+		expect(attempts).toBe(2);
+		await expect(page.getByRole("alert")).toHaveCount(0);
+		const count = observed.snapshots.length;
+		await page.getByRole("button", { name: "Continue", exact: true }).click();
+		await expect(
+			page.getByRole("button", { name: "Menu", exact: true }),
+		).toBeVisible();
+		await expect.poll(() => observed.snapshots.length).toBeGreaterThan(count);
+		expect(observed.snapshots.at(-1)!.playId).toBe(run);
+		await expect(page.getByRole("alert")).toHaveCount(0);
+	});
 test("two Accounts share server simulation, see each other jump, leave and Continue the saved run", async ({
 	browser,
 }, info) => {

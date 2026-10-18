@@ -85,6 +85,7 @@ export function App() {
 	const [pending, setPending] = useState(false);
 	const socket = useRef<GameSocket | null>(null);
 	const exitScreen = useRef<Screen | null>(null);
+	const [navigationError, setNavigationError] = useState("");
 	const leaveOnline = useCallback(() => {
 		const connection = socket.current;
 		return connection?.selfId
@@ -99,10 +100,11 @@ export function App() {
 				!["online", "lobby", "results"].includes(next)
 			) {
 				exitScreen.current = next;
+				setNavigationError("");
 				void leaveOnline().catch((cause) => {
 					if (socket.current !== connection) return;
 					exitScreen.current = null;
-					setError(
+					setNavigationError(
 						cause instanceof Error
 							? cause.message
 							: "Unable to leave online game",
@@ -335,6 +337,7 @@ export function App() {
 					} else if (type === "ROOM_LEFT") {
 						const next = exitScreen.current;
 						exitScreen.current = null;
+						setNavigationError("");
 						setRoom(null);
 						setResult(null);
 						resultRef.current = null;
@@ -393,16 +396,19 @@ export function App() {
 		}
 	};
 
+	const displayedError = navigationError || error;
 	if (screen === "online" && room && socket.current)
 		return (
 			<OnlineGame
 				room={room}
 				socket={socket.current}
+				navigationError={navigationError}
 				onResults={() => {
 					viewedEnding.current = resultRef.current?.playId || null;
 					setScreen("results");
 				}}
 				onHome={() => {
+					setNavigationError("");
 					socket.current?.close();
 					socket.current = null;
 					setRoom(null);
@@ -689,9 +695,9 @@ export function App() {
 						/>
 					)}
 
-					{error && (
+					{displayedError && (
 						<p className="error" role="alert">
-							{error}
+							{displayedError}
 						</p>
 					)}
 					{screen === "home" && accountId && !home && !homeLoading && (

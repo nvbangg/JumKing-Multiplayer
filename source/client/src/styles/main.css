@@ -21,8 +21,8 @@ body {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	justify-content: center;
-	padding: 24px;
+	justify-content: flex-start;
+	padding: 44px 24px 24px;
 }
 h1 {
 	color: #e4bb68;
@@ -178,7 +178,19 @@ button {
 	grid-template-columns: minmax(300px, 400px) minmax(250px, 300px);
 	gap: 42px;
 	width: min(100%, 800px);
-	align-items: center;
+	align-items: start;
+}
+.home-menu-column {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+.home-controls-guide {
+	padding: 0 4px;
+}
+.home-controls-guide .controls-help {
+	gap: 12px 20px;
+	font-size: 16px;
 }
 .single-panel {
 	width: min(100%, 500px);
@@ -306,6 +318,13 @@ button {
 	grid-template-columns: auto minmax(0, 1fr);
 	gap: 14px 24px;
 	font-size: 18px;
+}
+.home.screen-detail {
+	padding: 24px;
+}
+.home.screen-detail .record-detail {
+	gap: 10px 24px;
+	font-size: 17px;
 }
 .account-info dt,
 .record-detail dt {

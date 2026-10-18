@@ -385,16 +385,17 @@ export function App() {
 			/>
 		);
 	return (
-		<main className="home">
-			<header className="brand">
-				<h1>
-					<img src="/assets/title_logo.png" alt="JumpKing" />
-				</h1>
-			</header>
-			<div
-				className={screen === "home" && home ? "home-layout" : "single-panel"}
-			>
-				<MenuPanel
+		<main className={`home screen-${screen}`}>
+			{screen !== "detail" && (
+				<header className="brand">
+					<h1>
+						<img src="/assets/title_logo.png" alt="JumpKing" />
+					</h1>
+				</header>
+			)}
+			<div className={screen === "home" && home ? "home-layout" : "single-panel"}>
+				<div className={screen === "home" && home ? "home-menu-column" : undefined}>
+					<MenuPanel
 					title={
 						screen === "home"
 							? undefined
@@ -543,14 +544,11 @@ export function App() {
 						/>
 					)}
 					{screen === "options" && (
-						<>
-							<OptionsButtons
-								options={options}
-								onChange={updateOptions}
-								onError={setError}
-							/>
-							<ControlsHelp />
-						</>
+						<OptionsButtons
+							options={options}
+							onChange={updateOptions}
+							onError={setError}
+						/>
 					)}
 					{screen === "rooms" && (
 						<>
@@ -660,9 +658,13 @@ export function App() {
 						<p role="status">Loading…</p>
 					)}
 				</MenuPanel>
-				{screen === "home" && home && (
-					<StatisticsPanel statistics={home.statistics} />
+				{screen === "home" && (
+					<aside className="home-controls-guide" aria-label="Controls guide">
+						<ControlsHelp />
+					</aside>
 				)}
+			</div>
+				{screen === "home" && home && <StatisticsPanel statistics={home.statistics} />}
 			</div>
 		</main>
 	);

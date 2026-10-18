@@ -284,10 +284,9 @@ test("two Accounts share server simulation, see each other jump, leave and Conti
 		await expect(a.getByRole("log")).toContainText(text);
 		await a.getByRole("button", { name: "Close chat", exact: true }).click();
 		await leave(b);
-		await a
-			.locator("summary")
-			.filter({ hasText: /^Leaderboard$/ })
-			.click();
+		await expect(
+			a.getByRole("heading", { name: "Leaderboard", exact: true }),
+		).toBeVisible();
 		const entries = (
 			await (await a.request.get("/api/leaderboard?limit=100")).json()
 		).entries;

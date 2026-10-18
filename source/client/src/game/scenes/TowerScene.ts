@@ -159,12 +159,15 @@ export class TowerScene extends Phaser.Scene {
 					.setName("player:" + player.id),
 				name: this.add
 					.text(0, 0, "", {
-						fontFamily: "monospace",
+						fontFamily: "Arial, sans-serif",
 						fontSize: V.nameFontSize,
+						fontStyle: "bold",
 						color: "#ffffff",
 						stroke: "#000000",
-						strokeThickness: 3,
+						strokeThickness: V.nameStrokeThickness,
 					})
+					.setResolution(V.nameResolution)
+					.setName("nickname:" + player.id)
 					.setOrigin(0.5, 1)
 					.setDepth(V.nameDepth),
 				crown: this.add
@@ -190,12 +193,14 @@ export class TowerScene extends Phaser.Scene {
 		avatar.name.setText(player.nickname);
 		avatar.name
 			.setPosition(
-				Phaser.Math.Clamp(
-					s.x + PHYSICS.bodyWidth / 2,
-					avatar.name.width / 2,
-					V.width - avatar.name.width / 2,
+				Math.round(
+					Phaser.Math.Clamp(
+						s.x + PHYSICS.bodyWidth / 2,
+						avatar.name.width / 2,
+						V.width - avatar.name.width / 2,
+					),
 				),
-				s.y - V.nameGap,
+				Math.round(s.y - V.nameGap),
 			)
 			.setVisible(visible);
 		avatar.crown
@@ -223,6 +228,29 @@ export class TowerScene extends Phaser.Scene {
 			}
 		for (const peer of frame.peers) this.avatar(peer, false);
 		this.avatar(frame.self, true);
+		// Ưu tiên tên bản thân; xếp lệch theo chiều dọc khi nhiều người đứng sát nhau.
+		const occupied: Phaser.Geom.Rectangle[] = [];
+		for (const player of [frame.self, ...frame.peers]) {
+			const name = this.avatars.get(player.id)?.name;
+			if (!name?.visible) continue;
+			name.y = Math.max(name.y, this.cameras.main.scrollY + name.height);
+			const bounds = name.getBounds(),
+				initialY = name.y;
+			let row = 0;
+			while (
+				occupied.some((other) =>
+					Phaser.Geom.Intersects.RectangleToRectangle(bounds, other),
+				)
+			) {
+				const offset = ++row * (bounds.height + V.nameGap);
+				name.y =
+					initialY - offset - bounds.height >= this.cameras.main.scrollY
+						? initialY - offset
+						: initialY + offset;
+				bounds.y = name.y - bounds.height;
+			}
+			occupied.push(bounds);
+		}
 		this.adventureVisuals?.render(frame);
 		this.conversations?.render(frame, this.npcSprites);
 		if (frame.ending && !this.ending) {

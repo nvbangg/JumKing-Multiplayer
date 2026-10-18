@@ -31,7 +31,9 @@ test("username account, change password and online authentication", async ({
 }) => {
 	await page.goto("/");
 	await page.getByRole("button", { name: "Room", exact: true }).click();
-	await expect(page.getByText("Sign in to play online.")).toBeVisible();
+	await expect(
+		page.getByRole("heading", { name: "Sign In", exact: true }),
+	).toBeVisible();
 	await page.getByRole("button", { name: "Back", exact: true }).click();
 	const username = await register(page, "auth");
 	await page.getByRole("button", { name: username, exact: true }).click();
@@ -162,7 +164,9 @@ test("Community autosave/continue, manual leaderboard and no ID or in-game New G
 	page.on("request", (request) => {
 		if (request.url().includes("/api/leaderboard")) requests++;
 	});
-	await page.getByText("Leaderboard", { exact: true }).click();
+	await expect(
+		page.getByRole("heading", { name: "Leaderboard", exact: true }),
+	).toBeVisible();
 	await expect(
 		page.getByRole("button", { name: "Refresh", exact: true }),
 	).toBeEnabled();

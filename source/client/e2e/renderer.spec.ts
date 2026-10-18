@@ -55,7 +55,7 @@ test("renderer draws all 43 screens and keeps self above translucent peers", asy
 								id: "peer",
 								nickname: "Friend",
 								color: colors[(ownColor + 1) % colors.length],
-								state: { ...state, x: state.x + 30 },
+								state: { ...state },
 								crowned: state.screen % 2 === 0,
 							},
 						],
@@ -185,6 +185,26 @@ test("renderer draws all 43 screens and keeps self above translucent peers", asy
 						)
 					)
 						failures.push("Names " + screen);
+					const ownName = scene.children.getByName("nickname:self"),
+						peerName = scene.children.getByName("nickname:peer");
+					if (
+						!ownName ||
+						!peerName ||
+						ownName.style.strokeThickness !== 1 ||
+						ownName.style.resolution !== 2
+					)
+						failures.push("Name font " + screen);
+					if (ownName && peerName) {
+						const a = ownName.getBounds(),
+							b = peerName.getBounds();
+						if (
+							a.left < b.right &&
+							a.right > b.left &&
+							a.top < b.bottom &&
+							a.bottom > b.top
+						)
+							failures.push("Overlapping names " + screen);
+					}
 					screens.push(screen);
 				}
 				return { screens, failures };

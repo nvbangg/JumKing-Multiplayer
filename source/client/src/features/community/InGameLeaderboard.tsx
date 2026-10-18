@@ -14,7 +14,7 @@ export function InGameLeaderboard() {
 		setLoading(true);
 		setError("");
 		void api<{ entries: LeaderboardEntry[] }>(
-			"/leaderboard?limit=" + PRESENTATION.inGameLeaderboardLimit,
+			`/leaderboard?limit=${PRESENTATION.inGameLeaderboardLimit}`,
 		)
 			.then((result) => {
 				if (active) setEntries(result.entries);
@@ -43,7 +43,7 @@ export function InGameLeaderboard() {
 						</span>
 						<strong>
 							{entry.finishTimeMs === null
-								? Math.floor(entry.maxProgress) + " px"
+								? `${Math.floor(entry.maxProgress)} px`
 								: duration(entry.finishTimeMs)}
 						</strong>
 					</li>

@@ -23,6 +23,7 @@ import {
 	type RoomState,
 } from "../network/GameSocket";
 import { loadReconnect } from "../network/reconnect";
+import { required } from "../required";
 
 type Screen =
 	| "home"
@@ -587,7 +588,7 @@ export function App() {
 							<HistoryList
 								key={accountId}
 								onSelect={(item) => {
-									setDetail({ accountId: identity.account!.id, item });
+									setDetail({ accountId: required(identity.account).id, item });
 									setScreen("detail");
 								}}
 							/>
@@ -598,7 +599,7 @@ export function App() {
 						))}
 					{screen === "detail" && detail?.accountId === accountId && detail && (
 						<HistoryDetail
-							key={detail.item.kind + ":" + detail.item.id}
+							key={`${detail.item.kind}:${detail.item.id}`}
 							item={detail.item}
 						/>
 					)}

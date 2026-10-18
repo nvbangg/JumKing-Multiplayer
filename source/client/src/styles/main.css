@@ -106,11 +106,6 @@ button {
 	gap: 1rem;
 	background: #000b;
 }
-.game-overlay .menu-panel {
-	width: min(500px, 90vw);
-	max-height: 90dvh;
-	overflow-y: auto;
-}
 .game-hud .timer {
 	padding-left: 20px;
 }
@@ -206,6 +201,11 @@ button {
 	flex-direction: column;
 	gap: 3px;
 	min-width: 0;
+}
+.game-overlay .menu-panel {
+	width: min(500px, 90vw);
+	max-height: 90dvh;
+	overflow-y: auto;
 }
 .menu-panel h2 {
 	margin: 0 0 16px;
@@ -372,6 +372,10 @@ button {
 	font-size: 18px;
 	border-bottom: 1px solid #28251b;
 }
+.game-hud > span:last-child {
+	display: flex;
+	gap: 8px;
+}
 .players li > span:last-child {
 	color: #aaa28b;
 	font-size: 15px;
@@ -379,10 +383,6 @@ button {
 .home.screen-detail .leaderboard {
 	max-height: none;
 	overflow: visible;
-}
-.home.screen-detail .leaderboard li {
-	flex-wrap: wrap;
-	overflow-wrap: anywhere;
 }
 .room-code {
 	display: flex;
@@ -433,10 +433,6 @@ output.room-code {
 .self-result,
 .winner {
 	color: #e4bb68;
-}
-.game-hud > span:last-child {
-	display: flex;
-	gap: 8px;
 }
 .chat-panel {
 	position: absolute;
@@ -634,6 +630,10 @@ output.room-code {
 	gap: 6px;
 }
 
+.home.screen-detail .leaderboard li {
+	flex-wrap: wrap;
+	overflow-wrap: anywhere;
+}
 .network-badge {
 	display: inline-flex;
 	align-items: center;

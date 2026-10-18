@@ -19,8 +19,7 @@ test("Community records stay visible, scroll on mobile and load only on entry or
 	});
 	page.on("pageerror", (error) => errors.push(error.message));
 	try {
-		const name =
-			"board_" + crypto.randomUUID().replaceAll("-", "").slice(0, 12);
+		const name = `board_${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`;
 		await page.addInitScript(() =>
 			localStorage.setItem(
 				"jumpking.options",

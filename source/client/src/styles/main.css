@@ -199,10 +199,10 @@ button {
 	border: 2px solid #72684d;
 	outline: 4px solid #26231a;
 	background: #080808;
-	padding: 16px;
+	padding: 10px 14px;
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
+	gap: 3px;
 	min-width: 0;
 }
 .menu-panel h2 {
@@ -217,7 +217,7 @@ button {
 	background: transparent;
 	color: #e9e3cf;
 	text-align: left;
-	padding: 9px 14px;
+	padding: 6px 12px;
 	font-size: 22px;
 	position: relative;
 }
@@ -251,13 +251,13 @@ button {
 	display: flex;
 	flex-wrap: wrap;
 	border-top: 1px solid #302c20;
-	margin-top: 12px;
-	padding-top: 10px;
+	margin-top: 8px;
+	padding-top: 8px;
 	gap: 8px;
 }
 .account-actions button {
 	font-size: 17px;
-	padding: 8px;
+	padding: 6px 8px;
 }
 .statistics dl {
 	margin: 0;

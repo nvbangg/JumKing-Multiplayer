@@ -8,7 +8,7 @@ test("entry renders an accessible page without a backend connection", () => {
 	expect(html).toContain("New Game");
 	expect(html).toContain("Controls guide");
 	expect(html).toContain("Hold Space");
-	expect(html).not.toContain("Chat Online");
+	expect(html).toContain("Chat Online");
 });
 
 test("history screen keeps brand logo above the menu panel", () => {

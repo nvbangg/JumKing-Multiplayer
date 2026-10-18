@@ -33,9 +33,14 @@ function observe(page: Page) {
 			members: { playerId: string; nickname: string; colorSlot: number }[];
 		}[];
 		errors: string[];
-	} = { snapshots: [], rosters: [], errors: [] };
+		leaves: number;
+	} = { snapshots: [], rosters: [], errors: [], leaves: 0 };
 	page.on("websocket", (socket) => {
 		if (new URL(socket.url()).pathname !== "/ws/game") return;
+		socket.on("framesent", (frame) => {
+			if (JSON.parse(frame.payload.toString()).type === "LEAVE_ROOM")
+				state.leaves++;
+		});
 		socket.on("framereceived", (frame) => {
 			const message = JSON.parse(frame.payload.toString());
 			if (message.type === "GAME_SNAPSHOT")
@@ -383,7 +388,7 @@ test("window blur cancels charging and keeps Community time frozen until explici
 	await leave(page);
 	expect(observed.errors).toEqual([]);
 });
-test("reload reconnects the same identity and run from IndexedDB and confirmed Leave clears its token", async ({
+test("transport disconnect reconnects the same identity and run while confirmed Leave clears its token", async ({
 	page,
 }) => {
 	await page.addInitScript(() =>
@@ -391,6 +396,15 @@ test("reload reconnects the same identity and run from IndexedDB and confirmed L
 	);
 	const observed = observe(page);
 	await account(page, "reload_tower");
+	await page.evaluate(async () => {
+		const path = "/src/network/GameSocket.ts",
+			{ GameSocket } = await import(path),
+			connect = GameSocket.prototype.connect;
+		GameSocket.prototype.connect = function () {
+			Object.assign(window, { lifecycleConnection: this });
+			return connect.call(this);
+		};
+	});
 	await page.getByRole("button", { name: "New Game", exact: true }).click();
 	await expect(
 		page.getByRole("button", { name: "Menu", exact: true }),
@@ -401,7 +415,19 @@ test("reload reconnects the same identity and run from IndexedDB and confirmed L
 		.toBe(1);
 	const run = observed.snapshots.at(-1)!.playId,
 		generation = observed.snapshots.at(-1)!.generation;
-	await page.reload();
+	await page.evaluate(() => {
+		const connection = (
+			window as unknown as {
+				lifecycleConnection: { socket: WebSocket };
+			}
+		).lifecycleConnection;
+		connection.socket.close(4000, "Test transport disconnect");
+	});
+	await expect(
+		page.getByRole("button", { name: "Reconnect", exact: true }),
+	).toBeVisible();
+	expect(observed.leaves).toBe(0);
+	await page.getByRole("button", { name: "Reconnect", exact: true }).click();
 	await expect(
 		page.getByRole("button", { name: "Resume", exact: true }),
 	).toBeVisible({ timeout: 15_000 });
@@ -420,4 +446,130 @@ test("reload reconnects the same identity and run from IndexedDB and confirmed L
 	});
 	expect(saved).toBeNull();
 	expect(observed.errors).toEqual([]);
+});
+
+test("leaving a Community page saves the run, releases membership and reload never duplicates it", async ({
+	browser,
+}) => {
+	test.setTimeout(60000);
+	const first = await browser.newContext(),
+		second = await browser.newContext();
+	const a = await first.newPage(),
+		b = await second.newPage();
+	const own = observe(a),
+		peer = observe(b);
+	try {
+		for (const context of [first, second])
+			await context.addInitScript(() => {
+				if (location.protocol === "http:" || location.protocol === "https:")
+					localStorage.setItem(
+						"jumpking.options",
+						JSON.stringify({ sound: false }),
+					);
+			});
+		const name = await account(a, "page_tower");
+		await account(b, "page_peer");
+		for (const page of [a, b]) {
+			await page.getByRole("button", { name: "New Game", exact: true }).click();
+			await expect(
+				page.getByRole("button", { name: "Menu", exact: true }),
+			).toBeVisible({ timeout: 15_000 });
+		}
+		await expect
+			.poll(() =>
+				peer.snapshots.at(-1)?.peers.some((item) => item.nickname === name),
+			)
+			.toBe(true);
+		await a.bringToFront();
+		if (
+			!(await a
+				.getByRole("button", { name: "Resume", exact: true })
+				.isVisible())
+		)
+			await a.getByRole("button", { name: "Menu", exact: true }).click();
+		await expect.poll(() => own.snapshots.at(-1)?.self.paused).toBe(true);
+		await a.getByRole("button", { name: "Resume", exact: true }).click();
+		await expect.poll(() => own.snapshots.at(-1)?.self.paused).toBe(false);
+		await a.locator("canvas").click();
+		await expect(a.locator("canvas")).toBeFocused();
+		await jump(a);
+		await expect
+			.poll(() => own.snapshots.at(-1)?.self.simulation.physics.jumps)
+			.toBe(1);
+		await expect
+			.poll(() => own.snapshots.at(-1)?.self.simulation.physics.grounded)
+			.toBe(true);
+		const run = own.snapshots.at(-1)!.playId;
+		await a.goto("about:blank");
+		await expect
+			.poll(() =>
+				peer.rosters.at(-1)?.members.some((member) => member.nickname === name),
+			)
+			.toBe(false);
+		await expect
+			.poll(() =>
+				peer.snapshots.at(-1)?.peers.some((item) => item.nickname === name),
+			)
+			.toBe(false);
+		// Kiểm chứng Leave bằng roster/snapshot server vì document cũ đã bị hủy.
+		await a.goto("/");
+		await expect(a.getByRole("button", { name, exact: true })).toBeVisible();
+		await a.getByRole("button", { name: "Continue", exact: true }).click();
+		await expect(
+			a.getByRole("button", { name: "Menu", exact: true }),
+		).toBeVisible();
+		await expect.poll(() => own.snapshots.at(-1)?.playId).toBe(run);
+		expect(own.snapshots.at(-1)!.self.simulation.physics.jumps).toBe(1);
+		await expect
+			.poll(
+				() =>
+					peer.rosters
+						.at(-1)
+						?.members.filter((member) => member.nickname === name).length,
+			)
+			.toBe(1);
+		const count = own.snapshots.length;
+		await a.reload();
+		await expect
+			.poll(
+				async () =>
+					(await a
+						.getByRole("button", { name: "Continue", exact: true })
+						.isVisible()) ||
+					(await a
+						.getByRole("button", { name: "Resume", exact: true })
+						.isVisible()) ||
+					(await a
+						.getByRole("button", { name: "Menu", exact: true })
+						.isVisible()),
+			)
+			.toBe(true);
+		if (
+			await a.getByRole("button", { name: "Continue", exact: true }).isVisible()
+		)
+			await a.getByRole("button", { name: "Continue", exact: true }).click();
+		await expect.poll(() => own.snapshots.length).toBeGreaterThan(count);
+		expect(own.snapshots.at(-1)!.playId).toBe(run);
+		expect(own.snapshots.at(-1)!.self.simulation.physics.jumps).toBe(1);
+		await expect
+			.poll(
+				() =>
+					peer.rosters
+						.at(-1)
+						?.members.filter((member) => member.nickname === name).length,
+			)
+			.toBe(1);
+		const before = own.leaves;
+		await leave(a);
+		expect(own.leaves).toBe(before + 1);
+		await a.evaluate(() =>
+			window.dispatchEvent(new PageTransitionEvent("pagehide")),
+		);
+		expect(own.leaves).toBe(before + 1);
+	} finally {
+		await leaveOnline(a);
+		await leaveOnline(b);
+		await first.close();
+		await second.close();
+	}
 });

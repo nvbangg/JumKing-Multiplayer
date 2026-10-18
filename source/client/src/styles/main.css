@@ -322,10 +322,6 @@ button {
 .home.screen-detail {
 	padding: 24px;
 }
-.home.screen-detail .record-detail {
-	gap: 10px 24px;
-	font-size: 17px;
-}
 .account-info dt,
 .record-detail dt {
 	color: #aaa28b;
@@ -377,6 +373,14 @@ button {
 .players li > span:last-child {
 	color: #aaa28b;
 	font-size: 15px;
+}
+.home.screen-detail .leaderboard {
+	max-height: none;
+	overflow: visible;
+}
+.home.screen-detail .leaderboard li {
+	flex-wrap: wrap;
+	overflow-wrap: anywhere;
 }
 .room-code {
 	display: flex;

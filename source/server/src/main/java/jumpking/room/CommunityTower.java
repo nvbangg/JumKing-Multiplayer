@@ -32,9 +32,13 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
           "CANCEL_INPUT",
           "RECONNECT",
           "SET_COMMUNITY_PAUSED",
-          "CHAT_SEND");
+          "CHAT_SEND",
+          "SPECTATE_JOIN",
+          "SPECTATE_FOCUS",
+          "SPECTATE_LEAVE");
   private final GameWorkers workers;
   private final RoomDirectory directory;
+  private final SpectateHub spectators;
   private final Memberships memberships;
   private final CommunityRuns records;
   private final ObjectMapper json;
@@ -58,6 +62,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
       GameWorkers workers,
       PersistenceWorkers database,
       RoomDirectory directory,
+      SpectateHub spectators,
       Memberships memberships,
       CommunityRuns records,
       ObjectMapper json,
@@ -72,6 +77,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
     this.workers = workers;
     this.database = database;
     this.directory = directory;
+    this.spectators = spectators;
     this.memberships = memberships;
     this.records = records;
     this.crowns = crowns;
@@ -328,6 +334,14 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
       var info = directory.find(command.payload().path("roomId").asText());
       return info != null && info.kind().equals("COMMUNITY");
     }
+    if (command.type().equals("SPECTATE_JOIN")) {
+      var info = directory.find(command.payload().path("roomId").asText());
+      return info != null && info.kind().equals("COMMUNITY");
+    }
+    if (command.type().equals("SPECTATE_FOCUS") || command.type().equals("SPECTATE_LEAVE")) {
+      var viewer = spectators.find(connection.id());
+      return viewer != null && viewer.kind().equals("COMMUNITY");
+    }
     var membership = memberships.find(connection.identity().owner());
     return membership != null && towers.containsKey(membership.roomId());
   }
@@ -336,6 +350,18 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
   public void handle(GameConnection connection, GameEnvelope command) {
     if (command.type().equals("JOIN_COMMUNITY")) {
       join(connection, command);
+      return;
+    }
+    if (command.type().equals("SPECTATE_JOIN")) {
+      spectateJoin(connection, command);
+      return;
+    }
+    if (command.type().equals("SPECTATE_FOCUS")) {
+      spectateFocus(connection, command);
+      return;
+    }
+    if (command.type().equals("SPECTATE_LEAVE")) {
+      spectateLeave(connection, command);
       return;
     }
     var membership = memberships.find(connection.identity().owner());
@@ -446,6 +472,80 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
                 }));
   }
 
+  private void spectateJoin(GameConnection connection, GameEnvelope command) {
+    GameEnvelope.fields(command.payload(), Set.of("roomId"));
+    if (memberships.find(connection.identity().owner()) != null)
+      throw new ApiException(409, "ALREADY_IN_ROOM", "Leave your current room first");
+    String roomId = GameEnvelope.text(command.payload(), "roomId");
+    var tower = towers.get(roomId);
+    if (tower == null) throw new ApiException(404, "ROOM_NOT_FOUND", "Community tower not found");
+    var viewer = spectators.join(connection, roomId, "COMMUNITY");
+    try {
+      tower.actor.execute(
+          () ->
+              safely(
+                  connection,
+                  command,
+                  () -> {
+                    if (tower.players.values().stream().noneMatch(player -> !player.loading)) {
+                      spectators.leave(connection.id());
+                      throw new ApiException(409, "NOT_LIVE", "This tower has no active players");
+                    }
+                    connection.reply(command, "SPECTATE_JOINED", viewerPayload(viewer));
+                    snapshots(tower);
+                  }));
+    } catch (RejectedExecutionException busy) {
+      spectators.leave(connection.id());
+      throw busy;
+    }
+  }
+
+  private void spectateFocus(GameConnection connection, GameEnvelope command) {
+    GameEnvelope.fields(command.payload(), Set.of("playerId"));
+    var viewer = spectators.find(connection.id());
+    if (viewer == null)
+      throw new ApiException(409, "NOT_SPECTATING", "You are not spectating a live game");
+    String playerId = GameEnvelope.text(command.payload(), "playerId");
+    var tower = towers.get(viewer.roomId());
+    if (tower == null) {
+      spectators.leave(connection.id());
+      throw new ApiException(404, "ROOM_NOT_FOUND", "Community tower not found");
+    }
+    spectators.focus(connection.id(), playerId);
+    tower.actor.execute(
+        () ->
+            safely(
+                connection,
+                command,
+                () -> {
+                  var target = tower.players.get(playerId);
+                  if (target == null || target.loading)
+                    throw new ApiException(404, "PLAYER_NOT_FOUND", "Unknown player");
+                  connection.reply(
+                      command,
+                      "SPECTATE_FOCUSED",
+                      Map.of("roomId", tower.id, "playerId", playerId));
+                  snapshots(tower);
+                }));
+  }
+
+  private void spectateLeave(GameConnection connection, GameEnvelope command) {
+    GameEnvelope.fields(command.payload(), Set.of());
+    var viewer = spectators.leave(connection.id());
+    connection.reply(
+        command,
+        "SPECTATE_LEFT",
+        java.util.Collections.singletonMap("roomId", viewer == null ? null : viewer.roomId()));
+  }
+
+  private Map<String, Object> viewerPayload(SpectateHub.Viewer viewer) {
+    var value = new LinkedHashMap<String, Object>();
+    value.put("roomId", viewer.roomId());
+    value.put("kind", viewer.kind());
+    value.put("focusPlayerId", viewer.focus());
+    return value;
+  }
+
   private void resume(Member player) {
     if (!player.leaving && !player.finished && (player.paused || player.pausePending)) {
       player.paused = player.pausePending = false;
@@ -477,6 +577,7 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
       throw error;
     }
     var tower = towers.computeIfAbsent(slot.roomId(), Tower::new);
+    directory.roomState(slot.roomId(), "PLAYING");
     try {
       tower.actor.execute(
           () -> {
@@ -721,11 +822,14 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
     if (empty) {
       towers.remove(tower.id, tower);
       tower.timer.cancel(false);
+      for (var viewer : spectators.dropRoom(tower.id))
+        viewer.connection().send("SPECTATE_LEFT", Map.of("roomId", tower.id));
     } else broadcast(tower);
   }
 
   @Override
   public void disconnected(GameConnection connection) {
+    if (spectators.leave(connection.id()) != null) return;
     var membership = memberships.find(connection.identity().owner());
     var tower = membership == null ? null : towers.get(membership.roomId());
     if (tower == null) return;
@@ -940,33 +1044,63 @@ public class CommunityTower implements GameCommandHandler, AutoCloseable {
       }
     for (Member self : tower.players.values()) {
       if (self.loading || self.connection == null) continue;
-      var value =
-          json.createObjectNode()
-              .put("roomId", tower.id)
-              .put("serverTick", tower.serverTick)
-              .put("playId", self.stored.id())
-              .put("generation", self.generation)
-              .put("elapsedTimeMs", ms(self.game.physics().snapshot().ticks))
-              .putNull("remainingTimeMs");
-      value.set("players", standings);
-      var state =
-          value
-              .putObject("self")
-              .put("lastProcessedInputSeq", self.input.processed())
-              .put("status", self.finished ? "FINISHED" : "ACTIVE")
-              .put("paused", self.paused || self.pausePending);
-      state.set("simulation", json.valueToTree(self.game.snapshot()));
-      state.set("metrics", json.valueToTree(summary(self)));
-      var peers = value.putArray("peers");
-      int screen = state.path("simulation").path("physics").path("screen").asInt();
-      publicStates.forEach(
-          (id, view) -> {
-            if (!id.equals(self.id)
-                && Math.abs(view.path("state").path("screen").asInt() - screen) <= 1)
-              peers.add(view);
-          });
-      self.connection.snapshot(value);
+      self.connection.snapshot(
+          snapshotPayload(
+              tower, self, self.generation, self.input.processed(), standings, publicStates));
     }
+    for (var viewer : spectators.viewers(tower.id)) {
+      var connection = viewer.connection();
+      if (connection == null || !connection.open()) continue;
+      var self = viewer.focus() == null ? null : tower.players.get(viewer.focus());
+      if (self == null || self.loading)
+        self =
+            tower.players.values().stream()
+                .filter(player -> !player.loading)
+                .findFirst()
+                .orElse(null);
+      if (self == null) continue;
+      var payload = snapshotPayload(tower, self, self.generation, 0, standings, publicStates);
+      payload.put("spectate", true).put("focusPlayerId", self.id);
+      connection.snapshot(payload);
+    }
+  }
+
+  private ObjectNode snapshotPayload(
+      Tower tower,
+      Member self,
+      long generation,
+      long lastProcessedInputSeq,
+      JsonNode standings,
+      Map<String, ObjectNode> publicStates) {
+    var value =
+        json.createObjectNode()
+            .put("roomId", tower.id)
+            .put("serverTick", tower.serverTick)
+            .put("playId", self.stored.id())
+            .put("generation", generation)
+            .put("elapsedTimeMs", ms(self.game.physics().snapshot().ticks))
+            .putNull("remainingTimeMs");
+    value.set("players", standings);
+    var state =
+        value
+            .putObject("self")
+            .put("playerId", self.id)
+            .put("nickname", self.identity.username())
+            .put("colorSlot", self.slot.color())
+            .put("lastProcessedInputSeq", lastProcessedInputSeq)
+            .put("status", self.finished ? "FINISHED" : "ACTIVE")
+            .put("paused", self.paused || self.pausePending);
+    state.set("simulation", json.valueToTree(self.game.snapshot()));
+    state.set("metrics", json.valueToTree(summary(self)));
+    state.put("crowned", self.game.adventure().completed());
+    var peers = value.putArray("peers");
+    int screen = state.path("simulation").path("physics").path("screen").asInt();
+    publicStates.forEach(
+        (id, view) -> {
+          if (!id.equals(self.id)
+              && Math.abs(view.path("state").path("screen").asInt() - screen) <= 1) peers.add(view);
+        });
+    return value;
   }
 
   private long ms(long ticks) {

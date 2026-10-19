@@ -38,8 +38,12 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
           "END_MATCH",
           "PLAY_AGAIN",
           "PLAYER_INPUT",
-          "CANCEL_INPUT");
+          "CANCEL_INPUT",
+          "SPECTATE_JOIN",
+          "SPECTATE_FOCUS",
+          "SPECTATE_LEAVE");
   private final RoomDirectory directory;
+  private final SpectateHub spectators;
   private final Memberships memberships;
   private final GameWorkers workers;
   private final NetworkSettings limits;
@@ -61,6 +65,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
 
   public RaceRoom(
       RoomDirectory directory,
+      SpectateHub spectators,
       Memberships memberships,
       GameWorkers workers,
       NetworkSettings limits,
@@ -75,6 +80,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
       jumpking.service.CrownService crowns,
       @Value("${app.checkpoint-interval-ms:1000}") long saveIntervalMs) {
     this.directory = directory;
+    this.spectators = spectators;
     this.memberships = memberships;
     this.workers = workers;
     this.limits = limits;
@@ -178,6 +184,14 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
       var info = directory.find(command.payload().path("roomId").asText());
       return info != null && info.kind().equals("ROOM");
     }
+    if (command.type().equals("SPECTATE_JOIN")) {
+      var info = directory.find(command.payload().path("roomId").asText());
+      return info != null && info.kind().equals("ROOM");
+    }
+    if (command.type().equals("SPECTATE_FOCUS") || command.type().equals("SPECTATE_LEAVE")) {
+      var viewer = spectators.find(connection.id());
+      return viewer != null && viewer.kind().equals("ROOM");
+    }
     var membership = memberships.find(connection.identity().owner());
     return membership != null && rooms.containsKey(membership.roomId());
   }
@@ -186,6 +200,18 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
   public void handle(GameConnection connection, GameEnvelope command) {
     if (command.type().equals("CREATE_ROOM") || command.type().equals("JOIN_ROOM")) {
       join(connection, command);
+      return;
+    }
+    if (command.type().equals("SPECTATE_JOIN")) {
+      spectateJoin(connection, command);
+      return;
+    }
+    if (command.type().equals("SPECTATE_FOCUS")) {
+      spectateFocus(connection, command);
+      return;
+    }
+    if (command.type().equals("SPECTATE_LEAVE")) {
+      spectateLeave(connection, command);
       return;
     }
     var membership = memberships.find(connection.identity().owner());
@@ -290,6 +316,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
                       if (room.match.saveStatus.equals("SAVED")) {
                         player.confirmed = true;
                         room.state = "WAITING";
+                        directory.roomState(room.id, "WAITING");
                         directory.joinable(room.id, true);
                       }
                       connection.reply(command, "ROOM_STATE", state(room));
@@ -396,6 +423,77 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
       }
       throw error;
     }
+  }
+
+  private void spectateJoin(GameConnection connection, GameEnvelope command) {
+    GameEnvelope.fields(command.payload(), Set.of("roomId"));
+    if (memberships.find(connection.identity().owner()) != null)
+      throw new ApiException(409, "ALREADY_IN_ROOM", "Leave your current room first");
+    String roomId = GameEnvelope.text(command.payload(), "roomId");
+    var room = rooms.get(roomId);
+    if (room == null) throw new ApiException(404, "ROOM_NOT_FOUND", "Room not found");
+    var viewer = spectators.join(connection, roomId, "ROOM");
+    try {
+      room.actor.execute(
+          () ->
+              safely(
+                  connection,
+                  command,
+                  () -> {
+                    if (room.match == null || room.match.startedAt == null) {
+                      spectators.leave(connection.id());
+                      throw new ApiException(409, "NOT_LIVE", "This room is not playing right now");
+                    }
+                    connection.reply(command, "SPECTATE_JOINED", viewerPayload(viewer));
+                    snapshots(room);
+                  }));
+    } catch (RejectedExecutionException busy) {
+      spectators.leave(connection.id());
+      throw busy;
+    }
+  }
+
+  private void spectateFocus(GameConnection connection, GameEnvelope command) {
+    GameEnvelope.fields(command.payload(), Set.of("playerId"));
+    var viewer = spectators.find(connection.id());
+    if (viewer == null)
+      throw new ApiException(409, "NOT_SPECTATING", "You are not spectating a live game");
+    String playerId = GameEnvelope.text(command.payload(), "playerId");
+    var room = rooms.get(viewer.roomId());
+    if (room == null) {
+      spectators.leave(connection.id());
+      throw new ApiException(404, "ROOM_NOT_FOUND", "Room not found");
+    }
+    spectators.focus(connection.id(), playerId);
+    room.actor.execute(
+        () ->
+            safely(
+                connection,
+                command,
+                () -> {
+                  if (room.match == null || !room.match.players.containsKey(playerId))
+                    throw new ApiException(404, "PLAYER_NOT_FOUND", "Unknown player");
+                  connection.reply(
+                      command, "SPECTATE_FOCUSED", Map.of("roomId", room.id, "playerId", playerId));
+                  snapshots(room);
+                }));
+  }
+
+  private void spectateLeave(GameConnection connection, GameEnvelope command) {
+    GameEnvelope.fields(command.payload(), Set.of());
+    var viewer = spectators.leave(connection.id());
+    connection.reply(
+        command,
+        "SPECTATE_LEFT",
+        java.util.Collections.singletonMap("roomId", viewer == null ? null : viewer.roomId()));
+  }
+
+  private Map<String, Object> viewerPayload(SpectateHub.Viewer viewer) {
+    var value = new LinkedHashMap<String, Object>();
+    value.put("roomId", viewer.roomId());
+    value.put("kind", viewer.kind());
+    value.put("focusPlayerId", viewer.focus());
+    return value;
   }
 
   private String visibility(JsonNode payload) {
@@ -564,6 +662,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
 
   @Override
   public void disconnected(GameConnection connection) {
+    if (spectators.leave(connection.id()) != null) return;
     var membership = memberships.find(connection.identity().owner());
     var room = membership == null ? null : rooms.get(membership.roomId());
     if (room == null) return;
@@ -631,6 +730,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     for (var player : roster)
       if (player.crowned) room.match.players.get(player.id).game.adventure().complete();
     room.state = "COUNTDOWN";
+    directory.roomState(room.id, "COUNTDOWN");
     room.countdownAt = 0;
     room.prepareDeadline = time.nanos() + rules.path("roomLoadTimeoutMs").asLong() * 1_000_000L;
     roster.forEach(player -> player.ready = false);
@@ -651,6 +751,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
   private void cancelCountdown(Room room) {
     if (!room.state.equals("COUNTDOWN")) return;
     room.state = "WAITING";
+    directory.roomState(room.id, "WAITING");
     room.match = null;
     room.writer = null;
     directory.joinable(room.id, true);
@@ -677,6 +778,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     if (room.state.equals("COUNTDOWN") && room.countdownAt > 0 && now >= room.countdownAt) {
       room.match.start(clock.instant());
       room.state = "PLAYING";
+      directory.roomState(room.id, "PLAYING");
       room.nextTick = now;
       save(room, true);
       broadcast(room);
@@ -716,6 +818,7 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
   private void finish(Room room) {
     room.players.values().forEach(player -> player.confirmed = false);
     room.state = "FINISHED";
+    directory.roomState(room.id, "FINISHED");
     directory.joinable(room.id, false);
     save(room, true);
     for (var player : room.players.values())
@@ -888,35 +991,69 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     for (var member : room.players.values()) {
       var self = match.players.get(member.id);
       if (member.connection == null || self == null) continue;
-      var snapshot =
-          json.createObjectNode()
-              .put("roomId", room.id)
-              .put("serverTick", room.serverTick)
-              .put("playId", match.id)
-              .put("generation", member.generation)
-              .put("elapsedTimeMs", match.ms(match.ticks))
-              .put("remainingTimeMs", match.remainingMs());
-      snapshot.set("players", standings);
-      var own =
-          snapshot
-              .putObject("self")
-              .put("lastProcessedInputSeq", self.input.processed())
-              .put("status", self.status)
-              .put("paused", !room.state.equals("PLAYING"));
-      own.set("simulation", json.valueToTree(self.game.snapshot()));
-      own.putObject("metrics")
-          .put("currentProgress", self.currentProgress)
-          .put("maxProgress", self.maximum);
-      var peers = snapshot.putArray("peers");
-      int screen = own.path("simulation").path("physics").path("screen").asInt();
-      publicStates.forEach(
-          (id, view) -> {
-            if (!id.equals(member.id)
-                && Math.abs(view.path("state").path("screen").asInt() - screen) <= 1)
-              peers.add(view);
-          });
-      member.connection.snapshot(snapshot);
+      member.connection.snapshot(
+          snapshotPayload(
+              room,
+              match,
+              self,
+              member.generation,
+              self.input.processed(),
+              standings,
+              publicStates));
     }
+    for (var viewer : spectators.viewers(room.id)) {
+      var connection = viewer.connection();
+      if (connection == null || !connection.open()) continue;
+      var self = match.players.get(viewer.focus());
+      if (self == null) self = match.players.values().stream().findFirst().orElse(null);
+      if (self == null) continue;
+      var payload =
+          snapshotPayload(room, match, self, self.spec.generation(), 0, standings, publicStates);
+      payload.put("spectate", true).put("focusPlayerId", self.spec.playerId());
+      connection.snapshot(payload);
+    }
+  }
+
+  private ObjectNode snapshotPayload(
+      Room room,
+      RoomMatch match,
+      RoomMatch.Player self,
+      long generation,
+      long lastProcessedInputSeq,
+      JsonNode standings,
+      Map<String, ObjectNode> publicStates) {
+    var snapshot =
+        json.createObjectNode()
+            .put("roomId", room.id)
+            .put("serverTick", room.serverTick)
+            .put("playId", match.id)
+            .put("generation", generation)
+            .put("elapsedTimeMs", match.ms(match.ticks))
+            .put("remainingTimeMs", match.remainingMs());
+    snapshot.set("players", standings);
+    var own =
+        snapshot
+            .putObject("self")
+            .put("playerId", self.spec.playerId())
+            .put("nickname", self.spec.nickname())
+            .put("colorSlot", self.spec.color())
+            .put("lastProcessedInputSeq", lastProcessedInputSeq)
+            .put("status", self.status)
+            .put("paused", !room.state.equals("PLAYING"));
+    own.set("simulation", json.valueToTree(self.game.snapshot()));
+    own.putObject("metrics")
+        .put("currentProgress", self.currentProgress)
+        .put("maxProgress", self.maximum);
+    own.put("crowned", self.game.adventure().completed());
+    var peers = snapshot.putArray("peers");
+    int screen = own.path("simulation").path("physics").path("screen").asInt();
+    String selfId = self.spec.playerId();
+    publicStates.forEach(
+        (id, view) -> {
+          if (!id.equals(selfId)
+              && Math.abs(view.path("state").path("screen").asInt() - screen) <= 1) peers.add(view);
+        });
+    return snapshot;
   }
 
   private static String token() {
@@ -929,6 +1066,8 @@ public class RaceRoom implements GameCommandHandler, AutoCloseable {
     if (rooms.remove(room.id, room)) {
       directory.releaseEmptyRoom(room.id);
       room.timer.cancel(false);
+      for (var viewer : spectators.dropRoom(room.id))
+        viewer.connection().send("SPECTATE_LEFT", Map.of("roomId", room.id));
     }
   }
 

@@ -21,6 +21,12 @@ public class RoomLookupController {
     return java.util.Map.of("rooms", directory.publicRooms());
   }
 
+  @GetMapping("/live")
+  public java.util.Map<String, ?> live(jakarta.servlet.http.HttpServletRequest request) {
+    transport.roomLookup(request.getRemoteAddr());
+    return java.util.Map.of("rooms", directory.liveRooms());
+  }
+
   @GetMapping("/{id}")
   RoomDirectory.Info lookup(
       @PathVariable String id, jakarta.servlet.http.HttpServletRequest request) {

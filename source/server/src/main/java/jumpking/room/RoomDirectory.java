@@ -21,12 +21,22 @@ public class RoomDirectory {
   public record PublicRoom(
       String roomId, String mode, int mapLevel, int playerCount, int capacity) {}
 
+  public record LiveRoom(
+      String roomId,
+      String kind,
+      String mode,
+      int mapLevel,
+      String state,
+      int playerCount,
+      int capacity) {}
+
   private static class Entry {
     final String kind;
     final BitSet slots = new BitSet();
     boolean joinable = true;
     String visibility = "PRIVATE", mode = "RACE";
     int mapLevel = RoomSettings.FULL_MAP_LEVEL;
+    String state = "WAITING";
 
     Entry(String kind) {
       this.kind = kind;
@@ -73,6 +83,32 @@ public class RoomDirectory {
                     value.getValue().slots.cardinality(),
                     capacity))
         .toList();
+  }
+
+  public synchronized java.util.List<LiveRoom> liveRooms() {
+    return entries.entrySet().stream()
+        .filter(value -> value.getValue().slots.cardinality() >= 1)
+        .filter(
+            value ->
+                value.getValue().kind.equals("COMMUNITY")
+                    || value.getValue().visibility.equals("PUBLIC"))
+        .sorted(Map.Entry.comparingByKey())
+        .map(
+            value ->
+                new LiveRoom(
+                    value.getKey(),
+                    value.getValue().kind,
+                    value.getValue().mode,
+                    value.getValue().mapLevel,
+                    value.getValue().state,
+                    value.getValue().slots.cardinality(),
+                    capacity))
+        .toList();
+  }
+
+  public synchronized void roomState(String id, String state) {
+    var entry = entries.get(id);
+    if (entry != null) entry.state = state;
   }
 
   public synchronized void describeRoom(String id, String visibility, String mode, int mapLevel) {

@@ -100,6 +100,11 @@ public class GameTransport extends TextWebSocketHandler implements AutoCloseable
     quota("join-owner:" + connection.identity().owner(), limits.joinsPerMinute());
   }
 
+  public synchronized void spectateAttempt(GameConnection connection) {
+    quota("spectate-ip:" + connection.identity().ip(), limits.spectateJoinsPerMinute());
+    quota("spectate-owner:" + connection.identity().owner(), limits.spectateJoinsPerMinute());
+  }
+
   public synchronized String reserve(GameConnection.Identity identity) {
     int owned = 0, sameIp = 0;
     for (var value : reservations.values()) {
@@ -222,6 +227,7 @@ public class GameTransport extends TextWebSocketHandler implements AutoCloseable
       }
       if (Set.of("CREATE_ROOM", "JOIN_ROOM", "JOIN_COMMUNITY").contains(command.type()))
         joinAttempt(connection);
+      if (command.type().equals("SPECTATE_JOIN")) spectateAttempt(connection);
       var handler =
           handlers.stream()
               .filter(candidate -> candidate.supports(connection, command))
@@ -244,8 +250,13 @@ public class GameTransport extends TextWebSocketHandler implements AutoCloseable
           empty.putArray("members");
           connection.reply(command, "ROOM_STATE", empty);
         }
-      } else if (command.type().equals("JOIN_ROOM"))
+      } else if (command.type().equals("JOIN_ROOM") || command.type().equals("SPECTATE_JOIN"))
         throw new ApiException(404, "ROOM_NOT_FOUND", "Room not found");
+      else if (command.type().equals("SPECTATE_LEAVE"))
+        connection.reply(
+            command, "SPECTATE_LEFT", java.util.Collections.singletonMap("roomId", null));
+      else if (command.type().equals("SPECTATE_FOCUS"))
+        throw new ApiException(409, "NOT_SPECTATING", "You are not spectating a live game");
       else if (command.type().equals("RECONNECT"))
         throw new ApiException(409, "RECONNECT_EXPIRED", "Reconnect is no longer available");
       else

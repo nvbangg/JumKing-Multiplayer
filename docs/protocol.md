@@ -36,6 +36,7 @@ Các path có prefix `/api`. Auth/private responses dùng Cache-Control:no-store
 | GET /map | → GameMap |
 | GET /rooms/{roomId} | Public → {roomId,kind,joinable}; chỉ tra loại/khả năng Join, không trả members hoặc tokens |
 | GET /rooms | Public → {rooms:[{roomId,mode,mapLevel,playerCount,capacity}]}; chỉ Public/WAITING còn chỗ, không tokens |
+| GET /rooms/live | Public → {rooms:[{roomId,kind,mode,mapLevel,state,playerCount,capacity}]}; phòng còn người để xem (Room Public hoặc Community), không tokens |
 | GET /community/current | Account → {run:null hoặc RunSummary của lượt ACTIVE,updatedAt,saveStatus}; không trả snapshot nội bộ |
 | GET /leaderboard?limit=100 | Public → {entries:[LeaderboardEntry]} |
 | GET /history?page=0&size=20 | Account → {items,page,size,hasNext}; History đã kết thúc theo data |
@@ -56,7 +57,7 @@ Statistics={totalPlayTimeMs,totalJumps,totalFalls,finishes,matchesPlayed,wins,be
 
 Page 0–100000, size/limit 1–100; timestamps ISO-8601 UTC. Chỉ trả Account ID của chính phiên, không lộ credentials/token. Detail sai owner trả 404 như không tồn tại.
 
-Tra ID và danh sách phòng dùng chung giới hạn 60 requests/phút/IP; ID phải đúng định dạng trong gameplay. API liệt kê chỉ trả Public/WAITING còn chỗ; kết quả tra không cấp quyền Join/reconnect, server kiểm tra lại khi xử lý command.
+Tra ID và danh sách phòng/đang xem dùng chung giới hạn 60 requests/phút/IP; ID phải đúng định dạng trong gameplay. API liệt kê `/rooms` chỉ trả Public/WAITING còn chỗ; `/rooms/live` chỉ trả phòng còn người để xem và không cấp quyền Spectate/Join/reconnect, server kiểm tra lại khi xử lý command.
 
 Lỗi chung `{error:{code,message}}`: 400 validation, 401 credentials/identity, 403 quyền/CSRF, 404 not found, 409 conflict, 429 rate limit, 5xx lỗi server đã loại secrets. UI dựa code, không parse message.
 
@@ -76,6 +77,9 @@ playId là run ID Community hoặc match ID Room. generation tăng khi Join/reco
 | WS connections | 2/identity, 32/IP, 256/server |
 | Sảnh/phòng còn tồn tại | 64/server |
 | Create/Join/New Run | 20 lệnh/phút/IP và identity |
+| Spectate_JOIN | 20 lệnh/phút/IP và identity |
+| Người xem/phòng | 8 |
+| Người xem/server | 64 |
 | Inbound message / rate | 16 KiB / 120 messages/giây/connection |
 | Sequence | Integer 1–9007199254740991 |
 | Input queue server / client | 120 / 180 frames |
@@ -106,10 +110,15 @@ Giới hạn mặc định tập trung tại cấu hình network của backend, 
 | PLAYER_INPUT | {playId,generation,seq,left,right,jump,up?,down?,freeFlight?}; booleans, field tùy chọn mặc định false |
 | CANCEL_INPUT | {playId,generation,seq}; hủy input/charge, không launch |
 | RECONNECT | {roomId,playerId,reconnectToken} → full state |
+| SPECTATE_JOIN | {roomId} → theo dõi trận đang chạy; không chiếm chỗ, không phải thành viên |
+| SPECTATE_FOCUS | {playerId} → chọn người chơi đang theo dõi; phải là thành viên hiện tại của phòng |
+| SPECTATE_LEAVE | {} → ngừng xem; áp dụng cả khi người xem chưa từng có hoặc sau khi phòng đóng |
 
 Settings Room mặc định RACE/null/mapLevel=10, visibility mặc định PRIVATE; mode/biên timeLimitMinutes theo gameplay, mode khác TIME_LIMIT phải null. Patch atomic, sai field/state từ chối toàn bộ.
 
 JOIN_ROOM chỉ nhận Room đang WAITING; Community chỉ vào bằng JOIN_COMMUNITY tự xếp sảnh. RECONNECT vẫn kiểm tra ID nội bộ, owner/player/token của membership cũ; không dùng ID để vượt roster.
+
+Spectate chỉ đọc: người xem không phải member, không chiếm slot/generation và không gửi PLAYER_INPUT/chat/checkpoint. SPECTATE_JOIN cần trận đang chạy (Room chưa bắt đầu hoặc đã FINISHED trả NOT_LIVE) và từ chối khi còn membership (ALREADY_IN_ROOM) hoặc đã theo dõi phòng khác (ALREADY_SPECTATING); phòng không tồn tại trả ROOM_NOT_FOUND, focus sai trả PLAYER_NOT_FOUND, hết chỗ xem trả ROOM_FULL, vượt hạn mức trả RATE_LIMITED. Đóng socket/connection hoặc phòng đóng tự thu hồi và gửi SPECTATE_LEFT.
 
 JOIN_COMMUNITY luôn yêu cầu cả hai fields: Continue (newRun=false) phải gửi ID lượt ACTIVE; New Game (true) gửi ID ACTIVE hoặc null nếu chưa có. ID/trạng thái không còn đúng trả CONFLICT, không tự tạo hoặc thay lượt. Server giữ chỗ trước khi thay save theo transaction trong data. Thiếu chỗ/DB lỗi giữ lượt cũ; người chơi cần Save & Exit trước khi bắt đầu lượt mới.
 
@@ -126,7 +135,7 @@ Client nhận diện nhấn đúp khi cấu hình cho phép Fly Mode và gửi f
 | ROOM_STATE | {roomId,kind,state,visibility?,hostPlayerId,settings,members,currentPlay,result} |
 | ROOM_LEFT | {roomId}; null nếu đã rời |
 | GAME_STARTED | {playId,generation,countdownMs}; bắt đầu tải màn chơi; ROOM_STATE.currentPlay.countdownRemainingMs=0 khi chờ tải, >0 khi countdown chạy |
-| GAME_SNAPSHOT | {roomId,serverTick,playId,generation,self,peers,players,elapsedTimeMs,remainingTimeMs} |
+| GAME_SNAPSHOT | {roomId,serverTick,playId,generation,self,peers,players,elapsedTimeMs,remainingTimeMs}; người xem thêm spectate=true và focusPlayerId |
 | COMMUNITY_RUN_STATE | {run:RunSummary,generation,paused,pausePending,saveStatus} |
 | PLAYER_EFFECTS | {roomId,events:[{eventSeq,playerId,playId,screen,effect,terrain}]} |
 | ADVENTURE_EVENTS | {roomId,playId,events:[{eventSeq,kind,type,id}]}; chỉ owner, kind=ADVENTURE/WORLD, nội dung hiển thị tra tại client |
@@ -135,6 +144,9 @@ Client nhận diện nhấn đúp khi cấu hình cho phép Fly Mode và gửi f
 | SAVE_STATUS | {playId,revision,saveStatus}; chỉ owner checkpoint hoặc members của match |
 | CHAT_MESSAGE / CHAT_HISTORY | {roomId,messages:[{id,playerId,nickname,text,sentAt,colorSlot}]}; client bỏ chat từ sảnh cũ |
 | RECONNECT_OK | {roomId,playerId,generation,playId}; sau đó full state |
+| SPECTATE_JOINED | {roomId,kind,focusPlayerId}; xác nhận bắt đầu xem, theo sau là GAME_SNAPSHOT của người xem |
+| SPECTATE_FOCUSED | {roomId,playerId}; xác nhận đổi người đang theo dõi |
+| SPECTATE_LEFT | {roomId}; null khi không còn xem hoặc chưa từng xem |
 | PONG / ERROR | {nonce} / {code,message,playId?,generation?,seq?} |
 
 kind COMMUNITY/ROOM; host/settings null cho Community. Member={playerId,nickname,username,colorSlot,connected,paused,nextMatchConfirmed}; nickname lấy từ username trên server; Room giữ tên lúc Join. Các tên là plain text; colorSlot trong khoảng capacity ở gameplay. paused thuộc Community, nextMatchConfirmed thuộc Room; trường không áp dụng là null.
@@ -144,6 +156,8 @@ Room state là WAITING/COUNTDOWN/PLAYING/FINISHED; Community state=PLAYING, Paus
 self gồm lastProcessedInputSeq, status, metrics và full simulation để restore/replay: position/velocity, grounded/charge, direction/buffers, splat/knocked, terrain/wind, freeFlight/phasingFall, screen/ticks/jumps/falls/airChargeTicks và adventure. peers chỉ gồm người ở screen hiện tại hoặc liền kề, mỗi người có {playerId,nickname,colorSlot,state,crowned,status}; không broadcast checkpoint/secrets. players vẫn gồm toàn phòng.
 
 players=[{playerId,nickname,colorSlot,rank,currentProgress}] gồm các thành viên còn trong phòng, tối đa capacity. Server tính từ cùng state RAM với snapshot; Room dùng comparator mode, Community chỉ so độ cao hiện tại. Giữ đồng hạng, ID chỉ ổn định thứ tự; không truy vấn database theo tick.
+
+Với người xem, snapshot mang spectate=true và focusPlayerId; self là người đang được theo dõi (hoặc thành viên đầu tiên nếu chưa chọn), lastProcessedInputSeq=0, và peers lọc theo screen của người đó. Client chỉ dựng read-only projection, không dự đoán/replay input.
 
 adventure gồm ID/counters tiến độ hội thoại. Vương miện là ngoại hình profile tự cấp theo data, không có lệnh trang bị. Client dựng nội dung theo [architecture](architecture.md#công-nghệ-và-trách-nhiệm); thay đổi state phải do server xác nhận.
 
@@ -159,7 +173,7 @@ ACK và state lấy cùng tick. Client restore snapshot mới hơn, bỏ frames 
 
 Control timeout: GET_ROOM_STATE/reconnect, không tự gửi lại Start/New Run/End. Duplicate requestId trả kết quả cũ; New Run kiểm tra thêm expectedRunId. Bỏ message socket/context cũ; đóng connection phải kết thúc pending promises.
 
-Nhóm error codes: INVALID_MESSAGE/INVALID_INPUT/INVALID_SETTINGS, AUTH_REQUIRED/ACCOUNT_REQUIRED, ROOM_NOT_FOUND/ROOM_FULL/ROOM_NOT_JOINABLE/ALREADY_IN_ROOM/HOST_ONLY/NOT_ENOUGH_PLAYERS, STALE_PLAY/STALE_INPUT, INVALID_RECONNECT/RECONNECT_EXPIRED, SAVE_FAILED/CONFLICT/RATE_LIMITED/INTERNAL_ERROR.
+Nhóm error codes: INVALID_MESSAGE/INVALID_INPUT/INVALID_SETTINGS, AUTH_REQUIRED/ACCOUNT_REQUIRED, ROOM_NOT_FOUND/ROOM_FULL/ROOM_NOT_JOINABLE/ALREADY_IN_ROOM/HOST_ONLY/NOT_ENOUGH_PLAYERS, ALREADY_SPECTATING/NOT_SPECTATING/NOT_LIVE/PLAYER_NOT_FOUND, STALE_PLAY/STALE_INPUT, INVALID_RECONNECT/RECONNECT_EXPIRED, SAVE_FAILED/CONFLICT/RATE_LIMITED/INTERNAL_ERROR.
 
 ## Mở rộng dữ liệu hiển thị
 

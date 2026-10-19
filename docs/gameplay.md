@@ -11,6 +11,8 @@ Community dùng Main Babe hoàn chỉnh theo geometry, physics, camera và trả
 
 Community chỉ có chế độ bình thường; Continue chỉ dành cho lượt chưa kết thúc. Room chọn `RACE`, `HARDCORE`, `TIME_LIMIT` hoặc `NO_WALK`. Tất cả players không va chạm và không dùng item tác động người khác.
 
+Ngoài ra có **Spectate** — xem trận đang chạy của Room hoặc Community. Đây là chế độ chỉ đọc, không phải kiểu chơi và không tạo thành tích.
+
 ## Điều khiển và physics
 
 | Điều khiển | Hành động |
@@ -112,6 +114,16 @@ Progress = max(0, originFeetY−feetY); peak là progress cao nhất từng đ�
 Có 10 mốc Finish tăng dần từ chân tháp; map 10 là Main Babe đầy đủ. `source/common/room-maps.json` xác định đích trong đúng vùng của từng map; dùng nguyên geometry/spawn. Map 1–9 yêu cầu đáp đúng mặt nền đã đánh dấu, xác định bởi screen, minCenterX và minProgress; maxCenterX giới hạn đoạn nền khi cần. Không tính nền khác dù cao hơn. Map 10 giữ đích gốc. Host chọn trước Start, settings giữ khi Play Again. Map 1–9 chỉ Results, map 10 giữ ending. History lưu map của trận; Best Finish Time chỉ tính full map. Kiểm chứng các mốc bằng replay input hợp lệ từ spawn chuẩn ở cả hai simulation.
 
 Room hiện cờ ca-rô và chữ FINISH tại một platform đủ điều kiện ở màn đích của map đã chọn. Dấu chỉ dẫn không đổi collision hoặc luật Finish; đang bay qua đích chưa tính hoàn thành.
+
+## Spectate
+
+Spectate xem trực tiếp một trận đang chạy; cả Room (Public) và Community đều có thể bị theo dõi. Màn Room liệt kê các trận đang chạy để chọn xem, còn Community cho chọn Play hoặc Spectate. Chỉ trận đang chạy mới vào được; Room ở WAITING/COUNTDOWN/FINISHED và sảnh không còn người trả NOT_LIVE/ROOM_NOT_FOUND.
+
+Người xem không phải member: không chiếm slot hay generation của phòng, không gửi PLAYER_INPUT/chat/checkpoint, không tính vào roster, DNF hay kết quả, và không tạo mục History/Stats. Người xem chỉ nhận snapshot chỉ đọc của trận; không dự đoán hay replay.
+
+Mặc định theo dõi người chơi đầu tiên; có thể đổi người đang theo dõi bằng SPECTATE_FOCUS sang thành viên hiện tại, camera đi theo người đó. Không thể vừa chơi vừa xem: còn membership thì SPECTATE_JOIN trả ALREADY_IN_ROOM (phải Leave trước). Giới hạn 8 người xem mỗi phòng và 64 mỗi server; vượt hạn mức trả ROOM_FULL/RATE_LIMITED theo [protocol](protocol.md).
+
+Dừng xem bằng SPECTATE_LEAVE; đóng socket hoặc phòng đóng (hết người/dispose) tự thu hồi và gửi SPECTATE_LEFT. Spectate không ảnh hưởng physics, clock hay kết quả của trận.
 
 ## Leave và reconnect online
 

@@ -23,7 +23,10 @@ public record NetworkSettings(
     int roomLookupsPerMinute,
     int chatCodePoints,
     int chatHistory,
-    long chatIntervalMs) {
+    long chatIntervalMs,
+    int spectatorsPerRoom,
+    int spectatorsPerServer,
+    int spectateJoinsPerMinute) {
   public NetworkSettings {
     if (handshakesPerMinute < 1
         || connectionsPerIdentity < 1
@@ -44,7 +47,10 @@ public record NetworkSettings(
         || roomLookupsPerMinute < 1
         || chatCodePoints < 1
         || chatHistory < 1
-        || chatIntervalMs < 1) {
+        || chatIntervalMs < 1
+        || spectatorsPerRoom < 1
+        || spectatorsPerServer < 1
+        || spectateJoinsPerMinute < 1) {
       throw new IllegalArgumentException(
           "Network limits must be positive and heartbeat expiry must exceed send timeout");
     }

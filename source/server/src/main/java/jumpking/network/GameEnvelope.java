@@ -23,6 +23,9 @@ public record GameEnvelope(String type, String requestId, JsonNode payload) {
           "CHAT_SEND",
           "PLAYER_INPUT",
           "CANCEL_INPUT",
+          "SPECTATE_JOIN",
+          "SPECTATE_FOCUS",
+          "SPECTATE_LEAVE",
           "RECONNECT");
 
   public static GameEnvelope parse(ObjectMapper json, String text) {

@@ -25,6 +25,9 @@ const SERVER_TYPES = new Set([
 	"SAVE_STATUS",
 	"CHAT_MESSAGE",
 	"CHAT_HISTORY",
+	"SPECTATE_JOINED",
+	"SPECTATE_FOCUSED",
+	"SPECTATE_LEFT",
 	"RECONNECT_OK",
 	"PONG",
 	"ERROR",
@@ -79,6 +82,18 @@ function parseMessage(data: unknown): Message {
 		(typeof message.payload.playerId !== "string" || !message.payload.playerId)
 	)
 		throw new Error("Invalid player");
+	if (
+		message.type === "SPECTATE_JOINED" &&
+		(typeof message.payload.roomId !== "string" ||
+			!message.payload.roomId ||
+			!["ROOM", "COMMUNITY"].includes(String(message.payload.kind)))
+	)
+		throw new Error("Invalid spectate");
+	if (
+		message.type === "SPECTATE_FOCUSED" &&
+		typeof message.payload.playerId !== "string"
+	)
+		throw new Error("Invalid spectate focus");
 	return message;
 }
 export interface RoomMember {
@@ -115,6 +130,11 @@ export interface ResultRow {
 	isWinner: boolean;
 	finishTimeMs: number | null;
 }
+export interface SpectateState {
+	roomId: string;
+	kind: "ROOM" | "COMMUNITY";
+	focusPlayerId: string | null;
+}
 export interface MatchResult {
 	mapLevel?: number;
 	playId: string;
@@ -138,6 +158,7 @@ export class GameSocket {
 		}
 	>();
 	selfId: string | null = null;
+	spectate: SpectateState | null = null;
 	lastSnapshot: Record<string, unknown> | null = null;
 	lastFinish: Record<string, unknown> | null = null;
 	playContext: { playId: string; generation: number } | null = null;
@@ -387,6 +408,35 @@ export class GameSocket {
 				this.selfId = message.payload.playerId as string;
 				this.roomId = message.payload.roomId as string;
 			}
+			if (message.type === "SPECTATE_JOINED") {
+				this.selfId = null;
+				this.roomId = message.payload.roomId as string;
+				this.spectate = {
+					roomId: this.roomId,
+					kind: message.payload.kind as SpectateState["kind"],
+					focusPlayerId:
+						typeof message.payload.focusPlayerId === "string"
+							? message.payload.focusPlayerId
+							: null,
+				};
+				this.chatHistory = [];
+				this.playContext = null;
+			}
+			if (message.type === "SPECTATE_FOCUSED" && this.spectate) {
+				this.spectate = {
+					...this.spectate,
+					focusPlayerId:
+						typeof message.payload.playerId === "string"
+							? message.payload.playerId
+							: null,
+				};
+			}
+			if (message.type === "SPECTATE_LEFT") {
+				this.spectate = null;
+				this.roomId = null;
+				this.lastSnapshot = null;
+				this.playContext = null;
+			}
 			if (message.type === "RECONNECT_OK") this.resumeRequired = true;
 			if (message.type === "ROOM_JOINED" || message.type === "GAME_STARTED")
 				this.resumeRequired = false;
@@ -536,6 +586,7 @@ export class GameSocket {
 		this.cancelConnect?.();
 		this.cancelConnect = null;
 		this.selfId = null;
+		this.spectate = null;
 		this.lastSnapshot = null;
 		this.playContext = null;
 		this.leaving = null;

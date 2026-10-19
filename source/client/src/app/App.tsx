@@ -13,6 +13,8 @@ import { PublicRooms } from "../features/rooms/PublicRooms";
 import { Results } from "../features/rooms/Results";
 import { OptionsButtons } from "../features/settings/OptionsPanel";
 import { readOptions, saveOptions } from "../features/settings/options";
+import { LiveRooms } from "../features/spectate/LiveRooms";
+import { SpectateView } from "../features/spectate/SpectateView";
 import { loadManifest } from "../game/content/assets";
 import { AudioBus } from "../game/presentation/AudioBus";
 import { ApiError, api, backendOrigin, clearCsrf } from "../network/api";
@@ -21,6 +23,7 @@ import {
 	GameSocket,
 	type MatchResult,
 	type RoomState,
+	type SpectateState,
 } from "../network/GameSocket";
 import { loadReconnect } from "../network/reconnect";
 import { required } from "../required";
@@ -38,7 +41,10 @@ type Screen =
 	| "password"
 	| "public-rooms"
 	| "lobby"
-	| "results";
+	| "results"
+	| "community"
+	| "live-rooms"
+	| "spectate";
 const initialIdentity: Identity = {
 	authenticated: false,
 	account: null,
@@ -79,6 +85,8 @@ export function App() {
 	} | null>(null);
 	const [room, setRoom] = useState<RoomState | null>(null);
 	const [result, setResult] = useState<MatchResult | null>(null);
+	const [spectate, setSpectate] = useState<SpectateState | null>(null);
+	const [liveKind, setLiveKind] = useState<"ROOM" | "COMMUNITY">("ROOM");
 	const resultRef = useRef<MatchResult | null>(null);
 	const viewedEnding = useRef<string | null>(null);
 	const [options, setOptions] = useState(readOptions);
@@ -89,9 +97,12 @@ export function App() {
 	const [navigationError, setNavigationError] = useState("");
 	const leaveOnline = useCallback(() => {
 		const connection = socket.current;
-		return connection?.selfId
-			? connection.command("LEAVE_ROOM").then(() => {})
-			: Promise.resolve();
+		if (!connection) return Promise.resolve();
+		if (connection.selfId)
+			return connection.command("LEAVE_ROOM").then(() => {});
+		if (connection.spectate)
+			return connection.command("SPECTATE_LEAVE").then(() => {});
+		return Promise.resolve();
 	}, []);
 	const setScreen = useCallback(
 		(next: Screen) => {
@@ -109,6 +120,20 @@ export function App() {
 						cause instanceof Error
 							? cause.message
 							: "Unable to leave online game",
+					);
+				});
+				return;
+			}
+			if (connection?.spectate && next !== "spectate") {
+				exitScreen.current = next;
+				setNavigationError("");
+				void leaveOnline().catch((cause) => {
+					if (socket.current !== connection) return;
+					exitScreen.current = null;
+					setNavigationError(
+						cause instanceof Error
+							? cause.message
+							: "Unable to stop spectating",
 					);
 				});
 				return;
@@ -150,11 +175,15 @@ export function App() {
 		const next =
 			screen === "public-rooms"
 				? "rooms"
-				: screen === "password"
-					? "account"
-					: screen === "detail"
-						? "history"
-						: "home";
+				: screen === "live-rooms"
+					? liveKind === "COMMUNITY"
+						? "community"
+						: "rooms"
+					: screen === "password"
+						? "account"
+						: screen === "detail"
+							? "history"
+							: "home";
 		if (routes[next]) window.history.replaceState(null, "", routes[next]);
 		setError("");
 		setScreen(next);
@@ -335,6 +364,29 @@ export function App() {
 								viewedEnding.current,
 							),
 						);
+					} else if (type === "SPECTATE_JOINED") {
+						const info = payload as unknown as SpectateState;
+						if (
+							typeof info.roomId !== "string" ||
+							!["ROOM", "COMMUNITY"].includes(info.kind)
+						)
+							return;
+						setSpectate(info);
+						setRoom(null);
+						setResult(null);
+						resultRef.current = null;
+						setScreen("spectate");
+					} else if (type === "SPECTATE_LEFT") {
+						const next = exitScreen.current;
+						exitScreen.current = null;
+						setNavigationError("");
+						setSpectate(null);
+						setRoom(null);
+						setResult(null);
+						resultRef.current = null;
+						socket.current?.close();
+						socket.current = null;
+						setScreen(next ?? "live-rooms");
 					} else if (type === "ROOM_LEFT") {
 						const next = exitScreen.current;
 						exitScreen.current = null;
@@ -386,6 +438,13 @@ export function App() {
 			}
 		});
 	};
+	const spectateRoom = (roomId: string) => {
+		if (pending) return;
+		void execute(async () => {
+			const connection = await connectedSocket();
+			await connection.command("SPECTATE_JOIN", { roomId });
+		});
+	};
 	const updateOptions = (key: keyof typeof options) => {
 		const next = { ...options, [key]: !options[key] };
 		setOptions(next);
@@ -398,6 +457,14 @@ export function App() {
 	};
 
 	const displayedError = navigationError || error;
+	if (screen === "spectate" && spectate && socket.current)
+		return (
+			<SpectateView
+				key={spectate.roomId}
+				socket={socket.current}
+				onStop={() => command("SPECTATE_LEAVE")}
+			/>
+		);
 	if (screen === "online" && room && socket.current)
 		return (
 			<OnlineGame
@@ -468,6 +535,8 @@ export function App() {
 										"public-rooms": "Join Public Room",
 										lobby: "Lobby",
 										results: "Results",
+										community: "New Game",
+										"live-rooms": "Live Games",
 									} as Partial<Record<Screen, string>>
 								)[screen]
 					}
@@ -490,7 +559,11 @@ export function App() {
 							)}
 							<button
 								type="button"
-								onClick={() => enterCommunity(true)}
+								onClick={() =>
+									identity.account
+										? setScreen("community")
+										: setScreen("sign-in")
+								}
 								disabled={pending || (!!accountId && (homeLoading || !home))}
 							>
 								New Game
@@ -530,6 +603,26 @@ export function App() {
 									</>
 								)}
 							</div>
+						</>
+					)}
+					{screen === "community" && (
+						<>
+							<button
+								type="button"
+								disabled={pending || homeLoading}
+								onClick={() => enterCommunity(true)}
+							>
+								Play
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									setLiveKind("COMMUNITY");
+									setScreen("live-rooms");
+								}}
+							>
+								Spectate
+							</button>
 						</>
 					)}
 					{(screen === "sign-in" || screen === "register") && (
@@ -625,6 +718,15 @@ export function App() {
 							<button type="button" onClick={() => setScreen("public-rooms")}>
 								Join Public Room
 							</button>
+							<button
+								type="button"
+								onClick={() => {
+									setLiveKind("ROOM");
+									setScreen("live-rooms");
+								}}
+							>
+								Spectate Live Games
+							</button>
 							<form
 								className="room-join-form"
 								onSubmit={(event) => {
@@ -663,6 +765,9 @@ export function App() {
 						<PublicRooms
 							onJoin={(roomId) => command("JOIN_ROOM", { roomId })}
 						/>
+					)}
+					{screen === "live-rooms" && identity.authenticated && (
+						<LiveRooms kind={liveKind} onSpectate={spectateRoom} />
 					)}
 					{screen === "lobby" && room && (
 						<Lobby

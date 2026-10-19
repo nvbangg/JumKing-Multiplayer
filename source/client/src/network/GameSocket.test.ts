@@ -368,6 +368,52 @@ test("a failed Save and Exit keeps membership and allows one fresh Leave retry",
 	await closed;
 });
 
+test("spectate tracks the watched room and focus while filtering other rooms", async () => {
+	const received = vi.fn(),
+		game = new GameSocket(received, vi.fn()),
+		socket = await open(game);
+	socket.receive({
+		v: 1,
+		type: "SPECTATE_JOINED",
+		payload: { roomId: "ABCDEF", kind: "ROOM", focusPlayerId: null },
+	});
+	expect(game.selfId).toBeNull();
+	expect(game.spectate).toEqual({
+		roomId: "ABCDEF",
+		kind: "ROOM",
+		focusPlayerId: null,
+	});
+	socket.receive({
+		v: 1,
+		type: "GAME_SNAPSHOT",
+		payload: { roomId: "ABCDEF", spectate: true },
+	});
+	expect(game.lastSnapshot).toMatchObject({ roomId: "ABCDEF" });
+	socket.receive({
+		v: 1,
+		type: "GAME_SNAPSHOT",
+		payload: { roomId: "ZZZZZZ" },
+	});
+	expect(game.lastSnapshot).toMatchObject({ roomId: "ABCDEF" });
+	socket.receive({
+		v: 1,
+		type: "SPECTATE_FOCUSED",
+		payload: { roomId: "ABCDEF", playerId: "player" },
+	});
+	expect(game.spectate?.focusPlayerId).toBe("player");
+	const pending = game.command("SPECTATE_LEAVE");
+	const request = JSON.parse(required(socket.sent.at(-1)));
+	socket.receive({
+		v: 1,
+		type: "SPECTATE_LEFT",
+		requestId: request.requestId,
+		payload: { roomId: "ABCDEF" },
+	});
+	await expect(pending).resolves.toMatchObject({ type: "SPECTATE_LEFT" });
+	expect(game.spectate).toBeNull();
+	game.close();
+});
+
 test("closing an old Leave does not reuse it on a replacement connection", async () => {
 	const game = new GameSocket(vi.fn(), vi.fn()),
 		old = await open(game),

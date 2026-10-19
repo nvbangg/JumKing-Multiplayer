@@ -15,7 +15,7 @@ class RoomDirectoryTest {
     var limits =
         new NetworkSettings(
             30, 2, 32, 256, 64, 20, 16384, 120, 120, 4, 240, 4, 8, 5000, 30000, 500, 60, 200, 50,
-            1000);
+            1000, 8, 64, 20);
     return new RoomDirectory(new SharedData(new ObjectMapper()), limits);
   }
 
@@ -36,6 +36,25 @@ class RoomDirectoryTest {
     directory.joinable(publicRoom.roomId(), true);
     directory.describeRoom(publicRoom.roomId(), "PRIVATE", "RACE", 10);
     assertThat(directory.publicRooms()).isEmpty();
+  }
+
+  @Test
+  void liveRoomsExposePublicRoomsWithPlayersAndHidePrivateOnes() throws Exception {
+    var directory = directory();
+    var spectatorRoom = directory.createRoom();
+    directory.describeRoom(spectatorRoom.roomId(), "PUBLIC", "RACE", 10);
+    directory.roomState(spectatorRoom.roomId(), "PLAYING");
+    var privateRoom = directory.createRoom();
+    assertThat(directory.liveRooms())
+        .extracting(RoomDirectory.LiveRoom::roomId)
+        .containsExactly(spectatorRoom.roomId());
+    directory.room(spectatorRoom.roomId());
+    directory.room(privateRoom.roomId());
+    assertThat(directory.liveRooms())
+        .extracting(RoomDirectory.LiveRoom::roomId)
+        .containsExactly(spectatorRoom.roomId());
+    assertThat(directory.liveRooms().getFirst().state()).isEqualTo("PLAYING");
+    assertThat(directory.liveRooms().getFirst().playerCount()).isEqualTo(2);
   }
 
   @Test

@@ -27,7 +27,7 @@ class RoomMatchTest {
     var limits =
         new NetworkSettings(
             30, 2, 32, 256, 64, 20, 16_384, 120, 120, 64, 240, 4, 8, 5000, 30000, 500, 60, 200, 50,
-            1000);
+            1000, 8, 64, 20);
     return new RoomMatch(
         "ABCDEF",
         settings,

@@ -4,14 +4,14 @@
 
 | Thành phần | Công nghệ và trách nhiệm |
 | --- | --- |
-| UI | React + TypeScript: menu, Account, phòng và Records |
+| UI | React + TypeScript: menu, Account, phòng, Spectate và Records |
 | Hiển thị | Phaser: map, sprite, animation và camera; Web Audio/HTMLAudio: âm thanh |
 | Online | Spring Boot/Java quyết định physics, thời gian, tiến độ và kết quả |
 | Persistence | MySQL + Spring Data JPA/Hibernate: identity, lượt chơi, checkpoint và kết quả |
 
 ![Kiến trúc hệ thống](../statics/architecture.svg)
 
-Community/Room nhận input qua WebSocket; Java quyết định state, TypeScript dự đoán nhân vật của mình và nội suy peers. HTTP xử lý identity/Records theo [protocol](protocol.md).
+Community/Room nhận input qua WebSocket; Java quyết định state, TypeScript dự đoán nhân vật của mình và nội suy peers. HTTP xử lý identity/Records theo [protocol](protocol.md). Người xem (Spectate) nhận snapshot chỉ đọc của trận đang chạy, không gửi input và không dự đoán.
 
 Java/TypeScript dùng chung dữ liệu JSON, viết riêng simulation. Tính trung gian bằng double, ép float32 tại cùng điểm với `Math.fround`. Simulation độc lập Spring/Phaser/DOM/database; không dùng Phaser physics thay simulation.
 
@@ -35,7 +35,7 @@ source/
     public/assets/                # manifest, game assets và attribution
     src/
       app/                        # routing và bootstrap
-      features/                   # online, community, rooms, account, records, settings
+      features/                   # online, community, rooms, spectate, account, records, settings
       components/                 # UI dùng chung
       game/                       # simulation, input, netcode và presentation
         content/                  # lời thoại và metadata hiển thị
@@ -60,7 +60,7 @@ source/
       exception/                  # lỗi HTTP
       config/                     # Spring wiring và runtime settings
       game/                       # simulation và luật xếp hạng
-      room/                       # Community/Room lifecycle
+      room/                       # Community/Room lifecycle và registry người xem
       network/                    # WebSocket và dispatch
     src/main/resources/
     src/test/                     # tests và test resources
@@ -100,6 +100,7 @@ JPA tắt Open EntityManager in View, chỉ validate schema khi start. Repositor
 - Simulation fixed-step **60 Hz**, snapshot **20 Hz**, dùng monotonic clock. Không nhận deltaTime từ client hoặc tăng số bước theo số packet.
 - Community giữ simulation và active clock riêng cho từng lượt; Pause/Continue không thay pha vật lý của lượt đó. Room dùng đồng hồ trận chung.
 - Room giữ state, roster, reconnect tokens và xác nhận ván kế tiếp trong RAM; khi mọi thành viên offline chỉ giữ cửa sổ reconnect, không chạy bù ticks offline. Room không có Pause toàn phòng.
+- Spectate hub giữ ánh xạ connection→phòng/người đang xem trong RAM, không chiếm slot của phòng; snapshot người xem dùng lại đường phát snapshot sẵn có. Đóng socket, phòng đóng hoặc empty tự thu hồi người xem.
 - Socket validate rồi enqueue; hàng đợi lệnh và callback hoàn tất có giới hạn riêng, ưu tiên callback để không mất save/cleanup khi quá tải. Tick không chờ database hoặc socket chậm; snapshots gộp bản mới nhất, control messages giữ thứ tự.
 - Persistence worker xử lý ngoài tick theo [data](data.md).
 

@@ -45,9 +45,7 @@ export function AuthForm({
 						name="username"
 						autoComplete="username"
 						required
-						minLength={3}
-						maxLength={32}
-						pattern={"[\\p{L}\\p{N}_\\-]+"}
+						pattern={"[\\p{L}\\p{N}_\\-]{3,32}"}
 					/>
 				</label>
 				<label>

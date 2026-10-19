@@ -10,6 +10,26 @@ test.beforeEach(async ({ page }) => {
 	);
 });
 
+test("unified Sign In accepts thirty-two Unicode code points for creation and login", async ({
+	page,
+}) => {
+	const name =
+		crypto.randomUUID().replaceAll("-", "").slice(0, 12) +
+		"\u{20000}".repeat(20);
+	await page.goto("/");
+	for (let attempt = 0; attempt < 2; attempt++) {
+		await page.getByRole("button", { name: "Sign In", exact: true }).click();
+		await page.getByLabel("Username", { exact: true }).fill(name);
+		await page
+			.getByLabel("Password", { exact: true })
+			.fill("Unicode account password");
+		await page.getByRole("button", { name: "Sign In", exact: true }).click();
+		await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+		await page.getByRole("button", { name, exact: true }).click();
+		await page.getByRole("button", { name: "Sign Out", exact: true }).click();
+	}
+});
+
 test("account forms persist the session and sign out clears private home data", async ({
 	page,
 	context,

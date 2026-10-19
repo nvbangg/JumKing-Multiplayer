@@ -160,6 +160,28 @@ class IdentityIT {
   }
 
   @Test
+  void unifiedLoginCreatesAndReopensAnAccountWithThirtyTwoUnicodeCodePoints() throws Exception {
+    String name = unique().substring(0, 12) + "\uD840\uDC00".repeat(20);
+    String password = "Unicode account password";
+    try (var client = client()) {
+      client.token();
+      long count = accountCount();
+      var created = client.send("/auth/login", "POST", registration(name, password));
+      assertThat(created.statusCode()).isEqualTo(200);
+      assertThat(tree(created).path("account").path("username").asText()).isEqualTo(name);
+      String hash = passwordHash(name);
+      client.token();
+      assertThat(client.send("/auth/logout", "POST", null).statusCode()).isEqualTo(200);
+      client.token();
+      var reopened = client.send("/auth/login", "POST", registration(name, password));
+      assertThat(reopened.statusCode()).isEqualTo(200);
+      assertThat(tree(reopened)).isEqualTo(tree(created));
+      assertThat(accountCount()).isEqualTo(count + 1);
+      assertThat(passwordHash(name)).isEqualTo(hash);
+    }
+  }
+
+  @Test
   void existingCredentialsNeverCreateAccountsOrChangeThePassword() throws Exception {
     String name = unique(), password = "Existing account password";
     try (var registered = client();
@@ -220,6 +242,8 @@ class IdentityIT {
           java.util.List.of(
               registration("ab", "password123"),
               registration("invalid name", "password123"),
+              registration("a".repeat(33), "password123"),
+              registration("\uD840\uDC00".repeat(33), "password123"),
               registration(unique(), "short"),
               registration(unique(), "é".repeat(37)),
               registration(unique(), ""),

@@ -13,6 +13,7 @@ import { PlayerEffects } from "../../game/netcode/PlayerEffects";
 import { AudioBus } from "../../game/presentation/AudioBus";
 import { PRESENTATION } from "../../game/presentation/config";
 import { parseMap } from "../../game/simulation/map";
+import { PHYSICS } from "../../game/simulation/tuning";
 import { api } from "../../network/api";
 import type {
 	GameConfig,
@@ -42,7 +43,7 @@ export function OnlineGame({
 	onHome: () => void;
 	onResults: () => void;
 }) {
-	const container = useRef<HTMLElement>(null),
+	const container = useRef<HTMLDivElement>(null),
 		runtime = useRef<OnlineRuntime | null>(null),
 		input = useRef<InputController | null>(null),
 		audio = useRef<AudioBus | null>(null);
@@ -58,6 +59,11 @@ export function OnlineGame({
 		[saveStatus, setSaveStatus] = useState("SAVED");
 	const [remaining, setRemaining] = useState<number | null>(null);
 	const [players, setPlayers] = useState<PlayerStanding[]>([]);
+	const [caption, setCaption] = useState<{
+		id: string;
+		name: string;
+		delayMs: number;
+	} | null>(null);
 	const [disconnected, setDisconnected] = useState(false);
 	const [networkQuality, setNetworkQuality] = useState<NetworkQuality>(() =>
 		socket.getNetworkQuality(),
@@ -194,7 +200,9 @@ export function OnlineGame({
 									? "audio/music/event_music/ending_jingle"
 									: cueManifest.walls.find((wall) => wall.id === cue.id)
 											?.appearSound || "audio/illusion"
-								: "audio/talking";
+								: cue.type === "FLEE"
+									? "audio/event_sfx/bird_fly"
+									: "audio/talking";
 						audio.current?.play(key);
 					}
 				}
@@ -263,6 +271,24 @@ export function OnlineGame({
 					setRemaining(snapshot.remainingTimeMs);
 					setFlying(state.freeFlight);
 					setPlayers(snapshot.players || []);
+					const intro = snapshot.self.simulation.world.regionIntro;
+					if (intro) {
+						const id = `${snapshot.playId}:${intro.screen}:${intro.tick}`;
+						const age =
+							((snapshot.self.simulation.physics.ticks - intro.tick) * 1000) /
+							PHYSICS.tickRate;
+						setCaption((previous) =>
+							age >= PRESENTATION.regionCaptionMs
+								? null
+								: previous?.id === id
+									? previous
+									: {
+											id,
+											name: manifest.screens[intro.screen]?.location || "",
+											delayMs: -age,
+										},
+						);
+					}
 					audio.current?.setScreen(state.screen);
 					if (snapshot.self.paused && !session.menu) {
 						session.menu = true;
@@ -396,13 +422,29 @@ export function OnlineGame({
 		}
 	};
 	const displayedError = navigationError || error;
+	const captionPaused =
+		!!menu || !!ending || disconnected || room.state === "COUNTDOWN";
 	return (
 		<main className="play-page">
-			<section
-				className="game-viewport"
-				ref={container}
-				aria-label="Online Main Babe game"
-			/>
+			<section className="game-viewport" aria-label="Online Main Babe game">
+				{/* Phaser quản lý canvas; React giữ overlay ở phần tử anh em. */}
+				<div className="game-surface" ref={container} />
+				{ready && caption?.name && !ending && (
+					<output
+						key={caption.id}
+						className="region-caption"
+						aria-label="Current region"
+						style={{
+							visibility: captionPaused ? "hidden" : "visible",
+							animationPlayState: captionPaused ? "paused" : "running",
+							animationDuration: `${PRESENTATION.regionCaptionMs}ms`,
+							animationDelay: `${caption.delayMs}ms`,
+						}}
+					>
+						{caption.name}
+					</output>
+				)}
+			</section>
 			{!ready && !displayedError && (
 				<p className="game-message" role="status">
 					Loading…

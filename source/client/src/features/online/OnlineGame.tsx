@@ -64,6 +64,8 @@ export function OnlineGame({
 		name: string;
 		delayMs: number;
 	} | null>(null);
+	const [chatCollapsed, setChatCollapsed] = useState(false),
+		[leaderboardCollapsed, setLeaderboardCollapsed] = useState(false);
 	const [disconnected, setDisconnected] = useState(false);
 	const [networkQuality, setNetworkQuality] = useState<NetworkQuality>(() =>
 		socket.getNetworkQuality(),
@@ -424,8 +426,13 @@ export function OnlineGame({
 	const displayedError = navigationError || error;
 	const captionPaused =
 		!!menu || !!ending || disconnected || room.state === "COUNTDOWN";
+	const chatHidden = chatCollapsed && !chat.open;
 	return (
-		<main className="play-page">
+		<main
+			className="play-page"
+			data-chat-collapsed={chatHidden}
+			data-leaderboard-collapsed={leaderboardCollapsed}
+		>
 			<section className="game-viewport" aria-label="Online Main Babe game">
 				{/* Phaser quản lý canvas; React giữ overlay ở phần tử anh em. */}
 				<div className="game-surface" ref={container} />
@@ -535,6 +542,40 @@ export function OnlineGame({
 				</div>
 			)}
 			{ready && !ending && <ChatOverlay chat={chat} socket={socket} />}
+			{ready && !ending && !menu && (
+				<>
+					<button
+						type="button"
+						className="mobile-panel-toggle mobile-chat-toggle"
+						aria-label={chatHidden ? "Show chat" : "Collapse chat"}
+						title={chatHidden ? "Show chat" : "Collapse chat"}
+						aria-expanded={!chatHidden}
+						onClick={() => setChatCollapsed(!chatHidden)}
+					>
+						{chatHidden ? "›" : "‹"}
+					</button>
+					{room.kind === "COMMUNITY" && (
+						<button
+							type="button"
+							className="mobile-panel-toggle mobile-leaderboard-toggle"
+							aria-label={
+								leaderboardCollapsed
+									? "Show leaderboard"
+									: "Collapse leaderboard"
+							}
+							title={
+								leaderboardCollapsed
+									? "Show leaderboard"
+									: "Collapse leaderboard"
+							}
+							aria-expanded={!leaderboardCollapsed}
+							onClick={() => setLeaderboardCollapsed((value) => !value)}
+						>
+							{leaderboardCollapsed ? "‹" : "›"}
+						</button>
+					)}
+				</>
+			)}
 			{ready && !ending && (
 				<aside className="in-game-panels">
 					<PlayersPanel players={players} selfId={socket.selfId} />

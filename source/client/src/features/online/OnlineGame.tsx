@@ -82,6 +82,7 @@ export function OnlineGame({
 		socket,
 		ready && !ending,
 		() => {
+			setChatCollapsed(false);
 			runtime.current?.cancel();
 			flight.current?.cancel();
 			input.current?.cancel();
@@ -426,11 +427,10 @@ export function OnlineGame({
 	const displayedError = navigationError || error;
 	const captionPaused =
 		!!menu || !!ending || disconnected || room.state === "COUNTDOWN";
-	const chatHidden = chatCollapsed && !chat.open;
 	return (
 		<main
 			className="play-page"
-			data-chat-collapsed={chatHidden}
+			data-chat-collapsed={chatCollapsed}
 			data-leaderboard-collapsed={leaderboardCollapsed}
 		>
 			<section className="game-viewport" aria-label="Online Main Babe game">
@@ -547,12 +547,15 @@ export function OnlineGame({
 					<button
 						type="button"
 						className="mobile-panel-toggle mobile-chat-toggle"
-						aria-label={chatHidden ? "Show chat" : "Collapse chat"}
-						title={chatHidden ? "Show chat" : "Collapse chat"}
-						aria-expanded={!chatHidden}
-						onClick={() => setChatCollapsed(!chatHidden)}
+						aria-label={chatCollapsed ? "Show chat" : "Collapse chat"}
+						title={chatCollapsed ? "Show chat" : "Collapse chat"}
+						aria-expanded={!chatCollapsed}
+						onClick={() => {
+							chat.closeChat();
+							setChatCollapsed((value) => !value);
+						}}
 					>
-						{chatHidden ? "›" : "‹"}
+						{chatCollapsed ? "›" : "‹"}
 					</button>
 					{room.kind === "COMMUNITY" && (
 						<button

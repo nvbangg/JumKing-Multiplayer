@@ -750,7 +750,11 @@ output.room-code {
 		margin-right: 24px;
 	}
 
-	.play-page[data-chat-collapsed="true"] .chat-panel,
+	.play-page[data-chat-collapsed="true"] .chat-panel {
+		/* Giữ kích thước để chat vẫn cuộn tới tin mới khi đang thu gọn. */
+		visibility: hidden;
+	}
+
 	.play-page[data-leaderboard-collapsed="true"] .records-panel {
 		display: none;
 	}

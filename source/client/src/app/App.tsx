@@ -52,6 +52,8 @@ const routes: Partial<Record<Screen, string>> = {
 	"sign-in": "/sign-in",
 	register: "/register",
 };
+const REMOVED_FROM_ROOM =
+	"You were removed from the room. If you had an active Community run it was saved; use Continue to resume.";
 function locationScreen(): Screen {
 	return typeof location === "undefined"
 		? "home"
@@ -268,7 +270,7 @@ export function App() {
 			throw new Error("Sign in to play online");
 		if (!socket.current) {
 			const connection = new GameSocket(
-				(type, payload) => {
+				(type, payload, replied) => {
 					if (socket.current !== connection) return;
 					if (type === "ROOM_STATE") {
 						const next = payload as unknown as RoomState;
@@ -347,7 +349,13 @@ export function App() {
 						socket.current?.close();
 						socket.current = null;
 						if (next) setScreen(next);
-						else back();
+						else if (replied) back();
+						else {
+							// Server tự đưa người chơi ra: về trang chủ và báo lý do.
+							setError("");
+							setConnectionNotice(REMOVED_FROM_ROOM);
+							setScreen("home");
+						}
 					} else if (type === "ERROR") setError(String(payload.message));
 				},
 				() => {

@@ -1,6 +1,8 @@
 import { expect, test, vi } from "vitest";
 import mapData from "../../../../common/maps/main-babe.json";
+import { NETWORK } from "../../network/config";
 import { GameSocket, type RoomState } from "../../network/GameSocket";
+import { required } from "../../required";
 import { GameSimulation } from "../simulation/GameSimulation";
 import { parseMap } from "../simulation/map";
 import { OnlineRuntime, type OnlineSnapshot } from "./OnlineRuntime";
@@ -52,6 +54,48 @@ function snapshot(
 		peers: [],
 	};
 }
+test("missing acknowledgements stops input and requests disconnect; a new generation resumes cleanly", () => {
+	const socket = new GameSocket(
+		() => {},
+		() => {},
+	);
+	const fail = vi.spyOn(socket, "fail"),
+		send = vi.spyOn(socket, "input");
+	const failed = vi.fn();
+	socket.selfId = "self";
+	socket.playContext = { playId: "run", generation: 1 };
+	const game = new GameSimulation(map);
+	const runtime = new OnlineRuntime(
+		map,
+		socket,
+		room,
+		() => right,
+		() => {},
+		false,
+		failed,
+	);
+	runtime.receive(snapshot(game, 1, 0) as unknown as Record<string, unknown>);
+	for (let index = 0; index <= NETWORK.maxInputFrames; index++)
+		runtime.advance(1000 / 60);
+	expect(runtime.menu).toBe(true);
+	expect(fail).toHaveBeenCalledExactlyOnceWith(
+		expect.stringContaining("too far behind"),
+	);
+	expect(failed).toHaveBeenCalledOnce();
+	const sent = send.mock.calls.length;
+	runtime.advance(100);
+	expect(send).toHaveBeenCalledTimes(sent);
+	socket.playContext = { playId: "run", generation: 2 };
+	runtime.receive(
+		snapshot(game, 2, 0, 2) as unknown as Record<string, unknown>,
+	);
+	runtime.menu = false;
+	runtime.advance(1000 / 60);
+	expect(send).toHaveBeenLastCalledWith(
+		"PLAYER_INPUT",
+		expect.objectContaining({ generation: 2, seq: 1 }),
+	);
+});
 test("online ending waits for the private committed notice and matching finished snapshot", () => {
 	const socket = new GameSocket(
 		() => {},
@@ -72,7 +116,7 @@ test("online ending waits for the private committed notice and matching finished
 		playerId: "self",
 		playId: "run",
 		showEnding: true,
-		ending: { screen: 42 },
+		ending: { screen: 42, ravenDone: true },
 	};
 	runtime.receive(snapshot(game, 1, 0) as unknown as Record<string, unknown>);
 	runtime.finish({ ...notice, playerId: "other" });
@@ -83,9 +127,17 @@ test("online ending waits for the private committed notice and matching finished
 	finished.self.status = "FINISHED";
 	finished.self.paused = true;
 	runtime.receive(finished as unknown as Record<string, unknown>);
-	expect(runtime.frame().ending).toEqual({ id: "run", screen: 42 });
+	expect(runtime.frame().ending).toEqual({
+		id: "run",
+		screen: 42,
+		ravenDone: true,
+	});
 	runtime.finish(notice);
-	expect(runtime.frame().ending).toEqual({ id: "run", screen: 42 });
+	expect(runtime.frame().ending).toEqual({
+		id: "run",
+		screen: 42,
+		ravenDone: true,
+	});
 	socket.playContext = { playId: "next", generation: 2 };
 	runtime.receive({
 		...snapshot(game, 3, 0, 2),
@@ -274,8 +326,8 @@ test("remote interpolation follows server tick spacing and never extrapolates or
 	const interpolation = new PeerInterpolation(60);
 	interpolation.receive(previous, 0);
 	interpolation.receive(current, 50);
-	expect(interpolation.frame(125)[0]!.state.x).toBe(110);
-	expect(interpolation.frame(200)[0]!.state.x).toBe(120);
+	expect(required(interpolation.frame(125)[0]).state.x).toBe(110);
+	expect(required(interpolation.frame(200)[0]).state.x).toBe(120);
 	interpolation.receive({ ...current, serverTick: 9, peers: [] }, 200);
 	expect(interpolation.frame(220)).toEqual([]);
 });
@@ -308,7 +360,7 @@ test("buffered peers move continuously through delayed and bunched snapshots", (
 			];
 			interpolation.receive(packet, now);
 		}
-		const x = interpolation.frame(now)[0]!.state.x;
+		const x = required(interpolation.frame(now)[0]).state.x;
 		if (now > 110) {
 			expect(x - previousX).toBeGreaterThan(0);
 			expect(x - previousX).toBeLessThanOrEqual(0.221);
@@ -338,21 +390,21 @@ test("interpolation snaps screen changes and respawns and resets after a long si
 	interpolation.receive(packet(3, 110), 50);
 	interpolation.frame(50);
 	interpolation.receive(packet(6, 300), 100);
-	expect(interpolation.frame(100)[0]!.state.x).toBe(300);
+	expect(required(interpolation.frame(100)[0]).state.x).toBe(300);
 	interpolation.receive(packet(9, 10, 1), 150);
-	expect(interpolation.frame(150)[0]!.state.screen).toBe(1);
+	expect(required(interpolation.frame(150)[0]).state.screen).toBe(1);
 	interpolation.receive(packet(8, 400), 160);
-	expect(interpolation.frame(160)[0]!.state.screen).toBe(1);
+	expect(required(interpolation.frame(160)[0]).state.screen).toBe(1);
 	interpolation.receive(packet(12, 200), 5000);
-	expect(interpolation.frame(5000)[0]!.state.x).toBe(200);
+	expect(required(interpolation.frame(5000)[0]).state.x).toBe(200);
 	interpolation.reset();
 	expect(interpolation.frame(6000)).toEqual([]);
 	interpolation.receive(packet(0, 40), 0);
 	interpolation.frame(0);
 	const respawn = packet(3, 30);
-	respawn.peers[0]!.state.falls = 1;
+	required(respawn.peers[0]).state.falls = 1;
 	interpolation.receive(respawn, 50);
-	expect(interpolation.frame(50)[0]!.state.x).toBe(30);
+	expect(required(interpolation.frame(50)[0]).state.x).toBe(30);
 });
 
 test("interpolation adjusts clock drift without draining its buffer during a long session", () => {
@@ -375,7 +427,7 @@ test("interpolation adjusts clock drift without draining its buffer during a lon
 			];
 			interpolation.receive(packet, now);
 		}
-		x = interpolation.frame(now)[0]!.state.x;
+		x = required(interpolation.frame(now)[0]).state.x;
 	}
 	expect(x).toBeGreaterThan(1970);
 	expect(x).toBeLessThan(1999);
@@ -416,7 +468,7 @@ test("runtime ignores stale snapshots and clears sequence/prediction on generati
 	runtime.receive(
 		snapshot(server, 100, 2, 1) as unknown as Record<string, unknown>,
 	);
-	expect(runtime.latest!.generation).toBe(2);
+	expect(required(runtime.latest).generation).toBe(2);
 	socket.playContext = { playId: "run", generation: 3 };
 	const count = vi.mocked(socket.input).mock.calls.length;
 	runtime.advance(100);
@@ -426,5 +478,5 @@ test("runtime ignores stale snapshots and clears sequence/prediction on generati
 		...snapshot(server, 101, 1, 2),
 		self: { ...snapshot(server, 101, 1, 2).self, paused: true },
 	} as unknown as Record<string, unknown>);
-	expect(runtime.latest!.serverTick).toBe(2);
+	expect(required(runtime.latest).serverTick).toBe(2);
 });

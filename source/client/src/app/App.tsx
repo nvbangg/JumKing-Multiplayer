@@ -23,6 +23,8 @@ import {
 	type RoomState,
 } from "../network/GameSocket";
 import { loadReconnect } from "../network/reconnect";
+import { required } from "../required";
+import { UpdateNotice } from "./UpdateNotice";
 
 type Screen =
 	| "home"
@@ -59,11 +61,6 @@ function locationScreen(): Screen {
 }
 export function App() {
 	const [screen, setScreenState] = useState<Screen>(locationScreen);
-	const setScreen = (next: Screen) => {
-		if (routes[next] && location.pathname !== routes[next])
-			window.history.pushState(null, "", routes[next]);
-		setScreenState(next);
-	};
 	const [identity, setIdentityState] = useState<Identity>(initialIdentity);
 	const identityRevision = useRef(0);
 	const setIdentity = useCallback((value: Identity) => {
@@ -89,6 +86,41 @@ export function App() {
 	const [error, setError] = useState("");
 	const [pending, setPending] = useState(false);
 	const socket = useRef<GameSocket | null>(null);
+	const exitScreen = useRef<Screen | null>(null);
+	const [navigationError, setNavigationError] = useState("");
+	const [connectionNotice, setConnectionNotice] = useState("");
+	const leaveOnline = useCallback(() => {
+		const connection = socket.current;
+		return connection?.selfId
+			? connection.command("LEAVE_ROOM").then(() => {})
+			: Promise.resolve();
+	}, []);
+	const setScreen = useCallback(
+		(next: Screen) => {
+			const connection = socket.current;
+			if (
+				connection?.selfId &&
+				!["online", "lobby", "results"].includes(next)
+			) {
+				exitScreen.current = next;
+				setNavigationError("");
+				void leaveOnline().catch((cause) => {
+					if (socket.current !== connection) return;
+					exitScreen.current = null;
+					setNavigationError(
+						cause instanceof Error
+							? cause.message
+							: "Unable to leave online game",
+					);
+				});
+				return;
+			}
+			if (routes[next] && location.pathname !== routes[next])
+				window.history.pushState(null, "", routes[next]);
+			setScreenState(next);
+		},
+		[leaveOnline],
+	);
 	const connect = useRef<(() => Promise<GameSocket>) | null>(null);
 	const accountId = identity.account?.id;
 	const reconnectProfile = accountId
@@ -127,7 +159,7 @@ export function App() {
 						: "home";
 		if (routes[next]) window.history.replaceState(null, "", routes[next]);
 		setError("");
-		setScreenState(next);
+		setScreen(next);
 	};
 	const execute = async (action: () => Promise<void>) => {
 		if (pending) return;
@@ -150,9 +182,14 @@ export function App() {
 		let disposed = false;
 		const expectedIdentityRevision = identityRevision.current;
 		const pop = () => {
-			setScreenState(locationScreen());
+			setScreen(locationScreen());
+		};
+		const pageHide = () => {
+			// Gửi ngay khi page rời đi; không đóng socket trước xác nhận Leave.
+			void leaveOnline().catch(() => {});
 		};
 		window.addEventListener("popstate", pop);
+		window.addEventListener("pagehide", pageHide);
 		void api<Identity>("/auth/me")
 			.then((value) => {
 				if (typeof value.authenticated !== "boolean") return;
@@ -163,9 +200,15 @@ export function App() {
 		return () => {
 			disposed = true;
 			window.removeEventListener("popstate", pop);
-			socket.current?.close();
+			window.removeEventListener("pagehide", pageHide);
+			const connection = socket.current;
+			if (connection?.selfId)
+				void leaveOnline()
+					.catch(() => {})
+					.finally(() => connection.close());
+			else connection?.close();
 		};
-	}, [setIdentity]);
+	}, [setIdentity, leaveOnline, setScreen]);
 	useEffect(() => {
 		if (!identity.authenticated) return;
 		let cancelled = false;
@@ -223,9 +266,10 @@ export function App() {
 	const connectedSocket = async () => {
 		if (!identity.authenticated || !identity.account)
 			throw new Error("Sign in to play online");
-		if (!socket.current)
-			socket.current = new GameSocket(
+		if (!socket.current) {
+			const connection = new GameSocket(
 				(type, payload) => {
+					if (socket.current !== connection) return;
 					if (type === "ROOM_STATE") {
 						const next = payload as unknown as RoomState;
 						if (!next.roomId) {
@@ -294,16 +338,25 @@ export function App() {
 							),
 						);
 					} else if (type === "ROOM_LEFT") {
+						const next = exitScreen.current;
+						exitScreen.current = null;
+						setNavigationError("");
 						setRoom(null);
 						setResult(null);
 						resultRef.current = null;
 						socket.current?.close();
 						socket.current = null;
-						back();
+						if (next) setScreen(next);
+						else back();
 					} else if (type === "ERROR") setError(String(payload.message));
 				},
-				() => setError("Disconnected from the game server"),
+				() => {
+					if (socket.current === connection)
+						setError("Disconnected from the game server");
+				},
 			);
+			socket.current = connection;
+		}
 		await socket.current.restore(reconnectProfile);
 		return socket.current;
 	};
@@ -315,6 +368,7 @@ export function App() {
 		});
 	};
 	const enterCommunity = (newRun: boolean) => {
+		setConnectionNotice("");
 		if (!identity.account) {
 			setScreen("sign-in");
 			return;
@@ -346,51 +400,71 @@ export function App() {
 		}
 	};
 
+	const displayedError = navigationError || error;
 	if (screen === "online" && room && socket.current)
 		return (
-			<OnlineGame
-				room={room}
-				socket={socket.current}
-				onResults={() => {
-					viewedEnding.current = resultRef.current?.playId || null;
-					setScreen("results");
-				}}
-				onHome={() => {
-					socket.current?.close();
-					socket.current = null;
-					setRoom(null);
-					setScreen("home");
-					clearCsrf();
-					const expectedIdentityRevision = identityRevision.current;
-					void api<Identity>("/auth/me")
-						.then((value) => {
-							if (identityRevision.current === expectedIdentityRevision)
-								setIdentity(value);
-						})
-						.catch((cause) => {
-							if (identityRevision.current !== expectedIdentityRevision) return;
-							if (
-								cause instanceof ApiError &&
-								["SESSION_EXPIRED", "UNAUTHENTICATED"].includes(cause.code)
-							)
-								setIdentity(initialIdentity);
-							else
-								setError(
-									cause instanceof Error
-										? cause.message
-										: "Identity could not be refreshed",
-								);
-						});
-				}}
-			/>
+			<>
+				<UpdateNotice canReload={false} />
+				<OnlineGame
+					room={room}
+					socket={socket.current}
+					navigationError={navigationError}
+					onResults={() => {
+						viewedEnding.current = resultRef.current?.playId || null;
+						setScreen("results");
+					}}
+					onHome={(message) => {
+						setNavigationError("");
+						socket.current?.close();
+						socket.current = null;
+						setRoom(null);
+						setResult(null);
+						resultRef.current = null;
+						exitScreen.current = null;
+						setError("");
+						setConnectionNotice(message);
+						setHomeRevision((value) => value + 1);
+						setScreen("home");
+						clearCsrf();
+						const expectedIdentityRevision = identityRevision.current;
+						void api<Identity>("/auth/me")
+							.then((value) => {
+								if (identityRevision.current === expectedIdentityRevision)
+									setIdentity(value);
+							})
+							.catch((cause) => {
+								if (identityRevision.current !== expectedIdentityRevision)
+									return;
+								if (
+									cause instanceof ApiError &&
+									["SESSION_EXPIRED", "UNAUTHENTICATED"].includes(cause.code)
+								)
+									setIdentity(initialIdentity);
+								else
+									setError(
+										cause instanceof Error
+											? cause.message
+											: "Identity could not be refreshed",
+									);
+							});
+					}}
+				/>
+			</>
 		);
 	return (
-		<main className="home">
-			<header className="brand">
-				<h1>
-					<img src="/assets/title_logo.png" alt="JumpKing" />
-				</h1>
-			</header>
+		<main className={`home screen-${screen}`}>
+			<UpdateNotice
+				canReload={
+					screen === "home" && !room && !pending && !socket.current?.selfId
+				}
+			/>
+			{screen !== "detail" && (
+				<header className="brand">
+					<h1>
+						<img src="/assets/title_logo.png" alt="JumpKing" />
+					</h1>
+				</header>
+			)}
 			<div
 				className={screen === "home" && home ? "home-layout" : "single-panel"}
 			>
@@ -401,7 +475,7 @@ export function App() {
 							: (
 									{
 										"sign-in": "Sign In",
-										register: "Create Account",
+										register: "Sign In",
 										password: "Change Password",
 										rooms: "Room",
 										account: "Account",
@@ -439,7 +513,12 @@ export function App() {
 							>
 								New Game
 							</button>
-							<button type="button" onClick={() => setScreen("rooms")}>
+							<button
+								type="button"
+								onClick={() =>
+									setScreen(identity.authenticated ? "rooms" : "sign-in")
+								}
+							>
 								Room
 							</button>
 							<button
@@ -459,14 +538,9 @@ export function App() {
 										{identity.account.username}
 									</button>
 								) : (
-									<>
-										<button type="button" onClick={() => setScreen("sign-in")}>
-											Sign In
-										</button>
-										<button type="button" onClick={() => setScreen("register")}>
-											Create Account
-										</button>
-									</>
+									<button type="button" onClick={() => setScreen("sign-in")}>
+										Sign In
+									</button>
 								)}
 							</div>
 						</>
@@ -474,14 +548,10 @@ export function App() {
 					{(screen === "sign-in" || screen === "register") && (
 						<AuthForm
 							key={screen}
-							register={screen === "register"}
 							onSuccess={(value) => {
 								setIdentity(value);
 								back();
 							}}
-							onSwitch={() =>
-								setScreen(screen === "register" ? "sign-in" : "register")
-							}
 						/>
 					)}
 					{screen === "account" && identity.account && (
@@ -527,7 +597,7 @@ export function App() {
 							<HistoryList
 								key={accountId}
 								onSelect={(item) => {
-									setDetail({ accountId: identity.account!.id, item });
+									setDetail({ accountId: required(identity.account).id, item });
 									setScreen("detail");
 								}}
 							/>
@@ -538,7 +608,7 @@ export function App() {
 						))}
 					{screen === "detail" && detail?.accountId === accountId && detail && (
 						<HistoryDetail
-							key={detail.item.kind + ":" + detail.item.id}
+							key={`${detail.item.kind}:${detail.item.id}`}
 							item={detail.item}
 						/>
 					)}
@@ -552,67 +622,50 @@ export function App() {
 							<ControlsHelp />
 						</>
 					)}
-					{screen === "rooms" && (
+					{screen === "rooms" && identity.authenticated && (
 						<>
-							{!identity.authenticated ? (
-								<>
-									<p>Sign in to play online.</p>
-									<button type="button" onClick={() => setScreen("sign-in")}>
-										Sign In
-									</button>
-									<button type="button" onClick={() => setScreen("register")}>
-										Create Account
-									</button>
-								</>
-							) : (
-								<>
-									<button
-										type="button"
-										disabled={pending}
-										onClick={() => command("CREATE_ROOM")}
-									>
-										Create Room
-									</button>
-									<button
-										type="button"
-										onClick={() => setScreen("public-rooms")}
-									>
-										Join Public Room
-									</button>
-									<form
-										className="room-join-form"
-										onSubmit={(event) => {
-											event.preventDefault();
-											const roomId = String(
-												new FormData(event.currentTarget).get("roomId") || "",
-											)
-												.trim()
-												.toUpperCase();
-											command("JOIN_ROOM", { roomId });
-										}}
-									>
-										<input
-											name="roomId"
-											aria-label="Room ID"
-											placeholder="Enter Room ID"
-											required
-											minLength={6}
-											maxLength={6}
-											autoComplete="off"
-											autoCapitalize="characters"
-											pattern="[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}"
-											onInput={(event) => {
-												event.currentTarget.value =
-													event.currentTarget.value.toUpperCase();
-											}}
-										/>
+							<button
+								type="button"
+								disabled={pending}
+								onClick={() => command("CREATE_ROOM")}
+							>
+								Create Room
+							</button>
+							<button type="button" onClick={() => setScreen("public-rooms")}>
+								Join Public Room
+							</button>
+							<form
+								className="room-join-form"
+								onSubmit={(event) => {
+									event.preventDefault();
+									const roomId = String(
+										new FormData(event.currentTarget).get("roomId") || "",
+									)
+										.trim()
+										.toUpperCase();
+									command("JOIN_ROOM", { roomId });
+								}}
+							>
+								<input
+									name="roomId"
+									aria-label="Room ID"
+									placeholder="Enter Room ID"
+									required
+									minLength={6}
+									maxLength={6}
+									autoComplete="off"
+									autoCapitalize="characters"
+									pattern="[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}"
+									onInput={(event) => {
+										event.currentTarget.value =
+											event.currentTarget.value.toUpperCase();
+									}}
+								/>
 
-										<button type="submit" disabled={pending}>
-											Join
-										</button>
-									</form>
-								</>
-							)}
+								<button type="submit" disabled={pending}>
+									Join
+								</button>
+							</form>
 						</>
 					)}
 					{screen === "public-rooms" && identity.authenticated && (
@@ -640,9 +693,12 @@ export function App() {
 						/>
 					)}
 
-					{error && (
+					{screen === "home" && connectionNotice && (
+						<p role="status">{connectionNotice}</p>
+					)}
+					{displayedError && (
 						<p className="error" role="alert">
-							{error}
+							{displayedError}
 						</p>
 					)}
 					{screen === "home" && accountId && !home && !homeLoading && (

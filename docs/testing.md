@@ -72,12 +72,16 @@ Với `-Web` và `E2E_BROWSER_PATH`, `SchemaIT` còn chạy Chrome trực tiếp
 
 ## Scenarios và oracles
 
+Hồi quy cập nhật/lag: `npm run test:e2e -- e2e/updates.spec.ts` kiểm tra thông báo bản mới, chỉ reload khi bấm ở màn hình chính và lỗi tải chunk. Với backend/MySQL cô lập và `E2E_AUTH_ONLINE=true`, chạy thêm `e2e/lag-recovery-online.spec.ts`: chặn input để ACK không tiến, gây đầy hàng đợi trong Community/Room, reconnect/Resume hoặc Back to Menu khi API mất mạng. Không làm đầy hàng đợi bằng input giả trên server thật.
+
+`SessionAuthorityTest` kiểm tra idle/absolute không được gia hạn do khôi phục phiên. `SessionPersistenceIT` chạy Tomcat thật qua ba lần khởi động với cùng thư mục phiên và MySQL cô lập, giữ cookie/CSRF giữa các lần: đăng nhập được sau restart, registry chứa cả phiên chưa gửi HTTP mới, đổi mật khẩu thu hồi các thiết bị và logout không bị phục hồi sau restart. Sau đó nghiệm thu thêm JAR trên VPS qua `systemctl restart` theo [deployment](deployment.md#giữ-phiên-khi-deploy); test local không thay thế kiểm tra quyền thư mục và systemd thực tế.
+
 | Nhóm | Kiểm tra và kết quả mong đợi |
 | --- | --- |
 | Physics | Đi bộ, charge ngắn/full/auto, buffer/air grace, wall/ceiling/corner/slope, ice/snow/wind, splat/cancel; full state đúng expected mỗi tick |
 | Map/camera | Toàn tuyến Main Babe từ spawn tới Finish bằng input hợp lệ; mười mốc Finish hợp lệ từ mọi spawn; map ngắn không cấp crown/ending hoặc ghi đè best full-map; tile/biên/chuyển screen đúng, không stuck, không lọt solid |
-| Fly Mode | Một cờ server cho mọi người/kiểu chơi/profile, không Options; nhấn đúp/repeat/cancel không launch thừa; giữ Space bay lên, keyboard/touch, biên world, thoát solid/đáy world/restore; save và thành tích đúng [gameplay](gameplay.md#fly-mode) |
-| Nội dung/ending | Main Babe đủ NPC/readables/môi trường/audio; không Inventory/items/merchant/quest nhận đồ; ending/Skip đúng người, không credit hoặc phát trùng; build đúng scope |
+| Fly Mode | Một cờ server cho mọi người/kiểu chơi/profile, không Options; nhấn đúp/repeat/cancel không launch thừa; Space không làm bay lên, tốc độ ngang/dọc 2×/4× đi bộ, keyboard/touch, biên world, thoát solid/đáy world/restore; save và thành tích đúng [gameplay](gameplay.md#fly-mode) |
+| Nội dung/ending | Main Babe đủ NPC/readables/môi trường/audio; tên vùng kích hoạt ngay ở màn đầu (Colossal Drain index 5), chỉ một lần/lượt qua rơi xuống/respawn/Continue/reconnect, lượt mới reset, giữ hiệu ứng khi mở Menu và không chặn input; quạ đen/trắng đủ 14/17 điểm, trigger/flight đúng fixtures Java/TypeScript, save giữa flight và hai nhánh ending đúng owner; quạ trắng không đổi ending hoặc trao thưởng; không Inventory/items/merchant/quest nhận đồ; ending/Skip đúng người, không credit hoặc phát trùng; build đúng scope |
 | Adventure boundary | Hai simulation cùng luật/ID, frontend tra cứu đúng nội dung; Java/snapshot không chứa presentation; hội thoại/crown không nhân đôi qua restore/replay/input giả |
 | Community | Continue/New Game trực tiếp từ trang chủ, Continue không tạo lượt khi save thiếu/đổi, New Game xác nhận và kiểm tra expectedRunId; Account bắt buộc; tự ghép/tạo sảnh, không Join bằng ID; lookup không lộ members/token; một lượt/Account, giữ state/time và không nhân đôi membership |
 | Checkpoint | Restore đủ physics/adventure/world; metrics/snapshot/revision atomic; New Run đồng thời và rollback; writer đến muộn; Finish/Abandon không mất save hoặc bị writer cũ phục hồi |
@@ -88,7 +92,7 @@ Với `-Web` và `E2E_BROWSER_PATH`, `SchemaIT` còn chạy Chrome trực tiếp
 | Leaderboard | Chỉ Community; best của một lượt/Account, không ghép peak/time khác lượt, không nhận Room hoặc client score |
 | Identity/data | JPA/MySQL thật, không dùng H2; đủ ba bảng/FK/CHECK/unique theo [data](data.md), generated unique Community và transaction/lock/rollback; Controller/Service không chứa SQL/JdbcTemplate, API không trả Entity hoặc tải snapshot cho bảng tổng hợp; Register/Login/Logout/Change Password, session rotation/ownership/ID enumeration; rollback/revision/save status |
 | Stats/History | Tổng Community/Room đã commit; History chỉ terminal/finalized, ownership/pagination/best/wins đúng data; lỗi tải không thành dữ liệu rỗng giả |
-| Identity/chat | Ngoại hình không trùng; username cả Room/Community đúng identity; adventure/effects không lặp qua replay; chat plain text, cooldown/history/focus; Enter/Escape, tin mới hiện 10 giây không tự lấy focus; Players luôn hiện gọn, chỉ leaderboard thu gọn, hai bảng tách phạm vi |
+| Identity/chat | Ngoại hình không trùng; mỗi player có một nhãn tên rõ, không bị viền chữ đè nét; username cả Room/Community đúng identity; adventure/effects không lặp qua replay; chat plain text, cooldown/history/focus; Enter/Escape, chat trong trận tối đa 10 tin, tự cuộn và không tự lấy focus hoặc che nút cảm ứng; Players/Leaderboard cuộn khi dài và tách phạm vi; thu gọn/mở lại Chat và Leaderboard trên mobile giữ nháp, tin mới, vị trí cuộn và không tải lại bảng; UI không chọn chữ ngoài ô nhập và mã phòng |
 | Mobile/browser | Multi-touch/cancel/capture, xoay màn hình, keyboard/gamepad fallback, viewport/menu, storage/audio bị chặn; refresh UI đúng route, API/asset thiếu giữ đúng lỗi |
 | Assets | Manifest đủ file sử dụng, nguồn/tình trạng giấy phép rõ; artifact/Git đúng phạm vi và không chứa dữ liệu/công cụ riêng tư |
 

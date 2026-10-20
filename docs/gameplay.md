@@ -59,9 +59,9 @@ Camera nguyên screen 4:3, letterbox; không smooth-follow. Screen ứng viên =
 
 ## Fly Mode
 
-Tính năng thử nghiệm cho Community và cả bốn mode Room, được mở bằng `FLY_ENABLED` theo [deployment](deployment.md#fly-mode). Khi server bật cờ, mọi người được dùng ngay ở mọi môi trường, không có thiết lập riêng theo Account hoặc Options; nhấn Space hai lần trong 300 ms để bắt đầu/tắt bay. Chỉ đếm lần nhấn mới sau khi thả, không tính key repeat; cảm ứng dùng nhấn đúp Jump. Tốc độ ngang/dọc và khoảng nhấn đúp tập trung trong shared tuning.
+Tính năng thử nghiệm cho Community và cả bốn mode Room, được mở bằng `FLY_ENABLED` theo [deployment](deployment.md#fly-mode). Khi server bật cờ, mọi người được dùng ngay ở mọi môi trường, không có thiết lập riêng theo Account hoặc Options; nhấn Space hai lần trong 300 ms để bắt đầu/tắt bay. Chỉ đếm lần nhấn mới sau khi thả, không tính key repeat; cảm ứng dùng nhấn đúp Jump. Tốc độ bay ngang 3 px/tick (2× tốc độ đi bộ), dọc 6 px/tick (4×); các giá trị và khoảng nhấn đúp tập trung trong shared tuning.
 
-Khi bay, WASD hoặc các mũi tên di chuyển bốn hướng; giữ Space cũng bay lên; cảm ứng thêm lên/xuống. Bay xuyên địa hình, không gravity/charge/splat, giữ biên world. Đổi trạng thái bay xóa charge/velocity; không tạo cú nhảy ngoài ý muốn và phải thả Jump trước khi charge tiếp. Khi chưa bay, lần nhấn Space đầu vẫn điều khiển nhảy bình thường, không chờ nhận diện nhấn đúp.
+Khi bay, WASD hoặc các mũi tên di chuyển bốn hướng; Space không di chuyển nhân vật khi bay; cảm ứng thêm lên/xuống. Bay xuyên địa hình, không gravity/charge/splat, giữ biên world. Đổi trạng thái bay xóa charge/velocity; không tạo cú nhảy ngoài ý muốn và phải thả Jump trước khi charge tiếp. Khi chưa bay, lần nhấn Space đầu vẫn điều khiển nhảy bình thường, không chờ nhận diện nhấn đúp.
 
 Tắt bay khi đang trong solid: tự rơi thẳng xuống, tạm bỏ collision đến khi toàn bộ body ra ngoài khối rồi khôi phục physics bình thường. Trong lúc thoát khối không nhận movement/charge; nếu tới đáy world vẫn chưa thoát thì đưa về spawn để tránh kẹt. Restore save khi tính năng đã tắt cũng áp dụng cách thoát khối này.
 
@@ -115,7 +115,7 @@ Room hiện cờ ca-rô và chữ FINISH tại một platform đủ điều ki�
 
 ## Leave và reconnect online
 
-Đóng tab hoặc mất kết nối hủy input; server giữ slot 5 phút từ lúc phát hiện disconnect. Reconnect cần đúng identity/token, không tự bật lại điều khiển. Với Community, hạn disconnect thay hạn Pause; reconnect khi còn paused bắt đầu lại hạn Pause. Các mốc AFK/Pause/reconnect tập trung trong shared rules.
+Chủ động rời page (`pagehide`) hoặc điều hướng ra khỏi context online yêu cầu Leave; khi page còn hoạt động, client chờ xác nhận trước khi đóng socket/chuyển màn. Chuyển Game → Results/Lobby, đổi tab và blur không phải Leave. Khi page bị đóng, frame Leave chỉ được gửi best effort; nếu server chưa nhận được hoặc mất kết nối bất thường thì hủy input và giữ slot 5 phút từ lúc phát hiện disconnect. Reconnect cần đúng identity/token, không tự bật lại điều khiển. Với Community, hạn disconnect thay hạn Pause; reconnect khi còn paused bắt đầu lại hạn Pause. Các mốc AFK/Pause/reconnect tập trung trong shared rules.
 
 Room giữ slot reconnect tối đa 5 phút. Khi còn người connected, trận tiếp tục; khi mọi người offline, ngừng tick đến lúc có reconnect hoặc hết hạn rồi finalize. Leave/hết hạn reconnect chốt DNF, đóng băng metrics.
 
@@ -131,9 +131,15 @@ Chỉ triển khai Main Babe; không mở rộng campaign/DLC khác.
 
 Timer luôn hiện; không hiển thị số lần nhảy trong HUD. Jumps vẫn được đếm cho Stats/History.
 
+Tên vùng hiện ngay khi vào màn đầu của vùng, trong 6 giây; Colossal Drain bắt đầu từ màn 6 (index 5). Mốc khám phá và thời điểm hiệu ứng thuộc từng lượt, lưu trong checkpoint Community; rơi xuống, respawn, Continue hoặc reconnect không phát lại từ đầu. Lượt mới reset; tới vùng cao hơn bỏ qua tên các vùng thấp đã vượt qua. Menu tạm giữ hiệu ứng, ending không hiển thị tên vùng.
+
 NPC/hội thoại, bảng/sách/nhật ký và môi trường thuộc Main Babe; đọc/hội thoại không trực tiếp yêu cầu Pause. Không có Inventory, nhặt/mua vật phẩm hoặc quest nhận đồ. Hội thoại/trigger không phụ thuộc vật phẩm; ending không có credit.
 
 Hoàn thành Community hoặc Room map 10 tự mở vương miện trên Account cho các lượt sau; Room ngắn không mở vương miện. Màu của mỗi người nhất quán trên mọi client; bản thân opacity=1 và vẽ trên peers opacity=0.7. Nickname rõ và hội thoại vẽ trên tên.
+
+Quạ Main Babe có 14 điểm đậu; tới gần trong bán kính 40 px khiến quạ kêu và bay tới điểm kế tiếp. Tiến độ riêng từng lượt; Community lưu qua Continue, Room khởi tạo lại mỗi ván. Đuổi quạ ở điểm cuối rồi Finish full map thì quạ thay thiên thần trao vương miện; không có vật phẩm nhận từ quạ, không đổi physics hoặc xếp hạng.
+
+Quạ trắng là chi tiết môi trường với 17 điểm đậu trong Main Babe, dùng cùng cơ chế đuổi/lưu tiến độ riêng. Sau điểm cuối nó bay đi; không có vật phẩm, nhiệm vụ hoặc ảnh hưởng ending.
 
 Ending giữ cảnh/nhạc/ảnh kết thúc và Skip, bỏ credit. Community chỉ người Finish xem; Room chỉ winners xem, người khác tới Results. End/timeout chưa có Finish không phát ending. Ending không đổi kết quả/thời gian, xử lý một lần theo runId/matchId và hủy khi chuyển lượt.
 
@@ -151,6 +157,6 @@ Assets có manifest; `source/client/public/assets/ATTRIBUTION.md` ghi nguồn v�
 
 ## Chat và bảng trong trận
 
-Lobby luôn hiện chat và ô nhập. Trong trận, Enter mở/focus chat hoặc gửi khi đang nhập; Esc đóng và trả input. Không bắt phím từ form khác. Tin mới hiện 10 giây, không lấy focus; chat mở thủ công giữ đến khi đóng. Có nút cảm ứng, chat không đi vào database.
+Lobby luôn hiện chat và ô nhập. Trong trận, chat cố định ở góc dưới bên trái, hiển thị tối đa 10 tin gần nhất và tự cuộn xuống tin mới; không tự lấy focus. Enter mở/focus ô nhập hoặc gửi; Esc hoặc gửi thành công trả input cho game, khung chat vẫn hiện. Không bắt phím từ form khác hoặc che nút cảm ứng. Chat không đi vào database.
 
-Players là thứ hạng hiện tại trong cùng phòng: Room theo comparator mode, Community theo độ cao hiện tại và đồng hạng khi bằng nhau. Server tính từ state RAM. Leaderboard là thành tích Community đã commit, có thể xem khi chơi; tải khi mở hoặc nhấn Refresh. Players luôn hiển thị gọn; chỉ Leaderboard có thể thu gọn. Community chỉ bắt đầu lượt mới từ menu sau Save & Exit.
+Players là thứ hạng hiện tại trong cùng phòng: Room theo comparator mode, Community theo độ cao hiện tại và đồng hạng khi bằng nhau. Server tính từ state RAM. Các bảng mặc định hiển thị gọn, danh sách dài cuộn riêng và không che nút cảm ứng. Mobile cho thu gọn Chat và Leaderboard, giữ nội dung/nháp; Players vẫn hiện. Leaderboard dùng thành tích đã commit, tải khi vào trận hoặc nhấn Refresh; không polling hoặc tải lại khi mở bảng đã thu gọn. Community chỉ bắt đầu lượt mới từ menu sau Save & Exit.

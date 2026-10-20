@@ -1,14 +1,25 @@
 import { expect, test } from "vitest";
+import adventure from "../../../../common/adventure.json";
 import checkpoints from "../../../../common/fixtures/main-babe-checkpoints.json";
 import route from "../../../../common/fixtures/main-babe-route.json";
 import map from "../../../../common/maps/main-babe.json";
 import manifest from "../../../public/assets/manifest.json";
+import { required } from "../../required";
 import { GameSimulation } from "./GameSimulation";
 import { ROOM_MAPS, roomMap } from "./roomMaps";
 import { PHYSICS } from "./tuning";
 import { NEUTRAL_INPUT, type PlayerInput } from "./types";
 
 const floorEnds = [208, 328, 56, 280, 176, 104, 72, 384, 288];
+
+test("region boundaries match the manifest and Colossal Drain starts on screen six", () => {
+	const starts = manifest.screens.flatMap((screen, index) =>
+		screen.location !== manifest.screens[index - 1]?.location ? [index] : [],
+	);
+	expect(starts).toEqual(adventure.regionStarts);
+	expect(manifest.screens[4]?.location).toBe("REDCROWN WOODS");
+	expect(manifest.screens[5]?.location).toBe("COLOSSAL DRAIN");
+});
 
 test("Room maps keep the ten approved Finish boundaries", () => {
 	expect(
@@ -39,7 +50,7 @@ test("Room labels distinguish the forest sections and retain later region names"
 		"Red Tree",
 	]);
 	for (const goal of ROOM_MAPS.slice(2, -1))
-		expect(manifest.screens[goal.finish.screen]!.location).toBe(
+		expect(required(manifest.screens[goal.finish.screen]).location).toBe(
 			goal.name.toUpperCase(),
 		);
 });
@@ -67,7 +78,7 @@ for (const goal of ROOM_MAPS.slice(0, -1))
 		expect(game.finished).toBe(false);
 		game.physics.restore({ ...state, screen: state.screen - 1 });
 		expect(game.finished).toBe(false);
-		const floorEnd = floorEnds[goal.level - 1]!;
+		const floorEnd = required(floorEnds[goal.level - 1]);
 		game.physics.restore({ ...state, x: floorEnd });
 		expect(game.finished).toBe(false);
 		// Giữ biên phải của đoạn Finish; nền không giới hạn chấp nhận thân còn chạm mép.
@@ -83,14 +94,18 @@ for (const goal of ROOM_MAPS.slice(0, -1))
 
 test("a higher grounded platform in the Finish screen does not end a short Room", () => {
 	const game = new GameSimulation(roomMap(map, 1));
-	const point = checkpoints.find((checkpoint) => checkpoint.ticks === 1182)!;
+	const point = required(
+		checkpoints.find((checkpoint) => checkpoint.ticks === 1182),
+	);
 	game.physics.restore({ ...point, codecVersion: 1 });
 	expect(point.screen).toBe(game.map.finish.screen);
 	expect(point.grounded).toBe(true);
 	expect(point.x + PHYSICS.bodyWidth / 2).toBeGreaterThanOrEqual(
 		game.map.finish.minCenterX,
 	);
-	expect(game.physics.progress).toBeGreaterThan(game.map.finish.minProgress!);
+	expect(game.physics.progress).toBeGreaterThan(
+		required(game.map.finish.minProgress),
+	);
 	expect(game.finished).toBe(false);
 });
 
@@ -124,7 +139,9 @@ test("Room 10 keeps the native Solo and Community Finish", () => {
 		[16861, false],
 		[16957, true],
 	] as const) {
-		const point = checkpoints.find((checkpoint) => checkpoint.ticks === ticks)!;
+		const point = required(
+			checkpoints.find((checkpoint) => checkpoint.ticks === ticks),
+		);
 		original.physics.restore({ ...point, codecVersion: 1 });
 		room.physics.restore({ ...point, codecVersion: 1 });
 		expect(original.finished).toBe(finished);
@@ -147,24 +164,24 @@ for (const goal of ROOM_MAPS)
 		repeat(30);
 		for (const [index, action] of route.entries()) {
 			if ("walk" in action) {
-				for (let i = 0; i < action.ticks!; i++)
+				for (let i = 0; i < required(action.ticks); i++)
 					step({
-						left: action.walk! < 0,
-						right: action.walk! > 0,
+						left: required(action.walk) < 0,
+						right: required(action.walk) > 0,
 						jump: false,
 					});
 			} else {
 				step();
-				for (let i = 0; i < action.charge!; i++)
+				for (let i = 0; i < required(action.charge); i++)
 					step({
-						left: action.charge === 36 && action.direction! < 0,
-						right: action.charge === 36 && action.direction! > 0,
+						left: action.charge === 36 && required(action.direction) < 0,
+						right: action.charge === 36 && required(action.direction) > 0,
 						jump: true,
 					});
 				if (action.charge !== 36)
 					step({
-						left: action.direction! < 0,
-						right: action.direction! > 0,
+						left: required(action.direction) < 0,
+						right: required(action.direction) > 0,
 						jump: false,
 					});
 				for (let i = 0; i < 180; i++) {
@@ -188,7 +205,7 @@ for (const goal of ROOM_MAPS)
 		expect(game.adventure.completed).toBe(goal.level === 10);
 		if (goal.level < 10) {
 			expect(game.physics.progress).toBe(goal.finish.minProgress);
-			expect(state.x).toBeLessThan(floorEnds[goal.level - 1]!);
+			expect(state.x).toBeLessThan(required(floorEnds[goal.level - 1]));
 		}
 		expect(state.x + PHYSICS.bodyWidth).toBeGreaterThan(goal.finish.minCenterX);
 		expect(state.ticks).toBe(

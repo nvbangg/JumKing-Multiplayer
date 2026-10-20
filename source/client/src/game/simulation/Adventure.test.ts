@@ -2,11 +2,190 @@ import { expect, test } from "vitest";
 import fixtures from "../../../../common/fixtures/adventure-traces.json";
 import checkpoints from "../../../../common/fixtures/main-babe-checkpoints.json";
 import route from "../../../../common/fixtures/main-babe-route.json";
+import ravenTrace from "../../../../common/fixtures/raven-trace.json";
+import whiteRavenTrace from "../../../../common/fixtures/white-raven-trace.json";
 import map from "../../../../common/maps/main-babe.json";
-import { Adventure } from "./Adventure";
+import { required } from "../../required";
+import { ADVENTURE, Adventure } from "./Adventure";
 import { GameSimulation } from "./GameSimulation";
 import { Simulation } from "./Simulation";
 import { NEUTRAL_INPUT } from "./types";
+
+test("region intros start at their first screen and survive restore and respawn", () => {
+	const game = new GameSimulation(map, true);
+	for (const screen of ADVENTURE.regionStarts) {
+		game.physics.restore({
+			...game.physics.snapshot(),
+			y: -screen * map.screenHeight + 100,
+			screen,
+			freeFlight: true,
+			grounded: false,
+		});
+		game.tick(NEUTRAL_INPUT);
+		const saved = game.snapshot();
+		expect(saved.world.regionIntro).toEqual({
+			screen,
+			tick: saved.physics.ticks,
+		});
+		const restored = new GameSimulation(map, true);
+		restored.restore(saved);
+		restored.physics.respawn();
+		restored.tick(NEUTRAL_INPUT);
+		expect(restored.snapshot().world.regionIntro).toEqual(
+			saved.world.regionIntro,
+		);
+		expect(
+			new GameSimulation(map).snapshot().world.regionIntro,
+		).toBeUndefined();
+	}
+	const before = game.snapshot();
+	for (const intro of [
+		{ screen: 6, tick: 0 },
+		{ screen: 5, tick: -1 },
+		{ screen: 5, tick: before.physics.ticks + 1 },
+	]) {
+		expect(() =>
+			game.restore({
+				...before,
+				world: { ...before.world, regionIntro: intro },
+			}),
+		).toThrow();
+		expect(game.snapshot()).toEqual(before);
+	}
+});
+
+test("raven requires the same screen and strictly less than forty pixels", () => {
+	const adventure = new Adventure(map);
+	const player = {
+		...new Simulation(map).snapshot(),
+		screen: 2,
+		x: 65,
+		y: 88 - 720 - 13,
+	};
+	expect(adventure.tick(player, NEUTRAL_INPUT)).not.toContainEqual({
+		type: "FLEE",
+		id: "raven",
+	});
+	expect(
+		adventure.tick({ ...player, screen: 3, x: 25 }, NEUTRAL_INPUT),
+	).not.toContainEqual({ type: "FLEE", id: "raven" });
+	expect(adventure.tick({ ...player, x: 64 }, NEUTRAL_INPUT)).toContainEqual({
+		type: "FLEE",
+		id: "raven",
+	});
+});
+
+test("raven follows all fourteen perches with exact flight and checkpoint continuation", () => {
+	let adventure = new Adventure(map);
+	const other = new Adventure(map);
+	let flees = 0;
+	for (const leg of ravenTrace.legs) {
+		const player = { ...new Simulation(map).snapshot(), ...leg.player };
+		for (let tick = 1; tick <= leg.ticks; tick++) {
+			const flee = adventure
+				.tick(player, NEUTRAL_INPUT)
+				.some((event) => event.type === "FLEE");
+			if (flee) flees++;
+			const sample = leg.samples.find((sample) => sample.tick === tick);
+			if (sample) {
+				expect(adventure.snapshot().raven).toEqual(sample.state);
+				expect(flee).toBe(sample.flee);
+				const restored = new Adventure(map);
+				restored.restore(adventure.snapshot());
+				adventure = restored;
+			}
+		}
+	}
+	expect(flees).toBe(14);
+	expect(adventure.ravenDone).toBe(true);
+	expect(other.snapshot().raven.index).toBe(0);
+	expect(other.ravenDone).toBe(false);
+	expect(
+		adventure.tick(new Simulation(map).snapshot(), NEUTRAL_INPUT),
+	).not.toContainEqual({ type: "FLEE", id: "raven" });
+});
+
+test("white raven follows seventeen Main Babe perches without rewards or changing the ending", () => {
+	let adventure = new Adventure(map);
+	const other = new Adventure(map);
+	let flees = 0;
+	for (const leg of whiteRavenTrace.legs) {
+		const player = { ...new Simulation(map).snapshot(), ...leg.player };
+		for (let tick = 1; tick <= leg.ticks; tick++) {
+			const flee = adventure
+				.tick(player, NEUTRAL_INPUT)
+				.some((event) => event.type === "FLEE" && event.id === "whiteRaven");
+			if (flee) flees++;
+			const sample = leg.samples.find((sample) => sample.tick === tick);
+			if (sample) {
+				expect(adventure.snapshot().whiteRaven).toEqual(sample.state);
+				expect(flee).toBe(sample.flee);
+				const restored = new Adventure(map);
+				restored.restore(adventure.snapshot());
+				adventure = restored;
+			}
+		}
+	}
+	expect(flees).toBe(17);
+	expect(adventure.snapshot().whiteRaven.done).toBe(true);
+	expect(adventure.ravenDone).toBe(false);
+	expect(adventure.completed).toBe(false);
+	expect(adventure.snapshot().flags).toEqual([]);
+	expect(other.snapshot().whiteRaven.index).toBe(0);
+	expect(
+		adventure.tick(
+			{
+				...new Simulation(map).snapshot(),
+				...whiteRavenTrace.legs[16]?.player,
+			},
+			NEUTRAL_INPUT,
+		),
+	).not.toContainEqual({ type: "FLEE", id: "whiteRaven" });
+});
+
+test("white raven restore validates progress and preserves recorded black raven state", () => {
+	const adventure = new Adventure(map),
+		saved = adventure.snapshot();
+	for (const value of [
+		{ index: 17 },
+		{ index: -1 },
+		{ x: NaN },
+		{ flying: "yes" },
+		{ done: true },
+	]) {
+		expect(() =>
+			adventure.restore({
+				...saved,
+				whiteRaven: { ...saved.whiteRaven, ...value },
+			}),
+		).toThrow();
+		expect(adventure.snapshot()).toEqual(saved);
+	}
+	const { whiteRaven: _whiteRaven, ...unrecorded } = saved;
+	adventure.restore(unrecorded);
+	expect(adventure.snapshot()).toEqual(saved);
+});
+
+test("raven restore rejects corrupt state atomically and starts unrecorded progress at the first perch", () => {
+	const adventure = new Adventure(map),
+		saved = adventure.snapshot();
+	for (const value of [
+		{ index: 14 },
+		{ index: -1 },
+		{ x: NaN },
+		{ ticks: 1.5 },
+		{ done: true },
+		{ flying: "yes" },
+	]) {
+		expect(() =>
+			adventure.restore({ ...saved, raven: { ...saved.raven, ...value } }),
+		).toThrow();
+		expect(adventure.snapshot()).toEqual(saved);
+	}
+	const { raven: _raven, ...unrecorded } = saved;
+	adventure.restore(unrecorded);
+	expect(adventure.snapshot()).toEqual(saved);
+});
 
 function projection(adventure: Adventure) {
 	const state = adventure.snapshot();
@@ -52,7 +231,7 @@ test.each(fixtures.cases)(
 					adventure.tick(player, step.input);
 				}
 			}
-			expect(projection(adventure), fixture.name + "/" + index).toEqual(
+			expect(projection(adventure), `${fixture.name}/${index}`).toEqual(
 				step.expected,
 			);
 			const restored = new Adventure(map);
@@ -70,7 +249,7 @@ test("restores dialogue atomically and rejects malformed counters and flags", ()
 		adventure.restore({ ...saved, flags: ["UnknownFlag"] }),
 	).toThrow();
 	const invalid = structuredClone(saved);
-	invalid.dialogue.old_man!.ticks = -1;
+	required(invalid.dialogue.old_man).ticks = -1;
 	expect(() => adventure.restore(invalid)).toThrow();
 	expect(adventure.snapshot()).toEqual(saved);
 });
@@ -89,7 +268,7 @@ test("game restore validates every component before applying and copies caller-o
 	const before = game.snapshot();
 	const invalid = structuredClone(before);
 	invalid.physics.x += 10;
-	invalid.adventure.dialogue.old_man!.wait = -1;
+	required(invalid.adventure.dialogue.old_man).wait = -1;
 	expect(() => game.restore(invalid)).toThrow();
 	expect(game.snapshot()).toEqual(before);
 	const saved = structuredClone(before);
@@ -108,24 +287,24 @@ test("full game restores adventure and environment without changing the legitima
 	for (let i = 0; i < 30; i++) game.tick(NEUTRAL_INPUT);
 	for (const [index, action] of route.entries()) {
 		if ("walk" in action) {
-			for (let i = 0; i < action.ticks!; i++)
+			for (let i = 0; i < required(action.ticks); i++)
 				game.tick({
-					left: action.walk! < 0,
-					right: action.walk! > 0,
+					left: required(action.walk) < 0,
+					right: required(action.walk) > 0,
 					jump: false,
 				});
 		} else {
 			game.tick(NEUTRAL_INPUT);
-			for (let i = 0; i < action.charge!; i++)
+			for (let i = 0; i < required(action.charge); i++)
 				game.tick({
-					left: action.charge === 36 && action.direction! < 0,
-					right: action.charge === 36 && action.direction! > 0,
+					left: action.charge === 36 && required(action.direction) < 0,
+					right: action.charge === 36 && required(action.direction) > 0,
 					jump: true,
 				});
 			if (action.charge !== 36)
 				game.tick({
-					left: action.direction! < 0,
-					right: action.direction! > 0,
+					left: required(action.direction) < 0,
+					right: required(action.direction) > 0,
 					jump: false,
 				});
 			for (let i = 0; i < 180; i++) {

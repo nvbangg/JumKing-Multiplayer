@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { required } from "../src/required";
 import { leaveOnline, observeOnline } from "./support/online";
 
 test.skip(
@@ -42,19 +43,14 @@ test("committed Community Finish plays only for its owner and New Game clears th
 					peerFinishes.push(message.payload);
 			});
 		});
-		const name =
-			"ending_peer_" + crypto.randomUUID().replaceAll("-", "").slice(0, 10);
+		const name = `ending_peer_${crypto.randomUUID().replaceAll("-", "").slice(0, 10)}`;
 		await peer.goto("/");
-		await peer
-			.getByRole("button", { name: "Create Account", exact: true })
-			.click();
+		await peer.getByRole("button", { name: "Sign In", exact: true }).click();
 		await peer.getByLabel("Username", { exact: true }).fill(name);
 		await peer
 			.getByLabel("Password", { exact: true })
 			.fill("A secure ending peer password");
-		await peer
-			.getByRole("button", { name: "Create Account", exact: true })
-			.click();
+		await peer.getByRole("button", { name: "Sign In", exact: true }).click();
 		await expect(peer.getByRole("button", { name, exact: true })).toBeVisible();
 		await peer.getByRole("button", { name: "New Game", exact: true }).click();
 		await expect(
@@ -64,17 +60,17 @@ test("committed Community Finish plays only for its owner and New Game clears th
 		await winner.getByRole("button", { name: "Sign In", exact: true }).click();
 		await winner
 			.getByLabel("Username", { exact: true })
-			.fill(process.env.E2E_FINISH_USERNAME!);
+			.fill(required(process.env.E2E_FINISH_USERNAME));
 		await winner
 			.getByLabel("Password", { exact: true })
-			.fill(process.env.E2E_FINISH_PASSWORD!);
+			.fill(required(process.env.E2E_FINISH_PASSWORD));
 		await winner.getByRole("button", { name: "Sign In", exact: true }).click();
 		await winner.getByRole("button", { name: "Continue", exact: true }).click();
 		await expect(
 			winner.getByRole("button", { name: "Skip", exact: true }),
 		).toBeVisible({ timeout: 15_000 });
 		expect(finishEvents).toHaveLength(1);
-		expect(finishEvents[0]!.playId).toBe(process.env.E2E_FINISH_RUN);
+		expect(required(finishEvents[0]).playId).toBe(process.env.E2E_FINISH_RUN);
 		expect(peerFinishes).toEqual([]);
 		expect(
 			(await (await winner.request.get("/api/community/current")).json()).run,
@@ -88,6 +84,7 @@ test("committed Community Finish plays only for its owner and New Game clears th
 		).toHaveLength(1);
 		expect(history[0].status).toBe("FINISHED");
 		expect(history[0].finishTimeMs).toBe(282616);
+		expect(required(finishEvents[0]).ending).toMatchObject({ ravenDone: true });
 		await winner.getByRole("button", { name: "Skip", exact: true }).click();
 		await winner.screenshot({
 			path: info.outputPath("community-ending-picture.png"),

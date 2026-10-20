@@ -53,7 +53,7 @@ const routes: Partial<Record<Screen, string>> = {
 	register: "/register",
 };
 const REMOVED_FROM_ROOM =
-	"You were removed from the room. If you had an active Community run it was saved; use Continue to resume.";
+	"Your room membership has ended. For Community, use Continue to load the last server checkpoint.";
 function locationScreen(): Screen {
 	return typeof location === "undefined"
 		? "home"

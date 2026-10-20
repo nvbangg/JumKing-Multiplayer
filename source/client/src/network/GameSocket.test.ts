@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { required } from "../required";
 import { NETWORK } from "./config";
 import { GameSocket } from "./GameSocket";
-import { loadReconnect } from "./reconnect";
+import { clearReconnect, loadReconnect } from "./reconnect";
 
 vi.mock("./reconnect", () => ({
 	clearReconnect: vi.fn(async () => {}),
@@ -488,3 +488,36 @@ test("Reconnect resolves once the server restores the membership", async () => {
 	expect(game.selfId).toBe("self");
 	game.close();
 });
+
+test.each(["RECONNECT_EXPIRED", "ROOM_NOT_FOUND"])(
+	"Reconnect clears stored context and rejects when the server reports %s",
+	async (code) => {
+		vi.mocked(clearReconnect).mockClear();
+		const game = new GameSocket(vi.fn(), vi.fn()),
+			restoring = game.restore("profile"),
+			socket = required(Socket.instances.at(-1));
+		socket.open();
+		await restoring;
+		vi.mocked(loadReconnect).mockResolvedValueOnce({
+			roomId: "ABCDEF",
+			playerId: "11111111-1111-4111-8111-111111111111",
+			reconnectToken: "token",
+		});
+		const attempt = game.reconnect();
+		const rejected = expect(attempt).rejects.toMatchObject({
+			code: "RECONNECT_EXPIRED",
+		});
+		await vi.waitFor(() => expect(socket.sent).toHaveLength(1));
+		const request = JSON.parse(required(socket.sent[0]));
+		socket.receive({
+			v: 1,
+			type: "ERROR",
+			requestId: request.requestId,
+			payload: { code, message: "Membership has ended" },
+		});
+		await rejected;
+		expect(clearReconnect).toHaveBeenCalledExactlyOnceWith("profile");
+		expect(game.selfId).toBeNull();
+		game.close();
+	},
+);

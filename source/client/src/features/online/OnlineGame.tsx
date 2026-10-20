@@ -104,8 +104,8 @@ export function OnlineGame({
 	latestRoom.current = room;
 	const removedNotice =
 		room.kind === "COMMUNITY"
-			? "You were removed from the room after being away too long. Your run was saved; use Continue to resume."
-			: "You were removed from the room after being away too long.";
+			? "Your room membership has ended. Continue will use the last server checkpoint."
+			: "Your room membership has ended.";
 	// Lệnh bị từ chối khi membership đã kết thúc ở server thì về trang chủ, không kẹt ở menu.
 	const reportFailure = async (cause: unknown, fallback: string) => {
 		const ended = await socket.command("GET_ROOM_STATE").then(

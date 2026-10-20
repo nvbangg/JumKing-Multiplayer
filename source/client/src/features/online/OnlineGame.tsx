@@ -3,6 +3,7 @@ import rules from "../../../../common/rules.json";
 import { ControlsHelp } from "../../components/ControlsHelp";
 import { MenuPanel } from "../../components/MenuPanel";
 import { NetworkStatusBadge } from "../../components/NetworkStatusBadge";
+import { TutorialGuide } from "../../components/TutorialGuide";
 import { loadManifest } from "../../game/content/assets";
 import { FlightToggle } from "../../game/input/FlightToggle";
 import { InputController } from "../../game/input/InputController";
@@ -29,17 +30,27 @@ import { PlayersPanel } from "../rooms/PlayersPanel";
 import { useRoomChat } from "../rooms/useRoomChat";
 import { OptionsButtons } from "../settings/OptionsPanel";
 import { type Options, readOptions, saveOptions } from "../settings/options";
+import {
+	isTutorialCompleted,
+	nextTutorialStep,
+	saveTutorialCompleted,
+	type TutorialStep,
+} from "./tutorial";
 
 export function OnlineGame({
 	socket,
 	room,
 	navigationError,
+	accountId,
+	totalJumps,
 	onHome,
 	onResults,
 }: {
 	socket: GameSocket;
 	room: RoomState;
 	navigationError: string;
+	accountId?: string;
+	totalJumps?: number;
 	onHome: (message: string) => void;
 	onResults: () => void;
 }) {
@@ -76,6 +87,17 @@ export function OnlineGame({
 	}, [socket]);
 	const [ending, setEnding] = useState<"playing" | "picture" | null>(null),
 		[pictureReady, setPictureReady] = useState(false);
+	const [tutorialStep, setTutorialStep] = useState<TutorialStep | null>(() =>
+		isTutorialCompleted(accountId, totalJumps) ? null : "move",
+	);
+	const tutorialRef = useRef<TutorialStep | null>(tutorialStep);
+	tutorialRef.current = tutorialStep;
+	const tutorialOriginX = useRef<number | null>(null);
+	const dismissTutorial = () => {
+		tutorialRef.current = null;
+		setTutorialStep(null);
+		saveTutorialCompleted(accountId);
+	};
 	const endingActive = useRef(false),
 		skipEnding = useRef<(() => void) | null>(null);
 	const chat = useRoomChat(
@@ -303,6 +325,20 @@ export function OnlineGame({
 						setMenu("pause");
 						audio.current?.pause(true);
 					}
+					if (tutorialRef.current) {
+						if (tutorialOriginX.current === null)
+							tutorialOriginX.current = state.x;
+						const next = nextTutorialStep(
+							tutorialRef.current,
+							state,
+							tutorialOriginX.current,
+						);
+						if (next !== tutorialRef.current) {
+							tutorialRef.current = next;
+							setTutorialStep(next);
+							if (next === "completed") saveTutorialCompleted(accountId);
+						}
+					}
 				},
 				config.features.flyEnabled,
 				(message) => {
@@ -515,6 +551,14 @@ export function OnlineGame({
 			{ready && !ending && !menu && !chat.open && (
 				<TouchControls input={input} flying={flying} />
 			)}
+			{ready &&
+				!ending &&
+				!menu &&
+				!chat.open &&
+				(room.kind !== "ROOM" || room.state === "PLAYING") &&
+				tutorialStep && (
+					<TutorialGuide step={tutorialStep} onDismiss={dismissTutorial} />
+				)}
 			{ending && (
 				<div className="ending-actions">
 					{ending === "playing" ? (

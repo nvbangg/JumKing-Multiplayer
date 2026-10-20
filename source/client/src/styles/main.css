@@ -887,3 +887,84 @@ output.room-code {
 .update-notice p {
 	margin: 0 0 8px;
 }
+
+.tutorial-guide {
+	position: absolute;
+	top: max(48px, calc(env(safe-area-inset-top) + 40px));
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 25;
+	background: #08090cf2;
+	border: 1px solid #bfa15f;
+	outline: 2px solid #26231a;
+	padding: 10px 16px;
+	border-radius: 6px;
+	max-width: min(90vw, 440px);
+	width: max-content;
+	box-shadow: 0 4px 16px #000c;
+	pointer-events: none;
+}
+
+.tutorial-guide button {
+	pointer-events: auto;
+}
+
+.tutorial-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 16px;
+	margin-bottom: 4px;
+}
+
+.tutorial-title {
+	font-weight: bold;
+	color: #ede7d3;
+	font-size: 0.9rem;
+	letter-spacing: 0.5px;
+}
+
+.tutorial-dismiss {
+	background: transparent;
+	border: 1px solid #72684d;
+	color: #b2a484;
+	font-size: 0.75rem;
+	padding: 2px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.tutorial-dismiss:hover {
+	background: #3a3222;
+	color: #fff;
+	border-color: #bfa15f;
+}
+
+.tutorial-hint {
+	margin: 0;
+	color: #d1c7b7;
+	font-size: 0.82rem;
+	line-height: 1.35;
+}
+
+.tutorial-hint.touch-only {
+	display: none;
+}
+
+.tutorial-hint.desktop-only {
+	display: block;
+}
+
+@media (pointer: coarse), (max-width: 680px) {
+	.tutorial-hint.desktop-only {
+		display: none;
+	}
+	.tutorial-hint.touch-only {
+		display: block;
+	}
+	.tutorial-guide {
+		top: auto;
+		bottom: 96px;
+		font-size: 0.8rem;
+	}
+}

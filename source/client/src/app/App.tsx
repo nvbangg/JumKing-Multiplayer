@@ -409,6 +409,8 @@ export function App() {
 					room={room}
 					socket={socket.current}
 					navigationError={navigationError}
+					accountId={accountId}
+					totalJumps={home?.statistics.totalJumps}
 					onResults={() => {
 						viewedEnding.current = resultRef.current?.playId || null;
 						setScreen("results");

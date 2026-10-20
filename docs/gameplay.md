@@ -21,6 +21,8 @@ Community chỉ có chế độ bình thường; Continue chỉ dành cho lượ
 | Cảm ứng | Trái/phải và giữ/thả Jump; nhận đồng thời hướng và Jump |
 | Tay cầm | D-pad/analog trái, A để nhảy, Start mở menu |
 
+Người chơi lần đầu (chưa có lượt nhảy nào hoặc chưa hoàn thành hướng dẫn trên thiết bị) được hiển thị bảng hướng dẫn thao tác từng bước trực quan (di chuyển ➔ giữ phím tích lực ➔ thả để nhảy). Người chơi hoàn thành các bước hoặc chọn Skip sẽ ghi nhận trạng thái vào `localStorage` theo tài khoản và không hiển thị lại ở các lần chơi tiếp theo.
+
 Giá trị native tại timestep trong [architecture](architecture.md#xử-lý-đồng-thời):
 
 | Thông số | Giá trị |

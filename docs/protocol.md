@@ -161,6 +161,8 @@ ACK và state lấy cùng tick. Client restore snapshot mới hơn, bỏ frames 
 
 Control timeout: GET_ROOM_STATE/reconnect, không tự gửi lại Start/New Run/End. Duplicate requestId trả kết quả cũ; New Run kiểm tra thêm expectedRunId. Bỏ message socket/context cũ; đóng connection phải kết thúc pending promises.
 
+Client hết chỗ chứa input chưa ACK phải đi qua cùng luồng mất kết nối như socket lỗi: dừng input, phát CONNECTION_CLOSED và mở menu Reconnect/Back to Menu. Không dùng Resume hoặc Save & Exit trên socket đã đóng. Back to Menu khi mất kết nối về màn hình chính mà không chờ Leave; giữ context reconnect và báo chưa xác nhận lưu. Không coi thao tác này là Leave thành công hoặc SAVED; Continue dùng checkpoint server. Reconnect thành công nhận state/generation mới trước khi Resume.
+
 Nhóm error codes: INVALID_MESSAGE/INVALID_INPUT/INVALID_SETTINGS, AUTH_REQUIRED/ACCOUNT_REQUIRED, ROOM_NOT_FOUND/ROOM_FULL/ROOM_NOT_JOINABLE/ALREADY_IN_ROOM/HOST_ONLY/NOT_ENOUGH_PLAYERS, STALE_PLAY/STALE_INPUT, INVALID_RECONNECT/RECONNECT_EXPIRED, SAVE_FAILED/CONFLICT/RATE_LIMITED/INTERNAL_ERROR.
 
 ## Mở rộng dữ liệu hiển thị

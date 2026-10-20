@@ -408,11 +408,16 @@ export function App() {
 					viewedEnding.current = resultRef.current?.playId || null;
 					setScreen("results");
 				}}
-				onHome={() => {
+				onHome={(message) => {
 					setNavigationError("");
 					socket.current?.close();
 					socket.current = null;
 					setRoom(null);
+					setResult(null);
+					resultRef.current = null;
+					exitScreen.current = null;
+					setError(message);
+					setHomeRevision((value) => value + 1);
 					setScreen("home");
 					clearCsrf();
 					const expectedIdentityRevision = identityRevision.current;

@@ -668,11 +668,13 @@ export function OnlineGame({
 								</button>
 								{room.kind === "COMMUNITY" && (
 									<small role="status">
-										{saveStatus === "SAVED"
-											? "Saved"
-											: saveStatus === "FAILED"
-												? "Save failed"
-												: "Saving…"}
+										{disconnected
+											? "Latest save unconfirmed"
+											: saveStatus === "SAVED"
+												? "Saved"
+												: saveStatus === "FAILED"
+													? "Save failed"
+													: "Saving…"}
 									</small>
 								)}
 								<ControlsHelp />

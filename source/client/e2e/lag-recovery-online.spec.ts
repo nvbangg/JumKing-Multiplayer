@@ -80,6 +80,10 @@ for (const kind of ["COMMUNITY", "ROOM"] as const) {
 				page.getByRole("heading", { name: "Disconnected", exact: true }),
 			).toBeVisible({ timeout: 15000 });
 			await expect(page.getByRole("alert")).toContainText("too far behind");
+			if (kind === "COMMUNITY")
+				await expect(
+					page.getByText("Latest save unconfirmed", { exact: true }),
+				).toBeVisible();
 			await expect(
 				page.getByRole("button", { name: "Resume", exact: true }),
 			).toHaveCount(0);

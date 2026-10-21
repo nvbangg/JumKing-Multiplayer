@@ -1,5 +1,6 @@
 import { expect, test, vi } from "vitest";
 import mapData from "../../../../common/maps/main-babe.json";
+import { NETWORK } from "../../network/config";
 import { GameSocket, type RoomState } from "../../network/GameSocket";
 import { required } from "../../required";
 import { GameSimulation } from "../simulation/GameSimulation";
@@ -53,6 +54,48 @@ function snapshot(
 		peers: [],
 	};
 }
+test("missing acknowledgements stops input and requests disconnect; a new generation resumes cleanly", () => {
+	const socket = new GameSocket(
+		() => {},
+		() => {},
+	);
+	const fail = vi.spyOn(socket, "fail"),
+		send = vi.spyOn(socket, "input");
+	const failed = vi.fn();
+	socket.selfId = "self";
+	socket.playContext = { playId: "run", generation: 1 };
+	const game = new GameSimulation(map);
+	const runtime = new OnlineRuntime(
+		map,
+		socket,
+		room,
+		() => right,
+		() => {},
+		false,
+		failed,
+	);
+	runtime.receive(snapshot(game, 1, 0) as unknown as Record<string, unknown>);
+	for (let index = 0; index <= NETWORK.maxInputFrames; index++)
+		runtime.advance(1000 / 60);
+	expect(runtime.menu).toBe(true);
+	expect(fail).toHaveBeenCalledExactlyOnceWith(
+		expect.stringContaining("too far behind"),
+	);
+	expect(failed).toHaveBeenCalledOnce();
+	const sent = send.mock.calls.length;
+	runtime.advance(100);
+	expect(send).toHaveBeenCalledTimes(sent);
+	socket.playContext = { playId: "run", generation: 2 };
+	runtime.receive(
+		snapshot(game, 2, 0, 2) as unknown as Record<string, unknown>,
+	);
+	runtime.menu = false;
+	runtime.advance(1000 / 60);
+	expect(send).toHaveBeenLastCalledWith(
+		"PLAYER_INPUT",
+		expect.objectContaining({ generation: 2, seq: 1 }),
+	);
+});
 test("online ending waits for the private committed notice and matching finished snapshot", () => {
 	const socket = new GameSocket(
 		() => {},
@@ -73,7 +116,7 @@ test("online ending waits for the private committed notice and matching finished
 		playerId: "self",
 		playId: "run",
 		showEnding: true,
-		ending: { screen: 42 },
+		ending: { screen: 42, ravenDone: true },
 	};
 	runtime.receive(snapshot(game, 1, 0) as unknown as Record<string, unknown>);
 	runtime.finish({ ...notice, playerId: "other" });
@@ -84,9 +127,17 @@ test("online ending waits for the private committed notice and matching finished
 	finished.self.status = "FINISHED";
 	finished.self.paused = true;
 	runtime.receive(finished as unknown as Record<string, unknown>);
-	expect(runtime.frame().ending).toEqual({ id: "run", screen: 42 });
+	expect(runtime.frame().ending).toEqual({
+		id: "run",
+		screen: 42,
+		ravenDone: true,
+	});
 	runtime.finish(notice);
-	expect(runtime.frame().ending).toEqual({ id: "run", screen: 42 });
+	expect(runtime.frame().ending).toEqual({
+		id: "run",
+		screen: 42,
+		ravenDone: true,
+	});
 	socket.playContext = { playId: "next", generation: 2 };
 	runtime.receive({
 		...snapshot(game, 3, 0, 2),

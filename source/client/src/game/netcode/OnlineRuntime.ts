@@ -110,7 +110,13 @@ export class OnlineRuntime implements GameRuntime {
 			ending.screen !== this.game.physics.map.finish.screen
 		)
 			throw new Error("Invalid ending state");
-		this.ending ??= { id: payload.playId, screen: required(ending.screen) };
+		if (ending.ravenDone !== undefined && typeof ending.ravenDone !== "boolean")
+			throw new Error("Invalid ending state");
+		this.ending ??= {
+			id: payload.playId,
+			screen: required(ending.screen),
+			ravenDone: ending.ravenDone === true,
+		};
 	}
 	receive(payload: Record<string, unknown>): void {
 		const value = payload as unknown as OnlineSnapshot;
@@ -199,10 +205,10 @@ export class OnlineRuntime implements GameRuntime {
 				this.prediction.push(seq, input);
 			} catch (cause) {
 				this.menu = true;
-				this.socket.close();
-				this.failed(
-					cause instanceof Error ? cause.message : "Input queue is full",
-				);
+				const message =
+					cause instanceof Error ? cause.message : "Input queue is full";
+				this.socket.fail(message);
+				this.failed(message);
 				return;
 			}
 			this.socket.input("PLAYER_INPUT", {

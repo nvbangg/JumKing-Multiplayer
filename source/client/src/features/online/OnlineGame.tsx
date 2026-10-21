@@ -13,7 +13,8 @@ import { PlayerEffects } from "../../game/netcode/PlayerEffects";
 import { AudioBus } from "../../game/presentation/AudioBus";
 import { PRESENTATION } from "../../game/presentation/config";
 import { parseMap } from "../../game/simulation/map";
-import { api } from "../../network/api";
+import { PHYSICS } from "../../game/simulation/tuning";
+import { ApiError, api } from "../../network/api";
 import type {
 	GameConfig,
 	NetworkQuality,
@@ -39,10 +40,10 @@ export function OnlineGame({
 	socket: GameSocket;
 	room: RoomState;
 	navigationError: string;
-	onHome: () => void;
+	onHome: (message: string) => void;
 	onResults: () => void;
 }) {
-	const container = useRef<HTMLElement>(null),
+	const container = useRef<HTMLDivElement>(null),
 		runtime = useRef<OnlineRuntime | null>(null),
 		input = useRef<InputController | null>(null),
 		audio = useRef<AudioBus | null>(null);
@@ -58,6 +59,13 @@ export function OnlineGame({
 		[saveStatus, setSaveStatus] = useState("SAVED");
 	const [remaining, setRemaining] = useState<number | null>(null);
 	const [players, setPlayers] = useState<PlayerStanding[]>([]);
+	const [caption, setCaption] = useState<{
+		id: string;
+		name: string;
+		delayMs: number;
+	} | null>(null);
+	const [chatCollapsed, setChatCollapsed] = useState(false),
+		[leaderboardCollapsed, setLeaderboardCollapsed] = useState(false);
 	const [disconnected, setDisconnected] = useState(false);
 	const [networkQuality, setNetworkQuality] = useState<NetworkQuality>(() =>
 		socket.getNetworkQuality(),
@@ -74,6 +82,7 @@ export function OnlineGame({
 		socket,
 		ready && !ending,
 		() => {
+			setChatCollapsed(false);
 			runtime.current?.cancel();
 			flight.current?.cancel();
 			input.current?.cancel();
@@ -93,6 +102,19 @@ export function OnlineGame({
 	}, [ending]);
 	const latestRoom = useRef(room);
 	latestRoom.current = room;
+	const removedNotice =
+		room.kind === "COMMUNITY"
+			? "Your room membership has ended. Continue will use the last server checkpoint."
+			: "Your room membership has ended.";
+	// Lệnh bị từ chối khi membership đã kết thúc ở server thì về trang chủ, không kẹt ở menu.
+	const reportFailure = async (cause: unknown, fallback: string) => {
+		const ended = await socket.command("GET_ROOM_STATE").then(
+			(reply) => !reply.payload.roomId,
+			() => false,
+		);
+		if (ended) onHome(removedNotice);
+		else setError(cause instanceof Error ? cause.message : fallback);
+	};
 	const pauseRef = useRef<() => void>(() => {});
 	const pause = () => {
 		if (endingActive.current) {
@@ -110,7 +132,7 @@ export function OnlineGame({
 			setSaveStatus("PENDING");
 			void socket
 				.command("SET_COMMUNITY_PAUSED", { paused: true })
-				.catch((cause) => setError(cause.message));
+				.catch((cause) => reportFailure(cause, "Pause failed"));
 		}
 	};
 	pauseRef.current = pause;
@@ -194,7 +216,9 @@ export function OnlineGame({
 									? "audio/music/event_music/ending_jingle"
 									: cueManifest.walls.find((wall) => wall.id === cue.id)
 											?.appearSound || "audio/illusion"
-								: "audio/talking";
+								: cue.type === "FLEE"
+									? "audio/event_sfx/bird_fly"
+									: "audio/talking";
 						audio.current?.play(key);
 					}
 				}
@@ -225,7 +249,11 @@ export function OnlineGame({
 					audio.current?.pause(true);
 					setDisconnected(true);
 					setMenu("pause");
-					setError("Disconnected from the game server");
+					setError(
+						typeof payload.message === "string"
+							? payload.message
+							: "Disconnected from the game server",
+					);
 				}
 				if (type === "RECONNECT_OK") {
 					setDisconnected(false);
@@ -263,6 +291,24 @@ export function OnlineGame({
 					setRemaining(snapshot.remainingTimeMs);
 					setFlying(state.freeFlight);
 					setPlayers(snapshot.players || []);
+					const intro = snapshot.self.simulation.world.regionIntro;
+					if (intro) {
+						const id = `${snapshot.playId}:${intro.screen}:${intro.tick}`;
+						const age =
+							((snapshot.self.simulation.physics.ticks - intro.tick) * 1000) /
+							PHYSICS.tickRate;
+						setCaption((previous) =>
+							age >= PRESENTATION.regionCaptionMs
+								? null
+								: previous?.id === id
+									? previous
+									: {
+											id,
+											name: manifest.screens[intro.screen]?.location || "",
+											delayMs: -age,
+										},
+						);
+					}
 					audio.current?.setScreen(state.screen);
 					if (snapshot.self.paused && !session.menu) {
 						session.menu = true;
@@ -373,7 +419,7 @@ export function OnlineGame({
 			try {
 				await socket.command("SET_COMMUNITY_PAUSED", { paused: false });
 			} catch (cause) {
-				setError(cause instanceof Error ? cause.message : "Resume failed");
+				await reportFailure(cause, "Resume failed");
 				return;
 			} finally {
 				setPending(false);
@@ -396,13 +442,33 @@ export function OnlineGame({
 		}
 	};
 	const displayedError = navigationError || error;
+	const captionPaused =
+		!!menu || !!ending || disconnected || room.state === "COUNTDOWN";
 	return (
-		<main className="play-page">
-			<section
-				className="game-viewport"
-				ref={container}
-				aria-label="Online Main Babe game"
-			/>
+		<main
+			className="play-page"
+			data-chat-collapsed={chatCollapsed}
+			data-leaderboard-collapsed={leaderboardCollapsed}
+		>
+			<section className="game-viewport" aria-label="Online Main Babe game">
+				{/* Phaser quản lý canvas; React giữ overlay ở phần tử anh em. */}
+				<div className="game-surface" ref={container} />
+				{ready && caption?.name && !ending && (
+					<output
+						key={caption.id}
+						className="region-caption"
+						aria-label="Current region"
+						style={{
+							visibility: captionPaused ? "hidden" : "visible",
+							animationPlayState: captionPaused ? "paused" : "running",
+							animationDuration: `${PRESENTATION.regionCaptionMs}ms`,
+							animationDelay: `${caption.delayMs}ms`,
+						}}
+					>
+						{caption.name}
+					</output>
+				)}
+			</section>
 			{!ready && !displayedError && (
 				<p className="game-message" role="status">
 					Loading…
@@ -493,6 +559,43 @@ export function OnlineGame({
 				</div>
 			)}
 			{ready && !ending && <ChatOverlay chat={chat} socket={socket} />}
+			{ready && !ending && !menu && (
+				<>
+					<button
+						type="button"
+						className="mobile-panel-toggle mobile-chat-toggle"
+						aria-label={chatCollapsed ? "Show chat" : "Collapse chat"}
+						title={chatCollapsed ? "Show chat" : "Collapse chat"}
+						aria-expanded={!chatCollapsed}
+						onClick={() => {
+							chat.closeChat();
+							setChatCollapsed((value) => !value);
+						}}
+					>
+						{chatCollapsed ? "›" : "‹"}
+					</button>
+					{room.kind === "COMMUNITY" && (
+						<button
+							type="button"
+							className="mobile-panel-toggle mobile-leaderboard-toggle"
+							aria-label={
+								leaderboardCollapsed
+									? "Show leaderboard"
+									: "Collapse leaderboard"
+							}
+							title={
+								leaderboardCollapsed
+									? "Show leaderboard"
+									: "Collapse leaderboard"
+							}
+							aria-expanded={!leaderboardCollapsed}
+							onClick={() => setLeaderboardCollapsed((value) => !value)}
+						>
+							{leaderboardCollapsed ? "‹" : "›"}
+						</button>
+					)}
+				</>
+			)}
 			{ready && !ending && (
 				<aside className="in-game-panels">
 					<PlayersPanel players={players} selfId={socket.selfId} />
@@ -524,13 +627,31 @@ export function OnlineGame({
 												setPending(true);
 												void socket
 													.reconnect()
-													.catch((cause) => setError(cause.message))
+													.catch((cause) => {
+														if (
+															cause instanceof ApiError &&
+															["RECONNECT_EXPIRED", "ROOM_NOT_FOUND"].includes(
+																cause.code,
+															)
+														)
+															onHome(removedNotice);
+														else setError(cause.message);
+													})
 													.finally(() => setPending(false));
 											}}
 										>
 											Reconnect
 										</button>
-										<button type="button" onClick={onHome}>
+										<button
+											type="button"
+											onClick={() =>
+												onHome(
+													room.kind === "COMMUNITY"
+														? "Disconnected. Latest save could not be confirmed. Continue will use the last server checkpoint."
+														: "Disconnected. Your departure could not be confirmed by the server.",
+												)
+											}
+										>
 											Back to Menu
 										</button>
 									</>
@@ -569,11 +690,13 @@ export function OnlineGame({
 								</button>
 								{room.kind === "COMMUNITY" && (
 									<small role="status">
-										{saveStatus === "SAVED"
-											? "Saved"
-											: saveStatus === "FAILED"
-												? "Save failed"
-												: "Saving…"}
+										{disconnected
+											? "Latest save unconfirmed"
+											: saveStatus === "SAVED"
+												? "Saved"
+												: saveStatus === "FAILED"
+													? "Save failed"
+													: "Saving…"}
 									</small>
 								)}
 								<ControlsHelp />

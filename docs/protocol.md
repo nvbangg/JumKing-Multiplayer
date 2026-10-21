@@ -12,9 +12,13 @@ Account dùng Spring Security server-side session, không JWT. Cookies HttpOnly,
 
 HTTP dùng credentials:include và CSRF trước mutation. Login/Register đổi session ID/CSRF; Logout hoặc đổi mật khẩu hủy session. Đổi mật khẩu yêu cầu Account, currentPassword/newPassword, validate/hash như Register; chỉ trả thành công sau commit và thu hồi các phiên/socket của Account. Chưa có khôi phục mật khẩu.
 
-CORS nhận origins cụ thể, preflight trước authentication. WS yêu cầu Account và Origin trong allowlist; không tin tên/owner do client gửi. Login Account khác khi còn membership bị từ chối; đăng nhập lại đúng Account để reconnect vẫn cần token cũ. Session idle 30 phút, absolute 24 giờ; HTTP/WS cùng kiểm tra, heartbeat không gia hạn idle. Hết session xử lý như disconnect, không xóa dữ liệu đã lưu.
+CORS nhận origins cụ thể, preflight trước authentication. WS yêu cầu Account và Origin trong allowlist; không tin tên/owner do client gửi. Login Account khác khi còn membership bị từ chối; đăng nhập lại đúng Account để reconnect vẫn cần token cũ. Session idle và absolute đều 30 ngày; cookie giữ 30 ngày kể cả khi đóng trình duyệt; HTTP/WS cùng kiểm tra, heartbeat không gia hạn idle. Hết session xử lý như disconnect, không xóa dữ liệu đã lưu.
 
-Register/Login/Change Password: 20 requests/phút/IP và identity, đổi session không reset quota IP. Password BCrypt; lỗi credentials không tiết lộ Account tồn tại. Reconnect token ngẫu nhiên 256 bit, so sánh constant-time, hết hiệu lực khi membership kết thúc; không đặt secrets vào URL/logs/broadcast.
+Production lưu HTTP session qua restart bình thường bằng file ngoài JAR, cấu hình theo [deployment](deployment.md#giữ-phiên-khi-deploy). Mốc tạo/hoạt động được lưu cùng phiên và phục hồi vào registry trước khi ứng dụng sẵn sàng; restart không gia hạn idle/absolute. Phiên thiếu metadata thời hạn bị từ chối. Logout/đổi mật khẩu vẫn thu hồi phiên, kể cả phiên đã khôi phục chưa nhận request mới. Đây là phiên đăng nhập, không phải trạng thái trận Room trong RAM.
+
+Frontend phát hiện bản mới qua static `/version.json` (không cookie, không gia hạn session), khi mở web, focus/hiện tab và mỗi 60 giây lúc tab hiển thị. Khi khác mã build, báo `New version available`; chỉ cho bấm reload tại màn hình chính khi không còn membership/lệnh đang thực hiện. Không tự reload giữa trận. Lỗi mạng khi kiểm tra không chặn chơi; lỗi tải dynamic chunk cho phép reload thủ công tại màn hình chính. Không thay contract WebSocket.
+
+Register/Login/Change Password: 20 requests/phút/IP và identity, đổi session không reset quota IP. Password BCrypt; sai mật khẩu trả INVALID_CREDENTIALS, không sửa mật khẩu hoặc tạo Account khác. Reconnect token ngẫu nhiên 256 bit, so sánh constant-time, hết hiệu lực khi membership kết thúc; không đặt secrets vào URL/logs/broadcast.
 
 Client giữ context reconnect (roomId/playerId/token) trong IndexedDB theo backend origin và identity để quay lại sau disconnect; xóa khi Leave đã xác nhận hoặc server báo hết hạn. Chủ động rời page gửi `LEAVE_ROOM` qua socket hiện có; không đóng socket trước `ROOM_LEFT` khi còn có thể chờ. Frame từ `pagehide` không bảo đảm được nhận trước khi browser đóng page; trường hợp đó vẫn dùng grace/reconnect hiện có, không suy diễn mọi socket close thành Leave. Không chia sẻ token qua room code.
 
@@ -29,7 +33,7 @@ Các path có prefix `/api`. Auth/private responses dùng Cache-Control:no-store
 | GET /auth/csrf | → {token,headerName} |
 | GET /auth/me | → {authenticated,account:null hoặc {id,username,crownUnlocked}}; id là chuỗi ID của chính Account |
 | POST /auth/register | {username,password} → me |
-| POST /auth/login | {username,password} → me |
+| POST /auth/login | {username,password} → me; chưa có username thì tạo Account theo validation Register, đã có thì xác thực mật khẩu |
 | POST /auth/password | Account + CSRF; {currentPassword,newPassword} → {ok:true}; thu hồi các phiên sau commit |
 | POST /auth/logout | → {ok:true} |
 | GET /game-config | → {features:{flyEnabled:boolean}} |
@@ -41,6 +45,8 @@ Các path có prefix `/api`. Auth/private responses dùng Cache-Control:no-store
 | GET /history?page=0&size=20 | Account → {items,page,size,hasNext}; History đã kết thúc theo data |
 | GET /history/{kind}/{id} | Owner → History detail; kind=COMMUNITY/ROOM, id là run ID hoặc match ID |
 | GET /profile/me | Account → {username,total} |
+
+Sign In dùng chung luồng đăng nhập/tạo Account. Username trùng khi tạo đồng thời phải xác thực mật khẩu của Account đã được tạo, không ghi đè. Session đã đăng nhập không được tự tạo Account khác; đổi Account khi còn membership vẫn bị từ chối.
 
 HTTP JSON body tối đa 16 KiB. Register: username 3–32 letters/numbers/_/-, password ≥6 Unicode code points và ≤72 UTF-8 bytes. Tên online lấy từ username đã xác thực, không nhận nickname từ client; playerId phân biệt người chơi.
 
@@ -130,7 +136,7 @@ Client nhận diện nhấn đúp khi cấu hình cho phép Fly Mode và gửi f
 | COMMUNITY_RUN_STATE | {run:RunSummary,generation,paused,pausePending,saveStatus} |
 | PLAYER_EFFECTS | {roomId,events:[{eventSeq,playerId,playId,screen,effect,terrain}]} |
 | ADVENTURE_EVENTS | {roomId,playId,events:[{eventSeq,kind,type,id}]}; chỉ owner, kind=ADVENTURE/WORLD, nội dung hiển thị tra tại client |
-| PLAYER_FINISHED | {playerId,playId,result,showEnding,ending:{screen}}; sau commit, riêng người Finish ở Community hoặc winners ở Room; result tương ứng RunSummary/MatchResult |
+| PLAYER_FINISHED | {playerId,playId,result,showEnding,ending:{screen,ravenDone}}; sau commit, riêng người Finish ở Community hoặc winners ở Room; result tương ứng RunSummary/MatchResult |
 | GAME_FINISHED | {playId,mapLevel,reason,durationMs,results,saveStatus}; Room broadcast |
 | SAVE_STATUS | {playId,revision,saveStatus}; chỉ owner checkpoint hoặc members của match |
 | CHAT_MESSAGE / CHAT_HISTORY | {roomId,messages:[{id,playerId,nickname,text,sentAt,colorSlot}]}; client bỏ chat từ sảnh cũ |
@@ -145,7 +151,7 @@ self gồm lastProcessedInputSeq, status, metrics và full simulation để rest
 
 players=[{playerId,nickname,colorSlot,rank,currentProgress}] gồm các thành viên còn trong phòng, tối đa capacity. Server tính từ cùng state RAM với snapshot; Room dùng comparator mode, Community chỉ so độ cao hiện tại. Giữ đồng hạng, ID chỉ ổn định thứ tự; không truy vấn database theo tick.
 
-adventure gồm ID/counters tiến độ hội thoại. Vương miện là ngoại hình profile tự cấp theo data, không có lệnh trang bị. Client dựng nội dung theo [architecture](architecture.md#công-nghệ-và-trách-nhiệm); thay đổi state phải do server xác nhận.
+adventure gồm ID/counters tiến độ hội thoại và state quạ riêng của owner; không gửi state quạ cho peers. Cue FLEE phát tiếng quạ một lần, không phát lại khi reconciliation. Vương miện là ngoại hình profile tự cấp theo data, không có lệnh trang bị. Client dựng nội dung theo [architecture](architecture.md#công-nghệ-và-trách-nhiệm); thay đổi state phải do server xác nhận.
 
 Results={playerId,nickname,status,rank,currentProgress,maxProgress,isWinner,finishTimeMs}; nickname giữ lúc Join để Results vẫn hiển thị đúng người đã Leave. Status/reason/saveStatus theo data; SAVE_STATUS Room có revision=null. Server chốt metrics và showEnding theo gameplay.
 
@@ -158,6 +164,8 @@ Client gửi full input frame mỗi tick, kể cả không đổi phím. Server 
 ACK và state lấy cùng tick. Client restore snapshot mới hơn, bỏ frames đã ACK rồi replay frames còn lại. Peers dùng bộ đệm theo serverTick, mặc định trễ hiển thị 100 ms để hấp thụ jitter; hiệu chỉnh clock từ từ, không extrapolate, không nội suy xuyên screen/respawn. Các giá trị tập trung tại network/config.ts. Replay không phát lại âm thanh, hội thoại hoặc ending. Pause yêu cầu cancel/xóa queued input; pausePending không nhận movement mới. Resume Community trả full state và generation mới. Room không có Pause; menu chỉ hủy input cá nhân. Server vẫn xử lý heartbeat/chat/reconnect/Leave và deadlines. Đổi playId/generation phải xóa prediction buffers; heartbeat không tăng active clock. Vòng lặp heartbeat của client đo RTT (Round Trip Time), tính rolling average và jitter (|RTT_hiện_tại - RTT_trước|), đồng thời đếm số lần phản hồi vượt stall threshold (500 ms) do retransmission của tầng truyền tải để phân loại chất lượng kết nối và hiển thị HUD.
 
 Control timeout: GET_ROOM_STATE/reconnect, không tự gửi lại Start/New Run/End. Duplicate requestId trả kết quả cũ; New Run kiểm tra thêm expectedRunId. Bỏ message socket/context cũ; đóng connection phải kết thúc pending promises.
+
+Client hết chỗ chứa input chưa ACK phải đi qua cùng luồng mất kết nối như socket lỗi: dừng input, phát CONNECTION_CLOSED và mở menu Reconnect/Back to Menu. Không dùng Resume hoặc Save & Exit trên socket đã đóng. Back to Menu khi mất kết nối về màn hình chính mà không chờ Leave; giữ context reconnect và báo chưa xác nhận lưu. Không coi thao tác này là Leave thành công hoặc SAVED; Continue dùng checkpoint server. Reconnect thành công nhận state/generation mới trước khi Resume. `ROOM_LEFT` không kèm `requestId` là server chủ động đưa người chơi ra (Pause quá hạn, Start loại người chưa confirmed, v.v.): client về trang chủ và báo chung. Reconnect gặp `RECONNECT_EXPIRED`/`ROOM_NOT_FOUND`, hoặc Resume/Pause bị từ chối vì `GET_ROOM_STATE` trả `roomId` null, nghĩa là membership đã kết thúc: client về trang chủ và báo lý do, không giữ menu Resume/Reconnect. Context được xóa khi nhận ROOM_LEFT hoặc server xác nhận reconnect hết hạn. Thông báo không suy đoán nguyên nhân AFK hoặc khẳng định lần lưu mới nhất đã thành công; Continue đọc checkpoint server.
 
 Nhóm error codes: INVALID_MESSAGE/INVALID_INPUT/INVALID_SETTINGS, AUTH_REQUIRED/ACCOUNT_REQUIRED, ROOM_NOT_FOUND/ROOM_FULL/ROOM_NOT_JOINABLE/ALREADY_IN_ROOM/HOST_ONLY/NOT_ENOUGH_PLAYERS, STALE_PLAY/STALE_INPUT, INVALID_RECONNECT/RECONNECT_EXPIRED, SAVE_FAILED/CONFLICT/RATE_LIMITED/INTERNAL_ERROR.
 

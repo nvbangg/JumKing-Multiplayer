@@ -22,6 +22,51 @@ class AdventureTest {
   private final GameMap map;
   private final Physics physics;
 
+  @Test
+  void regionIntrosStartAtTheirFirstScreenAndSurviveRestoreAndRespawn() {
+    var game = new GameSimulation(map, physics, shared.adventure(), true, false);
+    for (JsonNode start : shared.adventure().path("regionStarts")) {
+      int screen = start.asInt();
+      var player = game.physics().snapshot();
+      player.y = -screen * map.screenHeight() + 100;
+      player.screen = screen;
+      player.freeFlight = true;
+      player.grounded = false;
+      game.physics().restore(player);
+      game.tick(PlayerInput.NEUTRAL);
+      var saved = game.snapshot();
+      var intro = saved.world().path("regionIntro");
+      assertThat(intro.path("screen").asInt()).isEqualTo(screen);
+      assertThat(intro.path("tick").asLong()).isEqualTo(saved.physics().ticks);
+      var restored = new GameSimulation(map, physics, shared.adventure(), true, false);
+      restored.restore(saved);
+      restored.physics().respawn();
+      restored.tick(PlayerInput.NEUTRAL);
+      assertThat(restored.snapshot().world().path("regionIntro")).isEqualTo(intro);
+      assertThat(
+              new GameSimulation(map, physics, shared.adventure(), true, false)
+                  .snapshot()
+                  .world()
+                  .has("regionIntro"))
+          .isFalse();
+    }
+    var saved = game.snapshot();
+    for (var intro :
+        List.of(
+            mapper.createObjectNode().put("screen", 6).put("tick", 0),
+            mapper.createObjectNode().put("screen", 5).put("tick", -1),
+            mapper.createObjectNode().put("screen", 5).put("tick", saved.physics().ticks + 1))) {
+      var invalid = (ObjectNode) saved.world().deepCopy();
+      invalid.set("regionIntro", intro);
+      assertThatThrownBy(
+              () ->
+                  game.restore(
+                      new GameSimulation.Snapshot(1, saved.physics(), saved.adventure(), invalid)))
+          .isInstanceOf(IllegalArgumentException.class);
+      assertThat(game.snapshot().world()).isEqualTo(saved.world());
+    }
+  }
+
   AdventureTest() throws Exception {
     shared = new SharedData(mapper);
     map = mapper.treeToValue(shared.map(), GameMap.class);
@@ -38,6 +83,116 @@ class AdventureTest {
 
   private Adventure adventure() {
     return new Adventure(shared.adventure(), map, physics);
+  }
+
+  @Test
+  void ravenRequiresTheSameScreenAndStrictlyLessThanFortyPixels() {
+    var adventure = adventure();
+    var player = new Simulation(map, physics, false, false).snapshot();
+    player.screen = 2;
+    player.x = 65;
+    player.y = 88 - 720 - 13;
+    assertThat(adventure.tick(player, PlayerInput.NEUTRAL))
+        .doesNotContain(new Adventure.Event("FLEE", "raven"));
+    player.screen = 3;
+    player.x = 25;
+    assertThat(adventure.tick(player, PlayerInput.NEUTRAL))
+        .doesNotContain(new Adventure.Event("FLEE", "raven"));
+    player.screen = 2;
+    player.x = 64;
+    assertThat(adventure.tick(player, PlayerInput.NEUTRAL))
+        .contains(new Adventure.Event("FLEE", "raven"));
+  }
+
+  @Test
+  void ravenFollowsEveryPerchAndResumesMidFlightIndependently() throws Exception {
+    var adventure = adventure();
+    var other = adventure();
+    int flees = 0;
+    for (var leg : fixture("raven-trace.json").path("legs")) {
+      var player = new Simulation(map, physics, false, false).snapshot();
+      player.x = leg.path("player").path("x").asDouble();
+      player.y = leg.path("player").path("y").asDouble();
+      player.screen = leg.path("player").path("screen").asInt();
+      for (int tick = 1; tick <= leg.path("ticks").asInt(); tick++) {
+        boolean flee =
+            adventure.tick(player, PlayerInput.NEUTRAL).stream()
+                .anyMatch(event -> event.type().equals("FLEE"));
+        if (flee) flees++;
+        for (var sample : leg.path("samples"))
+          if (sample.path("tick").asInt() == tick) {
+            assertJson(adventure.snapshot().path("raven"), sample.path("state"), "raven/" + tick);
+            assertThat(flee).isEqualTo(sample.path("flee").asBoolean());
+            var restored = adventure();
+            restored.restore(adventure.snapshot());
+            adventure = restored;
+          }
+      }
+    }
+    assertThat(flees).isEqualTo(14);
+    assertThat(adventure.ravenDone()).isTrue();
+    assertThat(other.ravenDone()).isFalse();
+    assertThat(other.snapshot().path("raven").path("index").asInt()).isZero();
+  }
+
+  @Test
+  void whiteRavenFollowsEveryMainBabePerchWithoutRewardsOrChangingEnding() throws Exception {
+    var adventure = adventure();
+    var other = adventure();
+    int flees = 0;
+    for (var leg : fixture("white-raven-trace.json").path("legs")) {
+      var player = new Simulation(map, physics, false, false).snapshot();
+      player.x = leg.path("player").path("x").asDouble();
+      player.y = leg.path("player").path("y").asDouble();
+      player.screen = leg.path("player").path("screen").asInt();
+      for (int tick = 1; tick <= leg.path("ticks").asInt(); tick++) {
+        boolean flee =
+            adventure.tick(player, PlayerInput.NEUTRAL).stream()
+                .anyMatch(event -> event.type().equals("FLEE") && event.id().equals("whiteRaven"));
+        if (flee) flees++;
+        for (var sample : leg.path("samples"))
+          if (sample.path("tick").asInt() == tick) {
+            assertJson(
+                adventure.snapshot().path("whiteRaven"),
+                sample.path("state"),
+                "whiteRaven/" + tick);
+            assertThat(flee).isEqualTo(sample.path("flee").asBoolean());
+            var restored = adventure();
+            restored.restore(adventure.snapshot());
+            adventure = restored;
+          }
+      }
+    }
+    assertThat(flees).isEqualTo(17);
+    assertThat(adventure.snapshot().path("whiteRaven").path("done").asBoolean()).isTrue();
+    assertThat(adventure.ravenDone()).isFalse();
+    assertThat(adventure.snapshot().path("flags")).isEmpty();
+    assertThat(other.ravenDone()).isFalse();
+    assertThat(other.snapshot().path("whiteRaven").path("index").asInt()).isZero();
+  }
+
+  @Test
+  void ravenRestoreRejectsCorruptionAndDefaultsOnlyAbsentProgress() {
+    var adventure = adventure();
+    var saved = adventure.snapshot();
+    var invalid = saved.deepCopy();
+    ((ObjectNode) invalid.path("raven")).put("index", 14);
+    assertThatThrownBy(() -> adventure.restore(invalid))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThat(adventure.snapshot()).isEqualTo(saved);
+    var unrecorded = saved.deepCopy();
+    unrecorded.remove("raven");
+    adventure.restore(unrecorded);
+    assertThat(adventure.snapshot()).isEqualTo(saved);
+    var invalidWhite = saved.deepCopy();
+    ((ObjectNode) invalidWhite.path("whiteRaven")).put("index", 17);
+    assertThatThrownBy(() -> adventure.restore(invalidWhite))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThat(adventure.snapshot()).isEqualTo(saved);
+    var unrecordedWhite = saved.deepCopy();
+    unrecordedWhite.remove("whiteRaven");
+    adventure.restore(unrecordedWhite);
+    assertThat(adventure.snapshot()).isEqualTo(saved);
   }
 
   private void assertJson(JsonNode actual, JsonNode expected, String context) {
@@ -64,6 +219,8 @@ class AdventureTest {
   private ObjectNode projection(Adventure adventure) {
     var state = adventure.snapshot();
     state.remove("codecVersion");
+    state.remove("raven");
+    state.remove("whiteRaven");
     var readables = (ObjectNode) state.path("readables");
     var remove = new java.util.ArrayList<String>();
     readables

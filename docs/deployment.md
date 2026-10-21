@@ -50,6 +50,7 @@ IP/port trong file mẫu là mặc định local, không phải địa chỉ b�
 | SERVER_ADDRESS/PORT | server.address/port |
 | APP_ALLOWED_ORIGINS | app.allowed-origins; origins cụ thể cách nhau dấu phẩy |
 | SERVER_SERVLET_SESSION_COOKIE_SECURE | true khi HTTPS |
+| SERVER_SERVLET_SESSION_COOKIE_MAX_AGE | server.servlet.session.cookie.max-age; thời hạn cookie theo [protocol](protocol.md#identity-và-security) |
 | SERVER_SERVLET_SESSION_TIMEOUT | server.servlet.session.timeout; idle theo [protocol](protocol.md#identity-và-security) |
 | APP_SESSION_ABSOLUTE_TIMEOUT | app.session-absolute-timeout; hạn tối đa theo protocol |
 | APP_AUTH_RATE_PER_MINUTE / APP_HTTP_BODY_LIMIT | app.auth-rate-per-minute=20; app.http-body-limit=16384 bytes |
@@ -170,5 +171,13 @@ sudo journalctl -u jumpking.service -n 100 --no-pager
 ```
 
 Sau deploy, kiểm tra từ mạng ngoài: đăng ký/đăng nhập, WebSocket, Room hai Account, Community Save & Exit/Continue và reconnect.
+
+### Giữ phiên khi deploy
+
+Profile `prod` bật `server.servlet.session.persistent=true`. Đặt `APP_SESSION_STORE_DIR` hoặc `server.servlet.session.store-dir` thành đường dẫn tuyệt đối bền vững ngoài JAR/target/thư mục release. Mặc định `./.local/sessions` chỉ phù hợp khi working directory của dịch vụ ổn định; không dùng thư mục tạm. Tạo thư mục trước bằng user quản trị, cho user chạy `jumpking.service` quyền đọc/ghi, giới hạn quyền thư mục ở `0700`; không đưa file phiên lên Git hoặc phục vụ qua HTTP. Không đổi schema MySQL.
+
+Tomcat ghi phiên khi dừng bình thường rồi nạp lại khi khởi động. Giữ nguyên thư mục và cho systemd đủ thời gian dừng (khuyến nghị `TimeoutStopSec=60s`, lớn hơn thời gian graceful shutdown 20 giây); tránh kill cưỡng bức. Phiên còn hạn giữ đăng nhập, CSRF và mốc hết hạn; không khôi phục trận Room trong RAM. File mất/hỏng, process crash hoặc phiên từ bản cũ thiếu metadata có thể yêu cầu đăng nhập lại. Lần triển khai tính năng đầu tiên chưa giữ được phiên đang nằm trong RAM của bản cũ. [Spring Boot session](https://docs.spring.io/spring-boot/3.5/reference/web/servlet.html), [Tomcat persistence](https://tomcat.apache.org/tomcat-10.1-doc/config/manager.html#Persistence_Across_Restarts).
+
+Mỗi build frontend sinh `/version.json` và nhúng cùng mã vào bundle: CI dùng `GITHUB_SHA`, build ngoài CI dùng UUID. Trình duyệt báo có bản mới theo [protocol](protocol.md#identity-và-security); tab đang dùng bản chưa có cơ chế thông báo cần reload một lần. Reverse proxy/CDN phải revalidate HTML và version metadata, không giữ bản cũ bằng quy tắc cache riêng. Khi nghiệm thu, mở tab bản A, deploy bản B, xác nhận thông báo, thoát về màn hình chính rồi bấm Update now và kiểm tra vẫn đăng nhập nếu phiên còn hạn.
 
 Không chạy lại script khởi tạo schema database trong quá trình deploy. Cập nhật code không đồng nghĩa với việc reset dữ liệu người chơi.

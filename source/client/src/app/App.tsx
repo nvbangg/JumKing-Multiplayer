@@ -24,6 +24,7 @@ import {
 } from "../network/GameSocket";
 import { loadReconnect } from "../network/reconnect";
 import { required } from "../required";
+import { UpdateNotice } from "./UpdateNotice";
 
 type Screen =
 	| "home"
@@ -51,6 +52,8 @@ const routes: Partial<Record<Screen, string>> = {
 	"sign-in": "/sign-in",
 	register: "/register",
 };
+const REMOVED_FROM_ROOM =
+	"Your room membership has ended. For Community, use Continue to load the last server checkpoint.";
 function locationScreen(): Screen {
 	return typeof location === "undefined"
 		? "home"
@@ -87,6 +90,7 @@ export function App() {
 	const socket = useRef<GameSocket | null>(null);
 	const exitScreen = useRef<Screen | null>(null);
 	const [navigationError, setNavigationError] = useState("");
+	const [connectionNotice, setConnectionNotice] = useState("");
 	const leaveOnline = useCallback(() => {
 		const connection = socket.current;
 		return connection?.selfId
@@ -266,7 +270,7 @@ export function App() {
 			throw new Error("Sign in to play online");
 		if (!socket.current) {
 			const connection = new GameSocket(
-				(type, payload) => {
+				(type, payload, replied) => {
 					if (socket.current !== connection) return;
 					if (type === "ROOM_STATE") {
 						const next = payload as unknown as RoomState;
@@ -345,7 +349,13 @@ export function App() {
 						socket.current?.close();
 						socket.current = null;
 						if (next) setScreen(next);
-						else back();
+						else if (replied) back();
+						else {
+							// Server tự đưa người chơi ra: về trang chủ và báo lý do.
+							setError("");
+							setConnectionNotice(REMOVED_FROM_ROOM);
+							setScreen("home");
+						}
 					} else if (type === "ERROR") setError(String(payload.message));
 				},
 				() => {
@@ -366,6 +376,7 @@ export function App() {
 		});
 	};
 	const enterCommunity = (newRun: boolean) => {
+		setConnectionNotice("");
 		if (!identity.account) {
 			setScreen("sign-in");
 			return;
@@ -400,46 +411,61 @@ export function App() {
 	const displayedError = navigationError || error;
 	if (screen === "online" && room && socket.current)
 		return (
-			<OnlineGame
-				room={room}
-				socket={socket.current}
-				navigationError={navigationError}
-				onResults={() => {
-					viewedEnding.current = resultRef.current?.playId || null;
-					setScreen("results");
-				}}
-				onHome={() => {
-					setNavigationError("");
-					socket.current?.close();
-					socket.current = null;
-					setRoom(null);
-					setScreen("home");
-					clearCsrf();
-					const expectedIdentityRevision = identityRevision.current;
-					void api<Identity>("/auth/me")
-						.then((value) => {
-							if (identityRevision.current === expectedIdentityRevision)
-								setIdentity(value);
-						})
-						.catch((cause) => {
-							if (identityRevision.current !== expectedIdentityRevision) return;
-							if (
-								cause instanceof ApiError &&
-								["SESSION_EXPIRED", "UNAUTHENTICATED"].includes(cause.code)
-							)
-								setIdentity(initialIdentity);
-							else
-								setError(
-									cause instanceof Error
-										? cause.message
-										: "Identity could not be refreshed",
-								);
-						});
-				}}
-			/>
+			<>
+				<UpdateNotice canReload={false} />
+				<OnlineGame
+					room={room}
+					socket={socket.current}
+					navigationError={navigationError}
+					onResults={() => {
+						viewedEnding.current = resultRef.current?.playId || null;
+						setScreen("results");
+					}}
+					onHome={(message) => {
+						setNavigationError("");
+						socket.current?.close();
+						socket.current = null;
+						setRoom(null);
+						setResult(null);
+						resultRef.current = null;
+						exitScreen.current = null;
+						setError("");
+						setConnectionNotice(message);
+						setHomeRevision((value) => value + 1);
+						setScreen("home");
+						clearCsrf();
+						const expectedIdentityRevision = identityRevision.current;
+						void api<Identity>("/auth/me")
+							.then((value) => {
+								if (identityRevision.current === expectedIdentityRevision)
+									setIdentity(value);
+							})
+							.catch((cause) => {
+								if (identityRevision.current !== expectedIdentityRevision)
+									return;
+								if (
+									cause instanceof ApiError &&
+									["SESSION_EXPIRED", "UNAUTHENTICATED"].includes(cause.code)
+								)
+									setIdentity(initialIdentity);
+								else
+									setError(
+										cause instanceof Error
+											? cause.message
+											: "Identity could not be refreshed",
+									);
+							});
+					}}
+				/>
+			</>
 		);
 	return (
 		<main className={`home screen-${screen}`}>
+			<UpdateNotice
+				canReload={
+					screen === "home" && !room && !pending && !socket.current?.selfId
+				}
+			/>
 			{screen !== "detail" && (
 				<header className="brand">
 					<h1>
@@ -457,7 +483,7 @@ export function App() {
 							: (
 									{
 										"sign-in": "Sign In",
-										register: "Create Account",
+										register: "Sign In",
 										password: "Change Password",
 										rooms: "Room",
 										account: "Account",
@@ -520,14 +546,9 @@ export function App() {
 										{identity.account.username}
 									</button>
 								) : (
-									<>
-										<button type="button" onClick={() => setScreen("sign-in")}>
-											Sign In
-										</button>
-										<button type="button" onClick={() => setScreen("register")}>
-											Create Account
-										</button>
-									</>
+									<button type="button" onClick={() => setScreen("sign-in")}>
+										Sign In
+									</button>
 								)}
 							</div>
 						</>
@@ -535,14 +556,10 @@ export function App() {
 					{(screen === "sign-in" || screen === "register") && (
 						<AuthForm
 							key={screen}
-							register={screen === "register"}
 							onSuccess={(value) => {
 								setIdentity(value);
 								back();
 							}}
-							onSwitch={() =>
-								setScreen(screen === "register" ? "sign-in" : "register")
-							}
 						/>
 					)}
 					{screen === "account" && identity.account && (
@@ -684,6 +701,9 @@ export function App() {
 						/>
 					)}
 
+					{screen === "home" && connectionNotice && (
+						<p role="status">{connectionNotice}</p>
+					)}
 					{displayedError && (
 						<p className="error" role="alert">
 							{displayedError}

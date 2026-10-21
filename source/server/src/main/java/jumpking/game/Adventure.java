@@ -26,6 +26,7 @@ public final class Adventure {
     state.putArray("flags");
     state.putObject("dialogue");
     state.putObject("readables");
+    for (String bird : List.of("raven", "whiteRaven")) state.set(bird, freshRaven(bird));
     for (JsonNode npc : data.path("npcs")) {
       var value =
           JSON.objectNode()
@@ -74,6 +75,65 @@ public final class Adventure {
 
   private static ObjectNode freshReadable() {
     return JSON.objectNode().put("wait", 0).put("line", 0).put("ticks", 0).put("done", false);
+  }
+
+  private ObjectNode freshRaven(String bird) {
+    var first = data.path(bird).path("positions").get(0);
+    return JSON.objectNode()
+        .put("index", 0)
+        .put("x", number(first, "x"))
+        .put("y", number(first, "y") - first.path("screen").asInt() * map.screenHeight())
+        .put("vx", 0)
+        .put("vy", 0)
+        .put("flying", false)
+        .put("ticks", 0)
+        .put("done", false);
+  }
+
+  public boolean ravenDone() {
+    return state.path("raven").path("done").asBoolean();
+  }
+
+  private void tickRaven(String bird, PlayerState player, List<Event> events) {
+    var s = object(state, bird);
+    var positions = data.path(bird).path("positions");
+    var pos = positions.get(s.path("index").asInt());
+    if (s.path("done").asBoolean()) return;
+    double dx = (int) player.x + physics.bodyWidth / 2.0 - number(s, "x"),
+        dy = (int) player.y + physics.bodyHeight / 2.0 - number(s, "y");
+    if (!s.path("flying").asBoolean()
+        && player.screen == pos.path("screen").asInt()
+        && dx * dx + dy * dy < Math.pow(number(data.path("raven"), "triggerRadius"), 2)) {
+      s.put("flying", true).put("ticks", 0);
+      s.put("vy", number(data.path("raven"), "launchVelocityY")).put("vx", 0);
+      events.add(new Event("FLEE", bird));
+    }
+    if (!s.path("flying").asBoolean()) return;
+    if (increment(s, "ticks") % data.path("raven").path("accelerationTicks").asInt() == 0) {
+      s.put(
+          "vx",
+          number(s, "vx")
+              + number(pos, "flyDirection") * number(data.path("raven"), "accelerationX"));
+      s.put("vy", number(s, "vy") * number(data.path("raven"), "velocityGrowthY"));
+    }
+    s.put("x", number(s, "x") + number(s, "vx") * number(data.path("raven"), "motionScale"));
+    s.put("y", number(s, "y") + number(s, "vy") * number(data.path("raven"), "motionScale"));
+    double localY = number(s, "y") + pos.path("screen").asInt() * map.screenHeight();
+    if (number(s, "x") < 0
+        || number(s, "x") >= map.width()
+        || localY < 0
+        || localY >= map.screenHeight()) {
+      int index = increment(s, "index");
+      if (index >= positions.size()) {
+        s.put("done", true);
+        index = positions.size() - 1;
+        s.put("index", index);
+      }
+      var next = positions.get(index);
+      s.put("flying", false)
+          .put("x", number(next, "x"))
+          .put("y", number(next, "y") - next.path("screen").asInt() * map.screenHeight());
+    }
   }
 
   private static int increment(ObjectNode node, String key) {
@@ -225,6 +285,7 @@ public final class Adventure {
         else s.put("done", true);
       }
     }
+    for (String bird : List.of("raven", "whiteRaven")) tickRaven(bird, player, events);
     return List.copyOf(events);
   }
 
@@ -286,11 +347,31 @@ public final class Adventure {
               && s.path("line").asInt() < readable.path("lineLengths").size()
               && s.path("done").isBoolean());
     }
+    var birds = JSON.objectNode();
+    for (String bird : List.of("raven", "whiteRaven")) {
+      var raven = saved.has(bird) ? saved.path(bird) : freshRaven(bird);
+      counts(raven, "index", "ticks");
+      int last = data.path(bird).path("positions").size() - 1;
+      require(
+          raven.path("index").asInt() <= last
+              && raven.path("flying").isBoolean()
+              && raven.path("done").isBoolean());
+      for (String field : List.of("x", "y", "vx", "vy"))
+        require(
+            raven.path(field).isNumber()
+                && Double.isFinite(number(raven, field))
+                && Math.abs(number(raven, field)) <= tuning("maxCounter"));
+      require(
+          !raven.path("done").asBoolean()
+              || (raven.path("index").asInt() == last && !raven.path("flying").asBoolean()));
+      birds.set(bird, raven.deepCopy());
+    }
     var next = JSON.objectNode().put("codecVersion", 2);
     var flags = next.putArray("flags");
     if (seen.contains("CompletedNormalGame")) flags.add("CompletedNormalGame");
     next.set("dialogue", saved.path("dialogue").deepCopy());
     next.set("readables", saved.path("readables").deepCopy());
+    next.setAll(birds);
     state = next;
   }
 }

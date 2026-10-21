@@ -27,6 +27,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.support.GenericApplicationContext;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class SessionPersistenceIT {
   private final ObjectMapper json = new ObjectMapper();
@@ -57,6 +58,15 @@ class SessionPersistenceIT {
             "--server.servlet.session.store-dir=" + store.toAbsolutePath(),
             "--server.servlet.session.cookie.secure=false",
             "--app.allowed-origins=http://127.0.0.1:" + port);
+  }
+
+  private void assertRegistered(
+      ConfigurableApplicationContext application, String sessionId, boolean expected) {
+    var registry =
+        (Map<?, ?>)
+            ReflectionTestUtils.getField(application.getBean(SessionAuthority.class), "sessions");
+    assertThat(registry).isNotNull();
+    assertThat(registry.containsKey(sessionId)).isEqualTo(expected);
   }
 
   private final class Client implements AutoCloseable {
@@ -138,6 +148,8 @@ class SessionPersistenceIT {
       try (var application = start(port, store)) {
         // Registry phải có cả phiên chưa gửi request sau restart để thu hồi đủ các thiết bị.
         var authority = application.getBean(SessionAuthority.class);
+        assertRegistered(application, a.sessionId(), true);
+        assertRegistered(application, b.sessionId(), true);
         assertThat(authority.find(a.sessionId())).isNotNull();
         assertThat(authority.find(b.sessionId())).isNotNull();
         assertThat(a.authenticated()).isTrue();
@@ -207,8 +219,16 @@ class SessionPersistenceIT {
         assertThat(client.authenticated()).isTrue();
       }
       // Tiến đồng hồ sau khi Tomcat đã ghi phiên còn hạn, trước khi nạp lại từ đĩa.
-      now.addAndGet(Duration.ofMinutes(absolute ? 10 : 30).toMillis());
+      now.addAndGet(Duration.ofMinutes(absolute ? 10 : 30).toMillis() - 1);
       try (var application = start(port, store, clock)) {
+        assertRegistered(application, sessionId, true);
+        assertThat(application.getBean(SessionAuthority.class).find(sessionId)).isNotNull();
+        // Không gửi HTTP/gia hạn activity ở mốc trước deadline.
+      }
+      now.incrementAndGet();
+      try (var application = start(port, store, clock)) {
+        // Kiểm tra trước find()/HTTP vì chính các thao tác đó cũng có thể loại phiên hết hạn.
+        assertRegistered(application, sessionId, false);
         assertThat(application.getBean(SessionAuthority.class).find(sessionId)).isNull();
         assertThat(client.authenticated()).isFalse();
         assertThat(client.send("/profile/me", null).statusCode()).isEqualTo(401);

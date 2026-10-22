@@ -59,6 +59,7 @@ IP/port trong file mẫu là mặc định local, không phải địa chỉ b�
 | APP_PERSISTENCE_RETRY_DELAY_MS | app.persistence-retry-delay-ms=1000; khoảng chờ giữa các lần thử |
 | APP_PERSISTENCE_THREADS / QUEUE / RUN_QUEUE | app.persistence-threads=2, app.persistence-queue=256, app.persistence-run-queue=16; workers chung và hàng chờ từng lượt |
 | FLY_ENABLED | app.fly-enabled=${FLY_ENABLED:false}; mặc định false |
+| GOOGLE_CLIENT_ID | app.google-client-id; Client ID xác thực Google Sign-In |
 
 Ưu tiên config: command-line → process ENV → external properties → JAR. Backend validate datasource/allowlist. Gameplay/rules ở source/common, network bounds theo protocol, presentation ở frontend config. [Spring external config](https://docs.spring.io/spring-boot/reference/features/external-config.html)
 

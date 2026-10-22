@@ -6,7 +6,7 @@ Database `jumpking`, MySQL/InnoDB, utf8mb4, timestamps UTC. Schema tạo bằng 
 
 | Bảng | Trách nhiệm |
 | --- | --- |
-| users | Account, password hash và vương miện |
+| users | Account, password hash, google_id và vương miện |
 | play_runs | Một lượt của một người: metrics, kết quả Room và checkpoint Community |
 | matches | Thông tin chung của một trận Room |
 
@@ -20,7 +20,8 @@ erDiagram
     users {
         BIGINT id PK
         VARCHAR(32) username UK
-        VARCHAR(255) password_hash
+        VARCHAR(255) password_hash "nullable; trống khi chỉ dùng Google"
+        VARCHAR(64) google_id UK "nullable; Google user ID"
         BOOLEAN crown_unlocked
         DATETIME(3) created_at
     }

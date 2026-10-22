@@ -11,7 +11,16 @@ public record SecuritySettings(
     Duration sessionAbsoluteTimeout,
     int authRatePerMinute,
     int httpBodyLimit,
-    int rateBucketLimit) {
+    int rateBucketLimit,
+    String googleClientId) {
+  public SecuritySettings(
+      List<String> allowedOrigins,
+      Duration sessionAbsoluteTimeout,
+      int authRatePerMinute,
+      int httpBodyLimit,
+      int rateBucketLimit) {
+    this(allowedOrigins, sessionAbsoluteTimeout, authRatePerMinute, httpBodyLimit, rateBucketLimit, null);
+  }
   public SecuritySettings {
     if (allowedOrigins == null || allowedOrigins.isEmpty())
       throw new IllegalArgumentException("An origin allowlist is required");

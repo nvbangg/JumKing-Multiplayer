@@ -18,7 +18,7 @@ Production lưu HTTP session qua restart bình thường bằng file ngoài JAR,
 
 Frontend phát hiện bản mới qua static `/version.json` (không cookie, không gia hạn session), khi mở web, focus/hiện tab và mỗi 60 giây lúc tab hiển thị. Khi khác mã build, báo `New version available`; chỉ cho bấm reload tại màn hình chính khi không còn membership/lệnh đang thực hiện. Không tự reload giữa trận. Lỗi mạng khi kiểm tra không chặn chơi; lỗi tải dynamic chunk cho phép reload thủ công tại màn hình chính. Không thay contract WebSocket.
 
-Register/Login/Change Password: 20 requests/phút/IP và identity, đổi session không reset quota IP. Password BCrypt; sai mật khẩu trả INVALID_CREDENTIALS, không sửa mật khẩu hoặc tạo Account khác. Reconnect token ngẫu nhiên 256 bit, so sánh constant-time, hết hiệu lực khi membership kết thúc; không đặt secrets vào URL/logs/broadcast.
+Register/Login/Google Login/Change Password: 20 requests/phút/IP và identity, đổi session không reset quota IP. Password BCrypt; sai mật khẩu hoặc ID token không hợp lệ trả INVALID_CREDENTIALS, không sửa mật khẩu hoặc tạo Account khác. Reconnect token ngẫu nhiên 256 bit, so sánh constant-time, hết hiệu lực khi membership kết thúc; không đặt secrets vào URL/logs/broadcast.
 
 Client giữ context reconnect (roomId/playerId/token) trong IndexedDB theo backend origin và identity để quay lại sau disconnect; xóa khi Leave đã xác nhận hoặc server báo hết hạn. Chủ động rời page gửi `LEAVE_ROOM` qua socket hiện có; không đóng socket trước `ROOM_LEFT` khi còn có thể chờ. Frame từ `pagehide` không bảo đảm được nhận trước khi browser đóng page; trường hợp đó vẫn dùng grace/reconnect hiện có, không suy diễn mọi socket close thành Leave. Không chia sẻ token qua room code.
 
@@ -34,9 +34,10 @@ Các path có prefix `/api`. Auth/private responses dùng Cache-Control:no-store
 | GET /auth/me | → {authenticated,account:null hoặc {id,username,crownUnlocked}}; id là chuỗi ID của chính Account |
 | POST /auth/register | {username,password} → me |
 | POST /auth/login | {username,password} → me; chưa có username thì tạo Account theo validation Register, đã có thì xác thực mật khẩu |
-| POST /auth/password | Account + CSRF; {currentPassword,newPassword} → {ok:true}; thu hồi các phiên sau commit |
+| POST /auth/google | CSRF; {idToken} → me; xác thực Google ID Token, tạo mới hoặc đăng nhập Account theo google_id |
+| POST /auth/password | Account + CSRF; {currentPassword,newPassword} → {ok:true}; thu hồi các phiên sau commit; tài khoản chỉ dùng Google trả CONFLICT |
 | POST /auth/logout | → {ok:true} |
-| GET /game-config | → {features:{flyEnabled:boolean}} |
+| GET /game-config | → {features:{flyEnabled:boolean},auth:{googleClientId:string|null}} |
 | GET /map | → GameMap |
 | GET /rooms/{roomId} | Public → {roomId,kind,joinable}; chỉ tra loại/khả năng Join, không trả members hoặc tokens |
 | GET /rooms | Public → {rooms:[{roomId,mode,mapLevel,playerCount,capacity}]}; chỉ Public/WAITING còn chỗ, không tokens |

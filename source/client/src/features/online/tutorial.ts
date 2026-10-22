@@ -26,16 +26,27 @@ export function saveTutorialCompleted(accountId?: string): void {
 
 export function nextTutorialStep(
 	current: TutorialStep,
-	state: { x: number; charge: number; grounded: boolean },
-	originX: number,
+	state: {
+		x: number;
+		charge: number;
+		grounded: boolean;
+		jumps: number;
+		freeFlight?: boolean;
+	},
+	origin: { x: number; jumps: number },
 ): TutorialStep {
+	if (state.freeFlight) return current;
+	// Chỉ xác nhận cú nhảy thật từ counter server; rơi khỏi bệ không hoàn tất hướng dẫn.
+	if (state.jumps > origin.jumps) return "completed";
 	switch (current) {
 		case "move":
-			return Math.abs(state.x - originX) >= 8 ? "charge" : "move";
+			return state.grounded && Math.abs(state.x - origin.x) >= 8
+				? "charge"
+				: "move";
 		case "charge":
 			return state.charge >= 4 ? "jump" : "charge";
 		case "jump":
-			return !state.grounded ? "completed" : "jump";
+			return "jump";
 		case "completed":
 			return "completed";
 	}

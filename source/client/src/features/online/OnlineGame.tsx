@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import rules from "../../../../common/rules.json";
 import { ControlsHelp } from "../../components/ControlsHelp";
 import { MenuPanel } from "../../components/MenuPanel";
@@ -99,16 +99,18 @@ export function OnlineGame({
 	const [ending, setEnding] = useState<"playing" | "picture" | null>(null),
 		[pictureReady, setPictureReady] = useState(false);
 	const [tutorialStep, setTutorialStep] = useState<TutorialStep | null>(() =>
-		isTutorialCompleted(accountId, totalJumps) ? null : "move",
+		room.kind === "ROOM" || isTutorialCompleted(accountId, totalJumps)
+			? null
+			: "move",
 	);
 	const tutorialRef = useRef<TutorialStep | null>(tutorialStep);
 	tutorialRef.current = tutorialStep;
-	const tutorialOriginX = useRef<number | null>(null);
-	const dismissTutorial = () => {
+	const tutorialOrigin = useRef<{ x: number; jumps: number } | null>(null);
+	const dismissTutorial = useCallback(() => {
 		tutorialRef.current = null;
 		setTutorialStep(null);
 		saveTutorialCompleted(accountId);
-	};
+	}, [accountId]);
 	const endingActive = useRef(false),
 		skipEnding = useRef<(() => void) | null>(null);
 	const chat = useRoomChat(
@@ -406,13 +408,19 @@ export function OnlineGame({
 						setMenu("pause");
 						audio.current?.pause(true);
 					}
-					if (tutorialRef.current) {
-						if (tutorialOriginX.current === null)
-							tutorialOriginX.current = state.x;
+					if (
+						tutorialRef.current &&
+						!view &&
+						!session.menu &&
+						!snapshot.self.paused
+					) {
+						const physics = snapshot.self.simulation.physics;
+						if (tutorialOrigin.current === null)
+							tutorialOrigin.current = { x: physics.x, jumps: physics.jumps };
 						const next = nextTutorialStep(
 							tutorialRef.current,
-							state,
-							tutorialOriginX.current,
+							physics,
+							tutorialOrigin.current,
 						);
 						if (next !== tutorialRef.current) {
 							tutorialRef.current = next;
@@ -706,7 +714,7 @@ export function OnlineGame({
 				!menu &&
 				!chat.open &&
 				!watching &&
-				(room.kind !== "ROOM" || room.state === "PLAYING") &&
+				room.kind === "COMMUNITY" &&
 				tutorialStep && (
 					<TutorialGuide step={tutorialStep} onDismiss={dismissTutorial} />
 				)}

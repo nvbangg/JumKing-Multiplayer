@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { TutorialStep } from "../features/online/tutorial";
 
 const STEP_CONTENT: Record<
@@ -27,6 +27,8 @@ const STEP_CONTENT: Record<
 	},
 };
 
+const BASE_STEPS: TutorialStep[] = ["move", "charge", "jump"];
+
 export function TutorialGuide({
 	step,
 	onDismiss,
@@ -34,16 +36,71 @@ export function TutorialGuide({
 	step: TutorialStep;
 	onDismiss: () => void;
 }) {
-	const content = STEP_CONTENT[step];
+	const [viewStep, setViewStep] = useState<TutorialStep>(step);
+	const [hasNavigated, setHasNavigated] = useState(false);
+
 	useEffect(() => {
-		if (step !== "completed") return;
-		const timer = setTimeout(onDismiss, 3500);
+		setViewStep(step);
+		setHasNavigated(false);
+	}, [step]);
+
+	useEffect(() => {
+		if (step !== "completed" || hasNavigated) return;
+		const timer = setTimeout(onDismiss, 4000);
 		return () => clearTimeout(timer);
-	}, [step, onDismiss]);
+	}, [step, hasNavigated, onDismiss]);
+
+	const visibleSteps =
+		step === "completed"
+			? [...BASE_STEPS, "completed" as TutorialStep]
+			: BASE_STEPS;
+	const currentIndex = visibleSteps.indexOf(viewStep);
+	const safeIndex = currentIndex === -1 ? 0 : currentIndex;
+	const canPrev = safeIndex > 0;
+	const canNext = safeIndex < visibleSteps.length - 1;
+
+	const handlePrev = () => {
+		if (!canPrev) return;
+		const nextStep = visibleSteps[safeIndex - 1];
+		if (!nextStep) return;
+		setHasNavigated(true);
+		setViewStep(nextStep);
+	};
+
+	const handleNext = () => {
+		if (!canNext) return;
+		const nextStep = visibleSteps[safeIndex + 1];
+		if (!nextStep) return;
+		setHasNavigated(true);
+		setViewStep(nextStep);
+	};
+
+	const content = STEP_CONTENT[viewStep] ?? STEP_CONTENT[step];
+
 	return (
 		<aside className="tutorial-guide" aria-label="Tutorial guide">
 			<div className="tutorial-header">
-				<span className="tutorial-title">{content.title}</span>
+				<div className="tutorial-title-row">
+					<button
+						type="button"
+						className="tutorial-nav-btn"
+						onClick={handlePrev}
+						disabled={!canPrev}
+						aria-label="Previous step"
+					>
+						‹
+					</button>
+					<span className="tutorial-title">{content.title}</span>
+					<button
+						type="button"
+						className="tutorial-nav-btn"
+						onClick={handleNext}
+						disabled={!canNext}
+						aria-label="Next step"
+					>
+						›
+					</button>
+				</div>
 				<button
 					type="button"
 					className="tutorial-dismiss"

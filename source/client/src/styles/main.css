@@ -887,3 +887,105 @@ output.room-code {
 .update-notice p {
 	margin: 0 0 8px;
 }
+
+.players-panel .watch-player {
+	padding: 0;
+	border: 0;
+	background: none;
+	text-align: left;
+	font: inherit;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.players-panel .watch-player:disabled {
+	opacity: 1;
+	cursor: default;
+}
+.players-panel .watch-player[aria-pressed="true"] {
+	text-decoration: underline;
+}
+.spectator-bar {
+	position: absolute;
+	top: 62px;
+	left: 12px;
+	z-index: 5;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 6px;
+	max-width: min(320px, calc(100% - min(210px, 44vw) - 36px));
+	padding: 6px 8px;
+	background: #000c;
+	font-size: 0.65rem;
+}
+.spectator-bar button {
+	background: #08090c;
+	color: inherit;
+	border: 1px solid #6b6250;
+	padding: 4px 8px;
+	font-size: inherit;
+	white-space: nowrap;
+}
+
+.spectator-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.screen-lobby > .chat-panel {
+	position: fixed;
+}
+@media (max-width: 1000px) {
+	.screen-lobby {
+		height: 100dvh;
+		overflow: hidden;
+		padding-bottom: calc(20dvh + 128px + env(safe-area-inset-bottom));
+	}
+	.screen-lobby .brand {
+		flex-shrink: 0;
+		margin-bottom: 16px;
+	}
+	.screen-lobby .single-panel {
+		flex: 1;
+		min-height: 0;
+	}
+	.screen-lobby .menu-panel {
+		max-height: 100%;
+		overflow-y: auto;
+	}
+	.screen-lobby .chat-messages {
+		max-height: 20dvh;
+	}
+}
+.item-control {
+	position: absolute;
+	z-index: 35;
+	right: max(16px, env(safe-area-inset-right));
+	bottom: max(100px, calc(env(safe-area-inset-bottom) + 88px));
+	font-size: 13px;
+	padding: 10px;
+	touch-action: manipulation;
+}
+.item-control[aria-pressed="true"] {
+	border-color: #d8be69;
+	color: #efdb99;
+}
+
+.mode-setting.item-toggle {
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	min-height: 44px;
+	cursor: pointer;
+}
+.item-toggle input[type="checkbox"] {
+	flex: 0 0 20px;
+	width: 20px;
+	height: 20px;
+	margin: 0;
+	padding: 0;
+	accent-color: #d8be69;
+}

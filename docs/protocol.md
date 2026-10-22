@@ -12,7 +12,7 @@ Account dùng Spring Security server-side session, không JWT. Cookies HttpOnly,
 
 HTTP dùng credentials:include và CSRF trước mutation. Login/Register đổi session ID/CSRF; Logout hoặc đổi mật khẩu hủy session. Đổi mật khẩu yêu cầu Account, currentPassword/newPassword, validate/hash như Register; chỉ trả thành công sau commit và thu hồi các phiên/socket của Account. Chưa có khôi phục mật khẩu.
 
-CORS nhận origins cụ thể, preflight trước authentication. WS yêu cầu Account và Origin trong allowlist; không tin tên/owner do client gửi. Login Account khác khi còn membership bị từ chối; đăng nhập lại đúng Account để reconnect vẫn cần token cũ. Session idle 30 phút, absolute 24 giờ; HTTP/WS cùng kiểm tra, heartbeat không gia hạn idle. Hết session xử lý như disconnect, không xóa dữ liệu đã lưu.
+CORS nhận origins cụ thể, preflight trước authentication. WS yêu cầu Account và Origin trong allowlist; không tin tên/owner do client gửi. Login Account khác khi còn membership bị từ chối; đăng nhập lại đúng Account để reconnect vẫn cần token cũ. Session idle và absolute đều 30 ngày; cookie giữ 30 ngày kể cả khi đóng trình duyệt; HTTP/WS cùng kiểm tra, heartbeat không gia hạn idle. Hết session xử lý như disconnect, không xóa dữ liệu đã lưu.
 
 Production lưu HTTP session qua restart bình thường bằng file ngoài JAR, cấu hình theo [deployment](deployment.md#giữ-phiên-khi-deploy). Mốc tạo/hoạt động được lưu cùng phiên và phục hồi vào registry trước khi ứng dụng sẵn sàng; restart không gia hạn idle/absolute. Phiên thiếu metadata thời hạn bị từ chối. Logout/đổi mật khẩu vẫn thu hồi phiên, kể cả phiên đã khôi phục chưa nhận request mới. Đây là phiên đăng nhập, không phải trạng thái trận Room trong RAM.
 
@@ -56,7 +56,7 @@ game-config trả tuning/rules từ shared; appearances=[{colorSlot,color}] ánh
 
 RunSummary={id,status,currentProgress,maxProgress,elapsedTimeMs,peakReachedTimeMs,finishTimeMs}; LeaderboardEntry thêm {rank,username}.
 
-History summary={id,kind,startedAt,endedAt,status,playTimeMs,jumps,falls,currentProgress,maxProgress,finishTimeMs,room}; room=null cho Community, Room có {mode,mapLevel,roomCode,durationMs,rank,isWinner}. Detail Room thêm {timeLimitMinutes,endReason,participants}; detail Community dùng summary. Participant={runId,nickname,status,rank,isWinner,currentProgress,maxProgress,finishTimeMs,playTimeMs,jumps,falls}. Ownership và thứ tự theo [data](data.md#history-và-leaderboard).
+History summary={id,kind,startedAt,endedAt,status,playTimeMs,jumps,falls,currentProgress,maxProgress,finishTimeMs,room}; room=null cho Community, Room có {mode,mapLevel,itemsEnabled,itemCooldownMinutes,roomCode,durationMs,rank,isWinner}. Detail Room thêm {timeLimitMinutes,endReason,participants}; detail Community dùng summary. Participant={runId,nickname,status,rank,isWinner,currentProgress,maxProgress,finishTimeMs,playTimeMs,jumps,falls}. Ownership và thứ tự theo [data](data.md#history-và-leaderboard).
 
 Statistics={totalPlayTimeMs,totalJumps,totalFalls,finishes,matchesPlayed,wins,bestFinishTimeMs}; matchesPlayed/wins chỉ đếm Room, bestFinishTimeMs=null nếu chưa Finish. Không nhận bộ lọc kind/mode.
 
@@ -103,10 +103,12 @@ Giới hạn mặc định tập trung tại cấu hình network của backend, 
 | JOIN_ROOM | {roomId} → vào đúng Room theo ID |
 | LEAVE_ROOM | {} → Community flush checkpoint; Room Leave/DNF |
 | GET_ROOM_STATE | {} → state hiện hành hoặc null khi đã rời |
-| UPDATE_ROOM_SETTINGS | {mode,timeLimitMinutes,mapLevel,visibility?}; Host/WAITING; có thể chỉ đổi visibility hoặc mapLevel |
+| UPDATE_ROOM_SETTINGS | Patch {mode?,timeLimitMinutes?,mapLevel?,visibility?,itemsEnabled?,itemCooldownMinutes?}; Host/WAITING; cặp mode/timeLimitMinutes phải hợp lệ theo gameplay |
 | GAME_READY | {playId,generation}; tự động khi renderer tải xong, chỉ roster COUNTDOWN; server bắt đầu countdown 3 giây khi tất cả sẵn sàng |
 | START_GAME / END_MATCH | {}; quyền, roster và lifecycle theo gameplay; kiểm tra khi xử lý command |
 | PLAY_AGAIN | {matchId}; mỗi thành viên xác nhận sau match vừa kết thúc, kể cả khi phòng đã về WAITING |
+| USE_ITEM | {playId,generation} → ITEM_USED {roomId,playId}; server quyết định loại/vị trí/mục tiêu, không nhận tọa độ hoặc target từ client |
+| SET_SPECTATE | {playerId:string hoặc null}; xem người cùng phòng hoặc hủy xem; server kiểm tra membership/trạng thái, không nhận vị trí hoặc screen từ client |
 | SET_COMMUNITY_PAUSED | {paused:boolean}; Pause/Resume cá nhân, server xác nhận theo gameplay |
 | CHAT_SEND | {text}; render plain text, lọc control characters |
 | PLAYER_INPUT | {playId,generation,seq,left,right,jump,up?,down?,freeFlight?}; booleans, field tùy chọn mặc định false |
@@ -132,10 +134,11 @@ Client nhận diện nhấn đúp khi cấu hình cho phép Fly Mode và gửi f
 | ROOM_STATE | {roomId,kind,state,visibility?,hostPlayerId,settings,members,currentPlay,result} |
 | ROOM_LEFT | {roomId}; null nếu đã rời |
 | GAME_STARTED | {playId,generation,countdownMs}; bắt đầu tải màn chơi; ROOM_STATE.currentPlay.countdownRemainingMs=0 khi chờ tải, >0 khi countdown chạy |
-| GAME_SNAPSHOT | {roomId,serverTick,playId,generation,self,peers,players,elapsedTimeMs,remainingTimeMs} |
+| GAME_SNAPSHOT | {roomId,serverTick,playId,generation,self,peers,players,spectating,elapsedTimeMs,remainingTimeMs} |
 | COMMUNITY_RUN_STATE | {run:RunSummary,generation,paused,pausePending,saveStatus} |
 | PLAYER_EFFECTS | {roomId,events:[{eventSeq,playerId,playId,screen,effect,terrain}]} |
-| ADVENTURE_EVENTS | {roomId,playId,events:[{eventSeq,kind,type,id}]}; chỉ owner, kind=ADVENTURE/WORLD, nội dung hiển thị tra tại client |
+| SPECTATE_STATE | {roomId,playerId:string hoặc null}; xác nhận mục tiêu, state hiển thị nhận qua snapshot |
+| ADVENTURE_EVENTS | {roomId,playId,sourcePlayerId,events:[{eventSeq,kind,type,id}]}; owner hoặc người đang xem owner, kind=ADVENTURE/WORLD, nội dung hiển thị tra tại client |
 | PLAYER_FINISHED | {playerId,playId,result,showEnding,ending:{screen,ravenDone}}; sau commit, riêng người Finish ở Community hoặc winners ở Room; result tương ứng RunSummary/MatchResult |
 | GAME_FINISHED | {playId,mapLevel,reason,durationMs,results,saveStatus}; Room broadcast |
 | SAVE_STATUS | {playId,revision,saveStatus}; chỉ owner checkpoint hoặc members của match |
@@ -147,11 +150,11 @@ kind COMMUNITY/ROOM; host/settings null cho Community. Member={playerId,nickname
 
 Room state là WAITING/COUNTDOWN/PLAYING/FINISHED; Community state=PLAYING, Pause thuộc từng lượt. currentPlay chứa metadata và kết quả nếu đã finalize; chưa có membership thì fields null, members=[]. Xác nhận/Host theo [gameplay](gameplay.md#room-và-xếp-hạng).
 
-self gồm lastProcessedInputSeq, status, metrics và full simulation để restore/replay: position/velocity, grounded/charge, direction/buffers, splat/knocked, terrain/wind, freeFlight/phasingFall, screen/ticks/jumps/falls/airChargeTicks và adventure. peers chỉ gồm người ở screen hiện tại hoặc liền kề, mỗi người có {playerId,nickname,colorSlot,state,crowned,status}; không broadcast checkpoint/secrets. players vẫn gồm toàn phòng.
+self gồm lastProcessedInputSeq, status, metrics và full simulation để restore/replay: position/velocity, grounded/charge, direction/buffers, splat/knocked, terrain/wind, freeFlight/phasingFall, screen/ticks/jumps/falls/airChargeTicks và adventure. peers chỉ gồm người ở screen đang xem hoặc liền kề, mỗi người có {playerId,nickname,colorSlot,state,crowned,status}; không broadcast checkpoint/secrets. players vẫn gồm toàn phòng.
 
 players=[{playerId,nickname,colorSlot,rank,currentProgress}] gồm các thành viên còn trong phòng, tối đa capacity. Server tính từ cùng state RAM với snapshot; Room dùng comparator mode, Community chỉ so độ cao hiện tại. Giữ đồng hạng, ID chỉ ổn định thứ tự; không truy vấn database theo tick.
 
-adventure gồm ID/counters tiến độ hội thoại và state quạ riêng của owner; không gửi state quạ cho peers. Cue FLEE phát tiếng quạ một lần, không phát lại khi reconciliation. Vương miện là ngoại hình profile tự cấp theo data, không có lệnh trang bị. Client dựng nội dung theo [architecture](architecture.md#công-nghệ-và-trách-nhiệm); thay đổi state phải do server xác nhận.
+adventure gồm ID/counters tiến độ hội thoại và state quạ riêng của owner; chỉ gửi state quạ cho người đang xem owner. Cue FLEE phát tiếng quạ một lần, không phát lại khi reconciliation. Vương miện là ngoại hình profile tự cấp theo data, không có lệnh trang bị. Client dựng nội dung theo [architecture](architecture.md#công-nghệ-và-trách-nhiệm); thay đổi state phải do server xác nhận.
 
 Results={playerId,nickname,status,rank,currentProgress,maxProgress,isWinner,finishTimeMs}; nickname giữ lúc Join để Results vẫn hiển thị đúng người đã Leave. Status/reason/saveStatus theo data; SAVE_STATUS Room có revision=null. Server chốt metrics và showEnding theo gameplay.
 
@@ -165,10 +168,20 @@ ACK và state lấy cùng tick. Client restore snapshot mới hơn, bỏ frames 
 
 Control timeout: GET_ROOM_STATE/reconnect, không tự gửi lại Start/New Run/End. Duplicate requestId trả kết quả cũ; New Run kiểm tra thêm expectedRunId. Bỏ message socket/context cũ; đóng connection phải kết thúc pending promises.
 
-Client hết chỗ chứa input chưa ACK phải đi qua cùng luồng mất kết nối như socket lỗi: dừng input, phát CONNECTION_CLOSED và mở menu Reconnect/Back to Menu. Không dùng Resume hoặc Save & Exit trên socket đã đóng. Back to Menu khi mất kết nối về màn hình chính mà không chờ Leave; giữ context reconnect và báo chưa xác nhận lưu. Không coi thao tác này là Leave thành công hoặc SAVED; Continue dùng checkpoint server. Reconnect thành công nhận state/generation mới trước khi Resume.
+Client hết chỗ chứa input chưa ACK phải đi qua cùng luồng mất kết nối như socket lỗi: dừng input, phát CONNECTION_CLOSED và mở menu Reconnect/Back to Menu. Không dùng Resume hoặc Save & Exit trên socket đã đóng. Back to Menu khi mất kết nối về màn hình chính mà không chờ Leave; giữ context reconnect và báo chưa xác nhận lưu. Không coi thao tác này là Leave thành công hoặc SAVED; Continue dùng checkpoint server. Reconnect thành công nhận state/generation mới trước khi Resume. `ROOM_LEFT` không kèm `requestId` là server chủ động đưa người chơi ra (Pause quá hạn, Start loại người chưa confirmed, v.v.): client về trang chủ và báo chung. Reconnect gặp `RECONNECT_EXPIRED`/`ROOM_NOT_FOUND`, hoặc Resume/Pause bị từ chối vì `GET_ROOM_STATE` trả `roomId` null, nghĩa là membership đã kết thúc: client về trang chủ và báo lý do, không giữ menu Resume/Reconnect. Context được xóa khi nhận ROOM_LEFT hoặc server xác nhận reconnect hết hạn. Thông báo không suy đoán nguyên nhân AFK hoặc khẳng định lần lưu mới nhất đã thành công; Continue đọc checkpoint server.
 
 Nhóm error codes: INVALID_MESSAGE/INVALID_INPUT/INVALID_SETTINGS, AUTH_REQUIRED/ACCOUNT_REQUIRED, ROOM_NOT_FOUND/ROOM_FULL/ROOM_NOT_JOINABLE/ALREADY_IN_ROOM/HOST_ONLY/NOT_ENOUGH_PLAYERS, STALE_PLAY/STALE_INPUT, INVALID_RECONNECT/RECONNECT_EXPIRED, SAVE_FAILED/CONFLICT/RATE_LIMITED/INTERNAL_ERROR.
 
 ## Mở rộng dữ liệu hiển thị
 
 Account/profile có `crownUnlocked`; public render state chỉ mang trạng thái vương miện, không nhận quyền mở từ input online. GAME_SNAPSHOT bổ sung Players ranking từ server RAM, giữ đồng hạng; Room theo mode, Community theo độ cao hiện tại. Không truy vấn DB theo tick để tạo bảng này. Leaderboard dùng HTTP theo [gameplay](gameplay.md#chat-và-bảng-trong-trận); bảng Players vẫn cập nhật qua snapshot.
+
+Spectating=null hoặc {player,playId,elapsedTimeMs,paused,adventure,world}; player là public render state như peers, playId là lượt của mục tiêu. Self/playId/generation/ACK ở gốc snapshot luôn thuộc người nhận, không đổi thành của mục tiêu. Dữ liệu spectating chỉ dành cho renderer, không restore vào prediction hoặc checkpoint. Khi đổi mục tiêu xóa bộ đệm nội suy; không gửi lại animation/âm thanh từ snapshot. Effects/cues theo người và screen đang xem, không phát ending của mục tiêu.
+
+SET_SPECTATE chỉ tồn tại trong RAM của membership; hủy khi reconnect, mục tiêu mất kết nối/rời/kết thúc hoặc Room không còn PLAYING. Target không hợp lệ trả INVALID_SPECTATE_TARGET. Khi xem, input không điều khiển nhân vật; Room vẫn chạy physics và clock, Community dùng Pause hiện có. Không thay đổi quyền owner, kết quả, save hoặc luật xếp hạng.
+
+## Items Room
+
+Settings có `itemsEnabled` boolean mặc định false, `itemCooldownMinutes` số nguyên 1–15 mặc định 3. Luật dùng/cấp/trúng theo [gameplay](gameplay.md#items-trong-room). USE_ITEM dùng requestId/dedup hiện có; sai context STALE_PLAY, item tắt hoặc trạng thái không cho dùng ITEM_UNAVAILABLE, chưa hồi ITEM_COOLDOWN, Banana chưa đứng nền INVALID_ITEM_POSITION, Rock không có mục tiêu NO_ITEM_TARGET. Lỗi không tiêu thụ vật phẩm. Chỉ thành viên PLAYING/ACTIVE, không spectating, được dùng.
+
+GAME_SNAPSHOT của Room bật Items có `items={held:BANANA|ROCK|null,bananaArmed:boolean,cooldownMs,bananas:[{id,x,y,armedAtTick}],rocks:[{id,x,y,direction,tick}]}`. Held/hồi chiêu chỉ của người nhận; bẫy/cue đá chỉ screen đang xem và liền kề. Tọa độ world: Banana là tâm chân, Rock là tâm mục tiêu lúc trúng. Rocks là cue ngắn, không quyết định hit. `physics.slipping` chỉ gửi khi true trong self/peers; client replay trạng thái này để reconciliation đúng. Community không có items. Reconnect trả item state hiện tại, không random lại.

@@ -899,9 +899,7 @@ output.room-code {
 	outline: 3px solid #26231a;
 	padding: 16px 24px;
 	border-radius: 8px;
-	min-width: min(92vw, 460px);
-	max-width: min(92vw, 640px);
-	width: max-content;
+	width: min(92vw, 600px);
 	box-shadow: 0 6px 24px #000c;
 	pointer-events: none;
 }
@@ -924,6 +922,9 @@ output.room-code {
 }
 
 .tutorial-title {
+	display: inline-block;
+	text-align: center;
+	min-width: 176px;
 	font-weight: bold;
 	color: #ede7d3;
 	font-size: 1.35rem;
@@ -983,8 +984,9 @@ output.room-code {
 .tutorial-hint {
 	margin: 0;
 	color: #d1c7b7;
-	font-size: 1.15rem;
-	line-height: 1.5;
+	font-size: 1.1rem;
+	line-height: 1.45;
+	min-height: 2.9em;
 }
 
 .tutorial-hint.touch-only {
@@ -1006,14 +1008,15 @@ output.room-code {
 		top: auto;
 		bottom: 96px;
 		padding: 12px 18px;
-		min-width: auto;
-		max-width: min(92vw, 480px);
+		width: min(92vw, 440px);
 	}
 	.tutorial-title {
 		font-size: 1.05rem;
+		min-width: 136px;
 	}
 	.tutorial-hint {
 		font-size: 0.95rem;
+		min-height: 2.9em;
 	}
 	.tutorial-dismiss {
 		font-size: 0.85rem;

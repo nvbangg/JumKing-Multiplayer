@@ -60,6 +60,20 @@ for (const mobile of [false, true])
 			).toHaveCount(0);
 			await joinRoom(peer, id);
 			await expect(peer.getByLabel("Items", { exact: true })).toBeDisabled();
+			await expect(host.locator(".menu-panel .chat-panel")).toHaveCount(0);
+			await expect(
+				host.getByRole("region", { name: "Room chat", exact: true }),
+			).toBeVisible();
+			await host.locator("body").click({ position: { x: 1, y: 1 } });
+			await host.keyboard.press("Enter");
+			await expect(host.getByLabel("Message", { exact: true })).toBeFocused();
+			await host.getByLabel("Message", { exact: true }).fill("Ready to play");
+			await host.keyboard.press("Enter");
+			await expect(peer.getByRole("log")).toContainText("Ready to play");
+			await peer.getByLabel("Message", { exact: true }).fill("Ready too");
+			await peer.getByRole("button", { name: "Send", exact: true }).click();
+			await expect(host.getByRole("log")).toContainText("Ready too");
+			await expect(host.getByLabel("Message", { exact: true })).toBeVisible();
 			const toggle = host.locator(".item-toggle");
 			if (mobile) await toggle.tap();
 			else await toggle.click();
@@ -80,6 +94,15 @@ for (const mobile of [false, true])
 			});
 			expect(alignment).toBeLessThanOrEqual(1);
 			await host.getByLabel("Map", { exact: true }).selectOption("1");
+			const chatBounds = await host.locator(".chat-panel").boundingBox(),
+				menuBounds = await host.locator(".menu-panel").boundingBox();
+			if (!chatBounds || !menuBounds)
+				throw new Error("Lobby panels are missing");
+			expect(
+				mobile
+					? menuBounds.y + menuBounds.height <= chatBounds.y
+					: chatBounds.x + chatBounds.width <= menuBounds.x,
+			).toBe(true);
 			await host.screenshot({
 				path: info.outputPath(
 					mobile ? "lobby-mobile.png" : "lobby-desktop.png",

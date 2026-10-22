@@ -1,22 +1,19 @@
 import { useEffect, useState } from "react";
 import rules from "../../../../common/rules.json";
 import { ROOM_MAPS } from "../../game/simulation/roomMaps";
-import type { GameSocket, RoomState } from "../../network/GameSocket";
+import type { RoomState } from "../../network/GameSocket";
 import { ItemSettings } from "./ItemSettings";
-import { RoomChat } from "./RoomChat";
 
 export function Lobby({
 	room,
 	selfId,
 	pending,
 	command,
-	socket,
 }: {
 	room: RoomState;
 	selfId: string | null;
 	pending: boolean;
 	command: (type: string, payload?: Record<string, unknown>) => void;
-	socket?: GameSocket | null;
 }) {
 	const host = room.hostPlayerId === selfId;
 	const limit =
@@ -171,7 +168,6 @@ export function Lobby({
 			>
 				Leave
 			</button>
-			{socket && <RoomChat socket={socket} />}
 		</>
 	);
 }

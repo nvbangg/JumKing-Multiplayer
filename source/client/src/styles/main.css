@@ -935,11 +935,51 @@ output.room-code {
 	white-space: nowrap;
 }
 
-.menu-panel > .chat-panel {
-	position: static;
+.lobby-layout {
+	display: grid;
+	grid-template-columns: minmax(220px, 320px) minmax(0, 500px);
+	gap: 24px;
+	width: min(100%, 844px);
+	align-items: start;
+}
+.lobby-layout > .chat-panel {
+	position: sticky;
+	top: 12px;
 	width: 100%;
 	max-width: 100%;
-	margin-top: 12px;
+}
+@media (max-width: 680px) {
+	.screen-lobby {
+		height: 100dvh;
+		overflow: hidden;
+		padding-bottom: max(12px, env(safe-area-inset-bottom));
+	}
+	.screen-lobby .brand {
+		flex-shrink: 0;
+		margin-bottom: 16px;
+	}
+	.lobby-layout {
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: minmax(0, 1fr) auto;
+		align-items: stretch;
+		gap: 12px;
+		flex: 1;
+		min-height: 0;
+		width: min(100%, 500px);
+	}
+	.lobby-layout > .menu-panel {
+		grid-row: 1;
+		min-height: 0;
+		overflow-y: auto;
+	}
+	.lobby-layout > .chat-panel {
+		grid-row: 2;
+		position: static;
+		width: min(320px, 100%);
+	}
+	.lobby-layout .chat-messages {
+		max-height: 20dvh;
+	}
 }
 .item-control {
 	position: absolute;

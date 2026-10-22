@@ -11,6 +11,7 @@ import { roomFinishScreen } from "../features/rooms/ending";
 import { Lobby } from "../features/rooms/Lobby";
 import { PublicRooms } from "../features/rooms/PublicRooms";
 import { Results } from "../features/rooms/Results";
+import { RoomChat } from "../features/rooms/RoomChat";
 import { OptionsButtons } from "../features/settings/OptionsPanel";
 import { readOptions, saveOptions } from "../features/settings/options";
 import { loadManifest } from "../game/content/assets";
@@ -474,8 +475,17 @@ export function App() {
 				</header>
 			)}
 			<div
-				className={screen === "home" && home ? "home-layout" : "single-panel"}
+				className={
+					screen === "lobby"
+						? "lobby-layout"
+						: screen === "home" && home
+							? "home-layout"
+							: "single-panel"
+				}
 			>
+				{screen === "lobby" && room && socket.current && (
+					<RoomChat socket={socket.current} />
+				)}
 				<MenuPanel
 					title={
 						screen === "home"
@@ -687,7 +697,6 @@ export function App() {
 							selfId={socket.current?.selfId || null}
 							pending={pending}
 							command={command}
-							socket={socket.current}
 						/>
 					)}
 					{screen === "results" && result && (

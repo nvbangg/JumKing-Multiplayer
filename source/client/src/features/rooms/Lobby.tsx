@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import rules from "../../../../common/rules.json";
 import { ROOM_MAPS } from "../../game/simulation/roomMaps";
 import type { GameSocket, RoomState } from "../../network/GameSocket";
+import { ItemSettings } from "./ItemSettings";
 import { RoomChat } from "./RoomChat";
 
 export function Lobby({
@@ -120,6 +121,11 @@ export function Lobby({
 							<option value="NO_WALK">No Walk</option>
 						</select>
 					</label>
+					<ItemSettings
+						value={room.settings}
+						disabled={!host || room.state !== "WAITING" || pending}
+						onChange={(patch) => command("UPDATE_ROOM_SETTINGS", patch)}
+					/>
 					{room.settings.mode === "TIME_LIMIT" && (
 						<label className="mode-setting">
 							Minutes

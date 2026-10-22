@@ -934,3 +934,35 @@ output.room-code {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+
+.menu-panel > .chat-panel {
+	position: static;
+	width: 100%;
+	max-width: 100%;
+	margin-top: 12px;
+}
+.room-create-settings {
+	font-size: 14px;
+}
+.room-create-settings summary {
+	cursor: pointer;
+	padding: 8px;
+}
+.item-control {
+	position: absolute;
+	z-index: 35;
+	right: max(16px, env(safe-area-inset-right));
+	bottom: max(100px, calc(env(safe-area-inset-bottom) + 88px));
+	font-size: 13px;
+	padding: 10px;
+	touch-action: manipulation;
+}
+.item-control[aria-pressed="true"] {
+	border-color: #d8be69;
+	color: #efdb99;
+}
+
+.mode-setting input[type="checkbox"] {
+	width: auto;
+	justify-self: end;
+}

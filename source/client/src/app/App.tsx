@@ -11,6 +11,7 @@ import { roomFinishScreen } from "../features/rooms/ending";
 import { Lobby } from "../features/rooms/Lobby";
 import { PublicRooms } from "../features/rooms/PublicRooms";
 import { Results } from "../features/rooms/Results";
+import { RoomChat } from "../features/rooms/RoomChat";
 import { OptionsButtons } from "../features/settings/OptionsPanel";
 import { readOptions, saveOptions } from "../features/settings/options";
 import { loadManifest } from "../game/content/assets";
@@ -52,6 +53,8 @@ const routes: Partial<Record<Screen, string>> = {
 	"sign-in": "/sign-in",
 	register: "/register",
 };
+const REMOVED_FROM_ROOM =
+	"Your room membership has ended. For Community, use Continue to load the last server checkpoint.";
 function locationScreen(): Screen {
 	return typeof location === "undefined"
 		? "home"
@@ -268,7 +271,7 @@ export function App() {
 			throw new Error("Sign in to play online");
 		if (!socket.current) {
 			const connection = new GameSocket(
-				(type, payload) => {
+				(type, payload, replied) => {
 					if (socket.current !== connection) return;
 					if (type === "ROOM_STATE") {
 						const next = payload as unknown as RoomState;
@@ -347,7 +350,13 @@ export function App() {
 						socket.current?.close();
 						socket.current = null;
 						if (next) setScreen(next);
-						else back();
+						else if (replied) back();
+						else {
+							// Server tự đưa người chơi ra: về trang chủ và báo lý do.
+							setError("");
+							setConnectionNotice(REMOVED_FROM_ROOM);
+							setScreen("home");
+						}
 					} else if (type === "ERROR") setError(String(payload.message));
 				},
 				() => {
@@ -681,7 +690,6 @@ export function App() {
 							selfId={socket.current?.selfId || null}
 							pending={pending}
 							command={command}
-							socket={socket.current}
 						/>
 					)}
 					{screen === "results" && result && (
@@ -722,6 +730,9 @@ export function App() {
 					<StatisticsPanel statistics={home.statistics} />
 				)}
 			</div>
+			{screen === "lobby" && room && socket.current && (
+				<RoomChat socket={socket.current} />
+			)}
 		</main>
 	);
 }

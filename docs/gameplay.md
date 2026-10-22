@@ -115,7 +115,7 @@ Room hiện cờ ca-rô và chữ FINISH tại một platform đủ điều ki�
 
 ## Items trong Room
 
-Host chọn Items (mặc định Off) khi tạo phòng hoặc tại Lobby; Item Cooldown là số phút nguyên 1–15, mặc định 3. Chỉ đổi trước Start, giữ settings qua Play Again. Áp dụng cho cả bốn mode; không Inventory hoặc chọn loại item.
+Host chọn Items (mặc định Off) tại Lobby, cùng các settings của phòng; Item Cooldown là số phút nguyên 1–15, mặc định 3. Chỉ đổi trước Start, giữ settings qua Play Again. Áp dụng cho cả bốn mode; không Inventory hoặc chọn loại item.
 
 - Hết countdown, server cấp ngẫu nhiên Banana/Rock 50/50, mỗi người một ô. Click/chạm nút vật phẩm để dùng. Dùng thành công mới bắt đầu hồi chiêu; hết hồi cấp ngẫu nhiên tiếp, không tích trữ/cấp đè vật phẩm đang giữ. Không dùng trong menu/chat/spectating, khi charge/splat/trượt/Fly/phasing; Rock dùng được trên không.
 - Banana: click khi đứng trên nền để chuẩn bị, click lại hủy. Cú bật nhảy thật trên nền tiếp theo để lại vỏ chuối tại chân lúc nhảy và bắt đầu hồi chiêu. Air grace/đặt trùng bẫy không tiêu thụ vật phẩm, hủy chuẩn bị. Bẫy hoạt động từ tick tiếp theo, không trúng người đang bay lên. Không có TTL, rời phòng không xóa bẫy; một người giẫm thì bẫy mất, kể cả chủ. Nhiều người cùng chạm một tick chỉ một người trúng, theo thứ tự roster.

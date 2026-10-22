@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import rules from "../../../common/rules.json";
 import { ControlsHelp } from "../components/ControlsHelp";
 import { MenuPanel } from "../components/MenuPanel";
 import { AuthForm } from "../features/account/AuthForm";
@@ -9,7 +8,6 @@ import { HistoryDetail } from "../features/records/HistoryDetail";
 import { HistoryList } from "../features/records/HistoryList";
 import { StatisticsPanel } from "../features/records/StatisticsPanel";
 import { roomFinishScreen } from "../features/rooms/ending";
-import { ItemSettings } from "../features/rooms/ItemSettings";
 import { Lobby } from "../features/rooms/Lobby";
 import { PublicRooms } from "../features/rooms/PublicRooms";
 import { Results } from "../features/rooms/Results";
@@ -65,10 +63,6 @@ function locationScreen(): Screen {
 }
 export function App() {
 	const [screen, setScreenState] = useState<Screen>(locationScreen);
-	const [newRoomItems, setNewRoomItems] = useState({
-		itemsEnabled: false,
-		itemCooldownMinutes: rules.items.cooldownDefaultMinutes,
-	});
 	const [identity, setIdentityState] = useState<Identity>(initialIdentity);
 	const identityRevision = useRef(0);
 	const setIdentity = useCallback((value: Identity) => {
@@ -638,29 +632,10 @@ export function App() {
 					)}
 					{screen === "rooms" && identity.authenticated && (
 						<>
-							<details className="room-create-settings">
-								<summary>New Room Settings</summary>
-								<ItemSettings
-									value={newRoomItems}
-									disabled={pending}
-									onChange={(patch) =>
-										setNewRoomItems((previous) => ({ ...previous, ...patch }))
-									}
-								/>
-							</details>
 							<button
 								type="button"
 								disabled={pending}
-								onClick={() =>
-									command("CREATE_ROOM", {
-										settings: {
-											mode: "RACE",
-											timeLimitMinutes: null,
-											mapLevel: 10,
-											...newRoomItems,
-										},
-									})
-								}
+								onClick={() => command("CREATE_ROOM")}
 							>
 								Create Room
 							</button>

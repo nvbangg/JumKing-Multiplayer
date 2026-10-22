@@ -12,8 +12,8 @@ export function ItemSettings({
 }) {
 	return (
 		<>
-			<label className="mode-setting">
-				Items
+			<label className="mode-setting item-toggle">
+				<span>Items</span>
 				<input
 					type="checkbox"
 					aria-label="Items"

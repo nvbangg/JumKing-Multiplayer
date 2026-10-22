@@ -941,13 +941,6 @@ output.room-code {
 	max-width: 100%;
 	margin-top: 12px;
 }
-.room-create-settings {
-	font-size: 14px;
-}
-.room-create-settings summary {
-	cursor: pointer;
-	padding: 8px;
-}
 .item-control {
 	position: absolute;
 	z-index: 35;
@@ -962,7 +955,18 @@ output.room-code {
 	color: #efdb99;
 }
 
-.mode-setting input[type="checkbox"] {
-	width: auto;
-	justify-self: end;
+.mode-setting.item-toggle {
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	min-height: 44px;
+	cursor: pointer;
+}
+.item-toggle input[type="checkbox"] {
+	flex: 0 0 20px;
+	width: 20px;
+	height: 20px;
+	margin: 0;
+	padding: 0;
+	accent-color: #d8be69;
 }

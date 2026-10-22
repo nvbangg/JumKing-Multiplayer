@@ -49,19 +49,36 @@ for (const mobile of [false, true])
 			await registerOnline(host, "item_host");
 			await registerOnline(peer, "item_peer");
 			await host.getByRole("button", { name: "Room", exact: true }).click();
-			await host.getByText("New Room Settings", { exact: true }).click();
-			await host.getByLabel("Items", { exact: true }).check();
-			await expect(
-				host.getByLabel("Item Cooldown", { exact: true }),
-			).toHaveValue("3");
-			await host.getByLabel("Item Cooldown", { exact: true }).selectOption("1");
+			await expect(host.getByLabel("Items", { exact: true })).toHaveCount(0);
 			await host
 				.getByRole("button", { name: "Create Room", exact: true })
 				.click();
 			const id = (await host.locator(".room-code code").innerText()).trim();
-			await expect(host.getByLabel("Items", { exact: true })).toBeChecked();
+			await expect(host.getByLabel("Items", { exact: true })).not.toBeChecked();
+			await expect(
+				host.getByLabel("Item Cooldown", { exact: true }),
+			).toHaveCount(0);
 			await joinRoom(peer, id);
 			await expect(peer.getByLabel("Items", { exact: true })).toBeDisabled();
+			const toggle = host.locator(".item-toggle");
+			if (mobile) await toggle.tap();
+			else await toggle.click();
+			await expect(peer.getByLabel("Items", { exact: true })).toBeChecked();
+			await expect(
+				host.getByLabel("Item Cooldown", { exact: true }),
+			).toHaveValue("3");
+			await host.getByLabel("Item Cooldown", { exact: true }).selectOption("1");
+			await expect(
+				peer.getByLabel("Item Cooldown", { exact: true }),
+			).toHaveValue("1");
+			const alignment = await toggle.evaluate((label) => {
+				const text = label.querySelector("span")?.getBoundingClientRect();
+				const box = label.querySelector("input")?.getBoundingClientRect();
+				return text && box
+					? Math.abs(text.y + text.height / 2 - box.y - box.height / 2)
+					: Infinity;
+			});
+			expect(alignment).toBeLessThanOrEqual(1);
 			await host.getByLabel("Map", { exact: true }).selectOption("1");
 			await host.screenshot({
 				path: info.outputPath(

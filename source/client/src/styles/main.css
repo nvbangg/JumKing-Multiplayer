@@ -935,49 +935,28 @@ output.room-code {
 	white-space: nowrap;
 }
 
-.lobby-layout {
-	display: grid;
-	grid-template-columns: minmax(220px, 320px) minmax(0, 500px);
-	gap: 24px;
-	width: min(100%, 844px);
-	align-items: start;
+.screen-lobby > .chat-panel {
+	position: fixed;
 }
-.lobby-layout > .chat-panel {
-	position: sticky;
-	top: 12px;
-	width: 100%;
-	max-width: 100%;
-}
-@media (max-width: 680px) {
+@media (max-width: 1000px) {
 	.screen-lobby {
 		height: 100dvh;
 		overflow: hidden;
-		padding-bottom: max(12px, env(safe-area-inset-bottom));
+		padding-bottom: calc(20dvh + 128px + env(safe-area-inset-bottom));
 	}
 	.screen-lobby .brand {
 		flex-shrink: 0;
 		margin-bottom: 16px;
 	}
-	.lobby-layout {
-		grid-template-columns: minmax(0, 1fr);
-		grid-template-rows: minmax(0, 1fr) auto;
-		align-items: stretch;
-		gap: 12px;
+	.screen-lobby .single-panel {
 		flex: 1;
 		min-height: 0;
-		width: min(100%, 500px);
 	}
-	.lobby-layout > .menu-panel {
-		grid-row: 1;
-		min-height: 0;
+	.screen-lobby .menu-panel {
+		max-height: 100%;
 		overflow-y: auto;
 	}
-	.lobby-layout > .chat-panel {
-		grid-row: 2;
-		position: static;
-		width: min(320px, 100%);
-	}
-	.lobby-layout .chat-messages {
+	.screen-lobby .chat-messages {
 		max-height: 20dvh;
 	}
 }

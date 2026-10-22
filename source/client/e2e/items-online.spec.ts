@@ -98,6 +98,13 @@ for (const mobile of [false, true])
 				menuBounds = await host.locator(".menu-panel").boundingBox();
 			if (!chatBounds || !menuBounds)
 				throw new Error("Lobby panels are missing");
+			const viewport = host.viewportSize();
+			if (!viewport) throw new Error("Viewport is missing");
+			expect(chatBounds.x).toBeLessThan(viewport.width / 4);
+			expect(viewport.height - chatBounds.y - chatBounds.height).toBeCloseTo(
+				12,
+				0,
+			);
 			expect(
 				mobile
 					? menuBounds.y + menuBounds.height <= chatBounds.y
@@ -165,8 +172,7 @@ for (const mobile of [false, true])
 					mobile ? "items-mobile.png" : "items-desktop.png",
 				),
 			});
-			const bounds = await button.boundingBox(),
-				viewport = host.viewportSize();
+			const bounds = await button.boundingBox();
 			expect(
 				bounds &&
 					viewport &&

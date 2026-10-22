@@ -475,17 +475,8 @@ export function App() {
 				</header>
 			)}
 			<div
-				className={
-					screen === "lobby"
-						? "lobby-layout"
-						: screen === "home" && home
-							? "home-layout"
-							: "single-panel"
-				}
+				className={screen === "home" && home ? "home-layout" : "single-panel"}
 			>
-				{screen === "lobby" && room && socket.current && (
-					<RoomChat socket={socket.current} />
-				)}
 				<MenuPanel
 					title={
 						screen === "home"
@@ -737,6 +728,9 @@ export function App() {
 					<StatisticsPanel statistics={home.statistics} />
 				)}
 			</div>
+			{screen === "lobby" && room && socket.current && (
+				<RoomChat socket={socket.current} />
+			)}
 		</main>
 	);
 }

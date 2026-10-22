@@ -8,6 +8,7 @@ import jumpking.entity.User;
 import jumpking.exception.ApiException;
 import jumpking.repository.UserRepository;
 import jumpking.room.Memberships;
+import org.springframework.dao.DataIntegrityViolationException;
 import jumpking.security.GoogleTokenVerifier;
 import jumpking.security.IdentityContext;
 import org.springframework.security.authentication.AuthenticationManager;

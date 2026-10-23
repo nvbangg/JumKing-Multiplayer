@@ -21,7 +21,13 @@ declare global {
 							width?: string | number;
 						},
 					) => void;
-					prompt: () => void;
+					prompt: (
+						momentListener?: (notification: {
+							isNotDisplayed: () => boolean;
+							isSkippedMoment: () => boolean;
+							isDismissedMoment: () => boolean;
+						}) => void,
+					) => void;
 				};
 			};
 		};
@@ -128,10 +134,22 @@ export function AuthForm({
 	}, [googleClientId]);
 
 	const triggerGooglePrompt = () => {
+		if (!googleClientId) {
+			setError(
+				"Google Sign-In is not configured yet (missing GOOGLE_CLIENT_ID).",
+			);
+			return;
+		}
 		if (window.google?.accounts?.id) {
-			window.google.accounts.id.prompt();
+			window.google.accounts.id.prompt((notification) => {
+				if (notification.isNotDisplayed()) {
+					setError(
+						"Google prompt was not displayed by browser. Check third-party cookies or browser popup settings.",
+					);
+				}
+			});
 		} else {
-			setError("Google Sign-In is unavailable or blocked by browser");
+			setError("Google Sign-In SDK is loading or blocked by browser.");
 		}
 	};
 

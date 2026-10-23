@@ -50,7 +50,7 @@ class DefaultGoogleTokenVerifierTest {
               "exp": 9999999999
             }
             """);
-    Mockito.when(mockHttp.send(Mockito.any(), Mockito.any())).thenReturn(mockResponse);
+    Mockito.doReturn(mockResponse).when(mockHttp).send(Mockito.any(), Mockito.any());
 
     var verifier = new DefaultGoogleTokenVerifier(settings, json, mockHttp);
     var profile = verifier.verify("valid-test-token");
@@ -75,7 +75,7 @@ class DefaultGoogleTokenVerifierTest {
               "exp": 9999999999
             }
             """);
-    Mockito.when(mockHttp.send(Mockito.any(), Mockito.any())).thenReturn(mockResponse);
+    Mockito.doReturn(mockResponse).when(mockHttp).send(Mockito.any(), Mockito.any());
 
     var verifier = new DefaultGoogleTokenVerifier(settings, json, mockHttp);
     assertThatThrownBy(() -> verifier.verify("token-wrong-audience"))

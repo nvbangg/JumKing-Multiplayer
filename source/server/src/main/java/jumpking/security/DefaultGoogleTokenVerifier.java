@@ -13,14 +13,15 @@ import java.time.Duration;
 import java.time.Instant;
 import jumpking.config.SecuritySettings;
 import jumpking.exception.ApiException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-
 @Component
 public class DefaultGoogleTokenVerifier implements GoogleTokenVerifier {
   private final SecuritySettings settings;
   private final ObjectMapper json;
   private final HttpClient http;
 
+  @Autowired
   public DefaultGoogleTokenVerifier(SecuritySettings settings, ObjectMapper json) {
     this(settings, json, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
   }

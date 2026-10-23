@@ -19,6 +19,8 @@ for (const ravenDone of [false, true])
 			async ({ physics, ravenDone }) => {
 				const renderer = "/src/game/presentation/createGame.ts";
 				const { createGame } = await import(renderer);
+				const adventurePath = "/src/game/simulation/Adventure.ts";
+				const { ADVENTURE } = await import(adventurePath);
 				const manifest = await (await fetch("/assets/manifest.json")).json(),
 					parent = document.createElement("div");
 				document.body.append(parent);
@@ -43,6 +45,21 @@ for (const ravenDone of [false, true])
 							crowned: true,
 						},
 						peers: [],
+						world: {
+							lastTick: physics.ticks,
+							registeredScreens: [],
+							weatherWind: 0,
+							walls: Object.fromEntries(
+								manifest.walls.map((wall: { id: string }) => [
+									wall.id,
+									{
+										touching: false,
+										canPlay: true,
+										fadeTicks: ADVENTURE.tuning.wallFadeTicks,
+									},
+								]),
+							),
+						},
 						ending: signal,
 					}),
 				};

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { api } from "../../network/api";
+import { useResource } from "../../network/useResource";
+import { displayLabel } from "../records/format";
 
 interface PublicRoom {
 	roomId: string;
@@ -9,30 +9,18 @@ interface PublicRoom {
 	capacity: number;
 }
 
-export function PublicRooms({ onJoin }: { onJoin: (roomId: string) => void }) {
-	const [rooms, setRooms] = useState<PublicRoom[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState("");
-	const [revision, setRevision] = useState(0);
-	// biome-ignore lint/correctness/useExhaustiveDependencies: Revision là tín hiệu của nút Refresh.
-	useEffect(() => {
-		let active = true;
-		setLoading(true);
-		setError("");
-		void api<{ rooms: PublicRoom[] }>("/rooms")
-			.then((result) => {
-				if (active) setRooms(result.rooms);
-			})
-			.catch((cause) => {
-				if (active) setError(cause.message);
-			})
-			.finally(() => {
-				if (active) setLoading(false);
-			});
-		return () => {
-			active = false;
-		};
-	}, [revision]);
+export function PublicRooms({
+	onJoin,
+	pending,
+}: {
+	onJoin: (roomId: string) => void;
+	pending: boolean;
+}) {
+	const { data, loading, error, reload } = useResource<{ rooms: PublicRoom[] }>(
+		"/rooms",
+		{ rooms: [] },
+	);
+	const rooms = data.rooms;
 	return (
 		<>
 			{loading && <p role="status">Loading…</p>}
@@ -43,24 +31,16 @@ export function PublicRooms({ onJoin }: { onJoin: (roomId: string) => void }) {
 					<li key={room.roomId}>
 						<button
 							type="button"
-							disabled={loading}
+							disabled={loading || pending}
 							onClick={() => onJoin(room.roomId)}
 						>
-							{room.roomId} ·{" "}
-							{room.mode
-								.split("_")
-								.map((word) => word[0] + word.slice(1).toLowerCase())
-								.join(" ")}{" "}
-							· Map {room.mapLevel} · {room.playerCount}/{room.capacity}
+							{room.roomId} · {displayLabel(room.mode)} · Map {room.mapLevel} ·{" "}
+							{room.playerCount}/{room.capacity}
 						</button>
 					</li>
 				))}
 			</ul>
-			<button
-				type="button"
-				disabled={loading}
-				onClick={() => setRevision((value) => value + 1)}
-			>
+			<button type="button" disabled={loading || pending} onClick={reload}>
 				Refresh
 			</button>
 		</>

@@ -16,7 +16,7 @@ test.skip(
 
 async function captureScene(page: Page): Promise<void> {
 	await page.evaluate(async () => {
-		const path = "/src/game/scenes/TowerScene.ts";
+		const path = "/src/game/presentation/TowerScene.ts";
 		const { TowerScene } = await import(path);
 		const create = TowerScene.prototype.create;
 		TowerScene.prototype.create = function () {
@@ -99,6 +99,18 @@ test("player colors match across browsers while only the local player has full o
 			await (await required(guest).request.get("/api/auth/me")).json()
 		).account.username;
 		const id = await createRoom(required(host));
+		await required(host)
+			.context()
+			.grantPermissions(["clipboard-read", "clipboard-write"]);
+		await required(host)
+			.getByRole("button", { name: "Copy ID", exact: true })
+			.click();
+		await expect(
+			required(host).getByRole("button", { name: "Copied", exact: true }),
+		).toBeVisible();
+		expect(
+			await required(host).evaluate(() => navigator.clipboard.readText()),
+		).toBe(id);
 		await joinRoom(required(guest), id);
 		await startRoom(required(host), required(guest));
 		for (const [index, page] of [required(host), required(guest)].entries()) {

@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
 import { ROOM_MAPS } from "../../game/simulation/roomMaps";
-import { api } from "../../network/api";
 import type { HistoryItem } from "../../network/contracts";
-import { duration } from "./format";
+import { useResource } from "../../network/useResource";
+import { displayLabel, duration } from "./format";
 
 interface Participant {
 	runId: string;
@@ -23,39 +22,23 @@ interface Detail extends HistoryItem {
 	participants?: Participant[];
 }
 export function HistoryDetail({ item }: { item: HistoryItem }) {
-	const [detail, setDetail] = useState<Detail>(item),
-		[loading, setLoading] = useState(true),
-		[error, setError] = useState("");
-	useEffect(() => {
-		let disposed = false;
-		void api<Detail>(`/history/${item.kind}/${encodeURIComponent(item.id)}`)
-			.then((value) => {
-				if (!disposed) setDetail(value);
-			})
-			.catch((cause) => {
-				if (!disposed)
-					setError(
-						cause instanceof Error
-							? cause.message
-							: "Game details could not be loaded",
-					);
-			})
-			.finally(() => {
-				if (!disposed) setLoading(false);
-			});
-		return () => {
-			disposed = true;
-		};
-	}, [item.kind, item.id]);
+	const {
+		data: detail,
+		loading,
+		error,
+	} = useResource<Detail>(
+		`/history/${item.kind}/${encodeURIComponent(item.id)}`,
+		item,
+	);
 	if (loading) return <p role="status">Loading…</p>;
 	if (error) return <p role="alert">{error}</p>;
 	return (
 		<>
 			<dl className="record-detail">
 				<dt>Type</dt>
-				<dd>{detail.kind}</dd>
+				<dd>{displayLabel(detail.kind)}</dd>
 				<dt>Result</dt>
-				<dd>{detail.status}</dd>
+				<dd>{displayLabel(detail.status)}</dd>
 				<dt>Play Time</dt>
 				<dd>{duration(detail.playTimeMs)}</dd>
 				<dt>Finish Time</dt>
@@ -71,7 +54,7 @@ export function HistoryDetail({ item }: { item: HistoryItem }) {
 						<dt>Room</dt>
 						<dd>{detail.room.roomCode}</dd>
 						<dt>Mode</dt>
-						<dd>{detail.room.mode}</dd>
+						<dd>{displayLabel(detail.room.mode)}</dd>
 						<dt>Map</dt>
 						<dd>
 							{detail.room.mapLevel} ·{" "}
@@ -89,7 +72,7 @@ export function HistoryDetail({ item }: { item: HistoryItem }) {
 						<dt>Rank</dt>
 						<dd>{detail.room.rank}</dd>
 						<dt>End</dt>
-						<dd>{detail.endReason}</dd>
+						<dd>{detail.endReason && displayLabel(detail.endReason)}</dd>
 					</>
 				)}
 			</dl>
@@ -102,7 +85,7 @@ export function HistoryDetail({ item }: { item: HistoryItem }) {
 								{player.isWinner ? " · Winner" : ""}
 							</span>
 							<strong>
-								{player.status} ·{" "}
+								{displayLabel(player.status)} ·{" "}
 								{player.finishTimeMs === null
 									? `${Math.floor(player.currentProgress)} px`
 									: duration(player.finishTimeMs)}

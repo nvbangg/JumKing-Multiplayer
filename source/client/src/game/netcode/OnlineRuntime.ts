@@ -78,7 +78,9 @@ export class OnlineRuntime implements GameRuntime {
 		private failed: (message: string) => void = () => {},
 	) {
 		this.game = new GameSimulation(
-			room.kind === "ROOM" ? roomMap(map, room.settings?.mapLevel ?? 10) : map,
+			room.kind === "ROOM"
+				? roomMap(map, required(room.settings).mapLevel)
+				: map,
 			flyAllowed,
 			room.settings?.mode === "NO_WALK",
 		);
@@ -264,7 +266,7 @@ export class OnlineRuntime implements GameRuntime {
 		return this.latest?.spectating?.playId ?? this.latest?.playId ?? "";
 	}
 	frame(): WorldFrame {
-		const saved = this.game.snapshot(),
+		const saved = this.game.view(),
 			self = this.room.members.find(
 				(member) => member.playerId === this.socket.selfId,
 			);

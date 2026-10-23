@@ -3,6 +3,7 @@ import { ControlsHelp } from "../components/ControlsHelp";
 import { MenuPanel } from "../components/MenuPanel";
 import { AuthForm } from "../features/account/AuthForm";
 import { ChangePassword } from "../features/account/ChangePassword";
+import { LobbyChat } from "../features/chat/Chat";
 import { OnlineGame } from "../features/online/OnlineGame";
 import { HistoryDetail } from "../features/records/HistoryDetail";
 import { HistoryList } from "../features/records/HistoryList";
@@ -11,11 +12,8 @@ import { roomFinishScreen } from "../features/rooms/ending";
 import { Lobby } from "../features/rooms/Lobby";
 import { PublicRooms } from "../features/rooms/PublicRooms";
 import { Results } from "../features/rooms/Results";
-import { RoomChat } from "../features/rooms/RoomChat";
 import { OptionsButtons } from "../features/settings/OptionsPanel";
 import { readOptions, saveOptions } from "../features/settings/options";
-import { loadManifest } from "../game/content/assets";
-import { AudioBus } from "../game/presentation/AudioBus";
 import { ApiError, api, backendOrigin, clearCsrf } from "../network/api";
 import type { HistoryItem, Identity, Statistics } from "../network/contracts";
 import {
@@ -25,13 +23,13 @@ import {
 } from "../network/GameSocket";
 import { loadReconnect } from "../network/reconnect";
 import { required } from "../required";
-import { UpdateNotice } from "./UpdateNotice";
+import { LoadErrorNotice, usePreloadError } from "./LoadErrorNotice";
+import { useMenuMusic } from "./useMenuMusic";
 
 type Screen =
 	| "home"
 	| "online"
 	| "sign-in"
-	| "register"
 	| "account"
 	| "history"
 	| "detail"
@@ -51,7 +49,6 @@ const routes: Partial<Record<Screen, string>> = {
 	options: "/options",
 	account: "/account",
 	"sign-in": "/sign-in",
-	register: "/register",
 };
 const REMOVED_FROM_ROOM =
 	"Your room membership has ended. For Community, use Continue to load the last server checkpoint.";
@@ -63,6 +60,7 @@ function locationScreen(): Screen {
 			)?.[0] as Screen | undefined) || "home";
 }
 export function App() {
+	const loadError = usePreloadError();
 	const [screen, setScreenState] = useState<Screen>(locationScreen);
 	const [identity, setIdentityState] = useState<Identity>(initialIdentity);
 	const identityRevision = useRef(0);
@@ -131,26 +129,7 @@ export function App() {
 		: "";
 	const home = homeData?.accountId === accountId ? homeData : null;
 	const playing = screen === "online";
-	useEffect(() => {
-		if (playing || !options.sound) return;
-		let disposed = false,
-			music: AudioBus | undefined;
-		const controller = new AbortController();
-		void loadManifest(controller.signal)
-			.then((manifest) => {
-				if (disposed) return;
-				music = new AudioBus(manifest, true, setError, false);
-				music.setMusic("audio/music/menu loop/menu_loop");
-			})
-			.catch(() => {
-				if (!disposed) setError("Menu sound could not be loaded");
-			});
-		return () => {
-			disposed = true;
-			controller.abort();
-			music?.dispose();
-		};
-	}, [playing, options.sound]);
+	useMenuMusic(playing, options.sound, setError);
 	const back = () => {
 		const next =
 			screen === "public-rooms"
@@ -401,23 +380,22 @@ export function App() {
 	const updateOptions = (key: keyof typeof options) => {
 		const next = { ...options, [key]: !options[key] };
 		setOptions(next);
-		try {
-			saveOptions(next);
-			setError("");
-		} catch {
-			setError("Options could not be saved on this device");
-		}
+		saveOptions(next);
 	};
 
 	const displayedError = navigationError || error;
 	if (screen === "online" && room && socket.current)
 		return (
 			<>
-				<UpdateNotice canReload={false} />
+				<LoadErrorNotice failed={loadError} canReload={false} />
 				<OnlineGame
 					room={room}
 					socket={socket.current}
 					navigationError={navigationError}
+					options={options}
+					onOptionsChange={updateOptions}
+					accountId={accountId}
+					totalJumps={home?.statistics.totalJumps}
 					onResults={() => {
 						viewedEnding.current = resultRef.current?.playId || null;
 						setScreen("results");
@@ -462,7 +440,8 @@ export function App() {
 		);
 	return (
 		<main className={`home screen-${screen}`}>
-			<UpdateNotice
+			<LoadErrorNotice
+				failed={loadError}
 				canReload={
 					screen === "home" && !room && !pending && !socket.current?.selfId
 				}
@@ -484,7 +463,6 @@ export function App() {
 							: (
 									{
 										"sign-in": "Sign In",
-										register: "Sign In",
 										password: "Change Password",
 										rooms: "Room",
 										account: "Account",
@@ -554,7 +532,7 @@ export function App() {
 							</div>
 						</>
 					)}
-					{(screen === "sign-in" || screen === "register") && (
+					{screen === "sign-in" && (
 						<AuthForm
 							key={screen}
 							onSuccess={(value) => {
@@ -679,6 +657,7 @@ export function App() {
 					)}
 					{screen === "public-rooms" && identity.authenticated && (
 						<PublicRooms
+							pending={pending}
 							onJoin={(roomId) => command("JOIN_ROOM", { roomId })}
 						/>
 					)}
@@ -704,6 +683,7 @@ export function App() {
 					{screen === "home" && connectionNotice && (
 						<p role="status">{connectionNotice}</p>
 					)}
+					{pending && <p role="status">Please wait…</p>}
 					{displayedError && (
 						<p className="error" role="alert">
 							{displayedError}
@@ -729,7 +709,7 @@ export function App() {
 				)}
 			</div>
 			{screen === "lobby" && room && socket.current && (
-				<RoomChat socket={socket.current} />
+				<LobbyChat socket={socket.current} />
 			)}
 		</main>
 	);

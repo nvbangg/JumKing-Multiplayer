@@ -1,12 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import rules from "../../../../common/rules.json";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ControlsHelp } from "../../components/ControlsHelp";
 import { MenuPanel } from "../../components/MenuPanel";
-import { NetworkStatusBadge } from "../../components/NetworkStatusBadge";
 import { loadManifest } from "../../game/content/assets";
 import { FlightToggle } from "../../game/input/FlightToggle";
-import { InputController } from "../../game/input/InputController";
-import { TouchControls } from "../../game/input/TouchControls";
+import type { InputController } from "../../game/input/InputController";
 import type { RoomItemsView } from "../../game/items";
 import { AdventureEffects } from "../../game/netcode/AdventureEffects";
 import {
@@ -26,24 +23,43 @@ import type {
 } from "../../network/contracts";
 import type { GameSocket, RoomState } from "../../network/GameSocket";
 import { required } from "../../required";
+import { Chat } from "../chat/Chat";
+import { useChat } from "../chat/useChat";
 import { InGameLeaderboard } from "../community/InGameLeaderboard";
 import { duration } from "../records/format";
-import { ChatOverlay } from "../rooms/ChatOverlay";
-import { PlayersPanel } from "../rooms/PlayersPanel";
-import { useRoomChat } from "../rooms/useRoomChat";
+import { RoomCode } from "../rooms/RoomCode";
 import { OptionsButtons } from "../settings/OptionsPanel";
-import { type Options, readOptions, saveOptions } from "../settings/options";
+import type { Options } from "../settings/options";
+import { createGameControls } from "./gameControls";
+import { NetworkStatusBadge } from "./NetworkStatusBadge";
+import { PlayersPanel } from "./PlayersPanel";
+import { TouchControls } from "./TouchControls";
+import { TutorialGuide } from "./TutorialGuide";
+import {
+	isTutorialCompleted,
+	nextTutorialStep,
+	saveTutorialCompleted,
+	type TutorialStep,
+} from "./tutorial";
 
 export function OnlineGame({
 	socket,
 	room,
 	navigationError,
+	options,
+	onOptionsChange,
+	accountId,
+	totalJumps,
 	onHome,
 	onResults,
 }: {
 	socket: GameSocket;
 	room: RoomState;
 	navigationError: string;
+	options: Options;
+	onOptionsChange: (key: keyof Options) => void;
+	accountId?: string;
+	totalJumps?: number;
 	onHome: (message: string) => void;
 	onResults: () => void;
 }) {
@@ -56,12 +72,16 @@ export function OnlineGame({
 		[menu, setMenu] = useState<"pause" | "options" | null>(null);
 	const flight = useRef<FlightToggle | null>(null);
 	const [flying, setFlying] = useState(false);
-	const [options, setOptions] = useState(readOptions);
+	const sound = useRef(options.sound);
+	sound.current = options.sound;
 	const [error, setError] = useState(""),
 		[pending, setPending] = useState(false),
 		[elapsed, setElapsed] = useState(0),
 		[saveStatus, setSaveStatus] = useState("SAVED");
-	const [items, setItems] = useState<RoomItemsView | null>(null);
+	const [items, setItems] = useState<Pick<
+		RoomItemsView,
+		"held" | "bananaArmed" | "cooldownMs"
+	> | null>(null);
 	const [itemPending, setItemPending] = useState(false);
 	const placingItem = useRef(false);
 	const [remaining, setRemaining] = useState<number | null>(null);
@@ -87,9 +107,22 @@ export function OnlineGame({
 	}, [socket]);
 	const [ending, setEnding] = useState<"playing" | "picture" | null>(null),
 		[pictureReady, setPictureReady] = useState(false);
+	const [tutorialStep, setTutorialStep] = useState<TutorialStep | null>(() =>
+		room.kind === "ROOM" || isTutorialCompleted(accountId, totalJumps)
+			? null
+			: "move",
+	);
+	const tutorialRef = useRef<TutorialStep | null>(tutorialStep);
+	tutorialRef.current = tutorialStep;
+	const tutorialOrigin = useRef<{ x: number; jumps: number } | null>(null);
+	const dismissTutorial = useCallback(() => {
+		tutorialRef.current = null;
+		setTutorialStep(null);
+		saveTutorialCompleted(accountId);
+	}, [accountId]);
 	const endingActive = useRef(false),
 		skipEnding = useRef<(() => void) | null>(null);
-	const chat = useRoomChat(
+	const chat = useChat(
 		socket,
 		ready && !ending,
 		() => {
@@ -209,38 +242,24 @@ export function OnlineGame({
 		let disposed = false,
 			game: { destroy(removeCanvas: boolean): void } | undefined;
 		const controller = new AbortController();
-		let lastActivity = performance.now();
 		const effects = new PlayerEffects(),
 			adventureEffects = new AdventureEffects();
 		let cueManifest: Awaited<ReturnType<typeof loadManifest>> | null = null;
-		const controls = new InputController(
-			() => {
-				lastActivity = performance.now();
-			},
-			() => pauseRef.current(),
-			() => {
+		const bindings = createGameControls({
+			pause: () => pauseRef.current(),
+			cancel: () => {
 				runtime.current?.cancel();
 				flight.current?.cancel();
 			},
-			(now) => flight.current?.press(now),
-		);
-		input.current = controls;
-		const afk = window.setInterval(() => {
-			if (
+			jump: (now) => flight.current?.press(now),
+			pauseWhenIdle: () =>
 				latestRoom.current.kind === "ROOM" &&
-				runtime.current &&
+				!!runtime.current &&
 				!runtime.current.menu &&
-				!runtime.current.latest?.spectating &&
-				performance.now() - lastActivity >= rules.afkMs
-			)
-				pauseRef.current();
-		}, PRESENTATION.afkPollMs);
-		const hidden = () => {
-			if (document.hidden) pauseRef.current();
-		};
-		const blur = () => pauseRef.current();
-		document.addEventListener("visibilitychange", hidden);
-		window.addEventListener("blur", blur);
+				!runtime.current.latest?.spectating,
+		});
+		const controls = bindings.input;
+		input.current = controls;
 		const unsubscribe = socket.subscribe((type, payload) => {
 			try {
 				if (type === "GAME_SNAPSHOT") runtime.current?.receive(payload);
@@ -326,18 +345,47 @@ export function OnlineGame({
 			]);
 			if (disposed) return;
 			cueManifest = manifest;
-			audio.current = new AudioBus(manifest, readOptions().sound, setError);
+			audio.current = new AudioBus(manifest, sound.current, setError);
 			const session = new OnlineRuntime(
 				parseMap(mapData),
 				socket,
 				latestRoom.current,
 				() => controls.read(),
 				(state, snapshot) => {
-					setElapsed(snapshot.elapsedTimeMs);
-					setItems(snapshot.items ?? null);
-					setRemaining(snapshot.remainingTimeMs);
+					setElapsed(Math.floor(snapshot.elapsedTimeMs / 1000) * 1000);
+					const item = snapshot.items;
+					setItems((previous) => {
+						if (!item) return null;
+						const cooldownMs = Math.ceil(item.cooldownMs / 1000) * 1000;
+						return previous?.held === item.held &&
+							previous.bananaArmed === item.bananaArmed &&
+							previous.cooldownMs === cooldownMs
+							? previous
+							: { held: item.held, bananaArmed: item.bananaArmed, cooldownMs };
+					});
+					setRemaining(
+						snapshot.remainingTimeMs === null
+							? null
+							: Math.ceil(snapshot.remainingTimeMs / 1000) * 1000,
+					);
 					setFlying(state.freeFlight);
-					setPlayers(snapshot.players || []);
+					setPlayers((previous) => {
+						const next = snapshot.players ?? [];
+						return previous.length === next.length &&
+							next.every((player, i) => {
+								const old = required(previous[i]);
+								return (
+									old.playerId === player.playerId &&
+									old.nickname === player.nickname &&
+									old.colorSlot === player.colorSlot &&
+									old.rank === player.rank &&
+									Math.floor(old.currentProgress) ===
+										Math.floor(player.currentProgress)
+								);
+							})
+							? previous
+							: next;
+					});
 					const view = snapshot.spectating;
 					if (
 						viewedPlayer.current &&
@@ -353,7 +401,16 @@ export function OnlineGame({
 					}
 					if (!view) returningToSelf.current = false;
 					viewedPlayer.current = view?.player.playerId ?? null;
-					setWatching(view ?? null);
+					setWatching((previous) => {
+						if (!view) return null;
+						return previous?.player.playerId === view.player.playerId &&
+							previous.player.nickname === view.player.nickname &&
+							previous.paused === view.paused &&
+							Math.floor(previous.elapsedTimeMs / 1000) ===
+								Math.floor(view.elapsedTimeMs / 1000)
+							? previous
+							: view;
+					});
 					if (view) controls.cancel();
 					const intro = (view?.world ?? snapshot.self.simulation.world)
 						.regionIntro;
@@ -383,6 +440,26 @@ export function OnlineGame({
 						controls.cancel();
 						setMenu("pause");
 						audio.current?.pause(true);
+					}
+					if (
+						tutorialRef.current &&
+						!view &&
+						!session.menu &&
+						!snapshot.self.paused
+					) {
+						const physics = snapshot.self.simulation.physics;
+						if (tutorialOrigin.current === null)
+							tutorialOrigin.current = { x: physics.x, jumps: physics.jumps };
+						const next = nextTutorialStep(
+							tutorialRef.current,
+							physics,
+							tutorialOrigin.current,
+						);
+						if (next !== tutorialRef.current) {
+							tutorialRef.current = next;
+							setTutorialStep(next);
+							if (next === "completed") saveTutorialCompleted(accountId);
+						}
 					}
 				},
 				config.features.flyEnabled,
@@ -452,9 +529,8 @@ export function OnlineGame({
 		return () => {
 			disposed = true;
 			controller.abort();
-			clearInterval(afk);
 			unsubscribe();
-			controls.dispose();
+			bindings.dispose();
 			runtime.current?.cancel();
 			runtime.current = null;
 			input.current = null;
@@ -462,8 +538,6 @@ export function OnlineGame({
 			game?.destroy(true);
 			audio.current?.dispose();
 			audio.current = null;
-			document.removeEventListener("visibilitychange", hidden);
-			window.removeEventListener("blur", blur);
 		};
 	}, [socket, room.roomId, chat.closeChat]);
 	const command = async (
@@ -532,16 +606,9 @@ export function OnlineGame({
 			setPending(false);
 		}
 	};
-	const updateOptions = (key: keyof Options) => {
-		const next = { ...options, [key]: !options[key] };
-		setOptions(next);
-		audio.current?.setEnabled(next.sound);
-		try {
-			saveOptions(next);
-		} catch {
-			setError("Options could not be saved on this device");
-		}
-	};
+	useEffect(() => {
+		audio.current?.setEnabled(options.sound);
+	}, [options.sound]);
 	const displayedError = navigationError || error;
 	const captionPaused =
 		!!menu || !!ending || disconnected || room.state === "COUNTDOWN";
@@ -595,22 +662,16 @@ export function OnlineGame({
 			{ready && !ending && (
 				<div className="game-hud">
 					<span>
-						{
-							<span className="timer" role="timer" aria-label="Play time">
-								{duration(watching?.elapsedTimeMs ?? elapsed)}
-							</span>
-						}
+						<span className="timer" role="timer" aria-label="Play time">
+							{duration(watching?.elapsedTimeMs ?? elapsed)}
+						</span>
 						{remaining !== null && (
 							<span className="timer" role="timer" aria-label="Time left">
 								Time Left: {duration(Math.ceil(remaining / 1000) * 1000)}
 							</span>
 						)}
 					</span>
-					{room.kind === "ROOM" && (
-						<output className="room-code" aria-label="Room ID">
-							{room.roomId}
-						</output>
-					)}
+					{room.kind === "ROOM" && <RoomCode roomId={room.roomId} />}
 					<span>
 						<NetworkStatusBadge quality={networkQuality} />
 						<button
@@ -665,6 +726,15 @@ export function OnlineGame({
 			{ready && !ending && !menu && !chat.open && !watching && (
 				<TouchControls input={input} flying={flying} />
 			)}
+			{ready &&
+				!ending &&
+				!menu &&
+				!chat.open &&
+				!watching &&
+				room.kind === "COMMUNITY" &&
+				tutorialStep && (
+					<TutorialGuide step={tutorialStep} onDismiss={dismissTutorial} />
+				)}
 			{ready && watching && !ending && !menu && (
 				<div className="spectator-bar" role="status">
 					<span
@@ -713,7 +783,7 @@ export function OnlineGame({
 					)}
 				</div>
 			)}
-			{ready && !ending && <ChatOverlay chat={chat} socket={socket} />}
+			{ready && !ending && <Chat chat={chat} socket={socket} dismissible />}
 			{ready && !ending && !menu && (
 				<>
 					<button
@@ -873,7 +943,7 @@ export function OnlineGame({
 						) : (
 							<OptionsButtons
 								options={options}
-								onChange={updateOptions}
+								onChange={onOptionsChange}
 								onError={setError}
 							/>
 						)}

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { NETWORK } from "../network/config";
-import type { ChatMessage } from "../network/contracts";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { NETWORK } from "../../network/config";
+import type { ChatMessage } from "../../network/contracts";
 
 export function ChatMessages({
 	messages,
@@ -10,27 +10,77 @@ export function ChatMessages({
 	colors: readonly string[];
 }) {
 	const list = useRef<HTMLDivElement>(null);
-	// biome-ignore lint/correctness/useExhaustiveDependencies: Tin nhắn đổi cần cuộn DOM đã render xuống cuối.
-	useEffect(() => {
-		if (list.current) list.current.scrollTop = list.current.scrollHeight;
+	const follow = useRef(true);
+	const anchor = useRef<{ id: string; offset: number } | null>(null);
+	const [away, setAway] = useState(false);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: Khôi phục vị trí đọc sau khi danh sách tin thay đổi.
+	useLayoutEffect(() => {
+		const element = list.current;
+		if (!element) return;
+		if (follow.current) element.scrollTop = element.scrollHeight;
+		else if (anchor.current) {
+			const saved = anchor.current;
+			const message = Array.from(element.children).find(
+				(child) => (child as HTMLElement).dataset.messageId === saved.id,
+			);
+			element.scrollTop = message
+				? element.scrollTop +
+					message.getBoundingClientRect().top -
+					element.getBoundingClientRect().top -
+					saved.offset
+				: 0;
+		}
 	}, [messages]);
 	return (
-		<div
-			ref={list}
-			className="chat-messages"
-			role="log"
-			aria-label="Messages"
-			aria-live="polite"
-		>
-			{messages.map((message) => (
-				<p key={message.id}>
-					<strong style={{ color: colors[message.colorSlot] || "#ffffff" }}>
-						{message.nickname}:{" "}
-					</strong>
-					{message.text}
-				</p>
-			))}
-		</div>
+		<>
+			<div
+				ref={list}
+				className="chat-messages"
+				role="log"
+				aria-label="Messages"
+				aria-live="polite"
+				onScroll={(event) => {
+					const element = event.currentTarget;
+					follow.current =
+						element.scrollHeight - element.clientHeight - element.scrollTop <=
+						24;
+					setAway(!follow.current);
+					const top = element.getBoundingClientRect().top;
+					const first = Array.from(element.children).find(
+						(child) => child.getBoundingClientRect().bottom > top,
+					);
+					anchor.current = first
+						? {
+								id: (first as HTMLElement).dataset.messageId || "",
+								offset: first.getBoundingClientRect().top - top,
+							}
+						: null;
+				}}
+			>
+				{messages.map((message) => (
+					<p key={message.id} data-message-id={message.id}>
+						<strong style={{ color: colors[message.colorSlot] || "#ffffff" }}>
+							{message.nickname}:{" "}
+						</strong>
+						{message.text}
+					</p>
+				))}
+			</div>
+			{away && (
+				<button
+					className="chat-latest"
+					type="button"
+					onClick={() => {
+						follow.current = true;
+						setAway(false);
+						if (list.current)
+							list.current.scrollTop = list.current.scrollHeight;
+					}}
+				>
+					Latest
+				</button>
+			)}
+		</>
 	);
 }
 export function ChatPanel({
@@ -40,7 +90,6 @@ export function ChatPanel({
 	onClose,
 	onFocus,
 	onBlur,
-	messageLimit,
 	focusRequest = 0,
 }: {
 	messages: ChatMessage[];
@@ -49,18 +98,12 @@ export function ChatPanel({
 	onClose?: () => void;
 	onFocus?: () => void;
 	onBlur?: () => void;
-	messageLimit?: number;
 	focusRequest?: number;
 }) {
 	const [text, setText] = useState(""),
 		[error, setError] = useState(""),
 		[sending, setSending] = useState(false);
 	const input = useRef<HTMLInputElement>(null);
-	const displayMessages = useMemo(
-		() =>
-			messageLimit === undefined ? messages : messages.slice(-messageLimit),
-		[messages, messageLimit],
-	);
 	useEffect(() => {
 		if (focusRequest > 0) input.current?.focus();
 	}, [focusRequest]);
@@ -80,9 +123,9 @@ export function ChatPanel({
 				}
 			}}
 		>
-			{displayMessages.length > 0 && (
+			{messages.length > 0 && (
 				<section className="chat-history-box" aria-label="Chat messages">
-					<ChatMessages messages={displayMessages} colors={colors} />
+					<ChatMessages messages={messages} colors={colors} />
 				</section>
 			)}
 			<section className="chat-input-box" aria-label="Chat input">
@@ -113,12 +156,16 @@ export function ChatPanel({
 							);
 							return;
 						}
+						const sentText = text;
 						setSending(true);
 						setError("");
-						void onSend(text)
+						void onSend(sentText)
 							.then(() => {
-								setText("");
-								if (onClose) {
+								// ACK chậm không được xóa draft mới hoặc đóng chat khi đang viết tiếp.
+								const hasNewDraft = input.current?.value !== sentText;
+								setText((current) => (current === sentText ? "" : current));
+								if (hasNewDraft) input.current?.focus();
+								else if (onClose) {
 									input.current?.form
 										?.querySelector<HTMLElement>(":focus")
 										?.blur();

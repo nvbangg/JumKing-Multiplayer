@@ -7,21 +7,22 @@ import {
 	type Npc,
 	type Prop,
 } from "../content/assets";
-import { AdventureVisuals } from "../presentation/AdventureVisuals";
-import { ConversationVisuals } from "../presentation/ConversationVisuals";
-import { PLAYER_FRAMES, PRESENTATION as V } from "../presentation/config";
-import { ENDING_FRAMES, endingFrameName } from "../presentation/endingFrames";
-import { MainBabeEnding } from "../presentation/MainBabeEnding";
-import { playerFrame } from "../presentation/playerFrame";
+import { PHYSICS } from "../simulation/tuning";
+import { AdventureVisuals } from "./AdventureVisuals";
+import { ConversationVisuals } from "./ConversationVisuals";
+import { PLAYER_FRAMES, PRESENTATION as V } from "./config";
+import { ENDING_FRAMES, endingFrameName } from "./endingFrames";
+import { MainBabeEnding } from "./MainBabeEnding";
+import { playerFrame } from "./playerFrame";
 import type {
 	GameRuntime,
 	PresentationHooks,
 	RenderPlayer,
 	WorldFrame,
-} from "../presentation/types";
-import { PHYSICS } from "../simulation/tuning";
+} from "./types";
 
 interface Avatar {
+	color?: string;
 	sprite: Phaser.GameObjects.Sprite;
 	name: Phaser.GameObjects.Text;
 	crown: Phaser.GameObjects.Sprite;
@@ -45,8 +46,6 @@ export class TowerScene extends Phaser.Scene {
 		durations: number[];
 		duration: number;
 	}[] = [];
-	private lastTick = 0;
-	private weatherWind = 0;
 	private screen = -1;
 	private ready = false;
 	private itemGraphics?: Phaser.GameObjects.Graphics;
@@ -115,18 +114,6 @@ export class TowerScene extends Phaser.Scene {
 		this.render(frame);
 		const state = frame.self.state,
 			world = frame.world;
-		if (world) this.weatherWind = world.weatherWind;
-		else
-			for (let tick = this.lastTick + 1; tick <= state.ticks; tick++) {
-				const phase = (tick / PHYSICS.tickRate) * PHYSICS.windFrequency;
-				const force =
-					Math.max(
-						-1,
-						Math.min(1, 2 * Math.sin(phase) + (Math.cos(phase) > 0 ? 1 : -1)),
-					) * PHYSICS.windAcceleration;
-				this.weatherWind = state.wind ? this.weatherWind - (force * 2) / 3 : 0;
-			}
-		this.lastTick = state.ticks;
 		const seconds = state.ticks / PHYSICS.tickRate;
 		for (const layer of this.background)
 			layer.sprite.tilePositionX = layer.speed * seconds;
@@ -139,7 +126,7 @@ export class TowerScene extends Phaser.Scene {
 				),
 			);
 			weather.sprite.tilePositionX =
-				this.weatherWind *
+				world.weatherWind *
 				required(this.manifest.textures[required(weather.textures[0])]).width;
 		}
 		for (const { sprite, data, durations, duration } of this.props) {
@@ -184,6 +171,12 @@ export class TowerScene extends Phaser.Scene {
 			};
 			this.avatars.set(player.id, avatar);
 		}
+		if (avatar.color !== player.color) {
+			avatar.color = player.color;
+			avatar.sprite.setTint(
+				Phaser.Display.Color.HexStringToColor(player.color).color,
+			);
+		}
 		const s = player.state,
 			visible = s.screen === this.screen;
 		avatar.sprite
@@ -195,7 +188,6 @@ export class TowerScene extends Phaser.Scene {
 			.setFlipX(s.direction === -1)
 			.setAlpha(self ? 1 : V.peerOpacity)
 			.setDepth(self ? V.selfDepth : V.peerDepth)
-			.setTint(Phaser.Display.Color.HexStringToColor(player.color).color)
 			.setVisible(visible);
 		avatar.name.setText(player.nickname);
 		avatar.name

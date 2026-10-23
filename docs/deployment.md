@@ -28,6 +28,8 @@ Backend nạp `config/application-<profile>.properties` theo working directory. 
 | VITE_BACKEND_ORIGIN | Để trống khi cùng origin; chỉ đặt origin backend khi tách frontend |
 
 JAR dùng URL cùng origin cho HTTP/WS, không cần gắn địa chỉ backend vào frontend. `VITE_*` là dữ liệu công khai tại thời điểm build. Credentials, keystore, session, dumps và file cấu hình thật nằm ngoài Git; không đặt secrets trong frontend.
+Chi tiết các bước đăng ký Client ID và xác minh tên miền trên Google Cloud Console xem tại [google-oauth-setup](google-oauth-setup.md).
+
 
 ## MySQL
 
